@@ -82,7 +82,7 @@ For every Azure resource, from the subscription down to the Storage account, the
 
 ```
 Subscription        ( ) Create new        (•) Select existing
-                    [ sub-sportify-dev  ▼ ]   ← populated from azure-discovery-service
+                    [ sub-sportify-dev  ▼ ]   ← populated from azure-discovery
 
 Resource group      ( ) Create new        (•) Select existing
                     [ rg-sportify-apps-dev  (uksouth)  ▼ ]
@@ -108,11 +108,18 @@ Some resources have stricter rules when **Create new** is chosen:
 
 | Resource | Create new behaviour |
 |---|---|
-| Subscription | Uses subscription vending through the `Microsoft.Subscription` alias API. It needs an Enterprise Agreement or Microsoft Customer Agreement billing scope, a separate vending identity and platform-team approval. The new subscription is placed under the configured management group. |
-| AKS cluster, container registry | Provisioned through the shared platform modules in `iac/`, not the application repository. They require platform-team approval, and the new cluster or registry becomes a shared, reusable target for later requests rather than a one-off for this application. |
-| Resource group, namespace, Storage, Key Vault, managed identity | Provisioned from the application repository's Terraform, with the normal plan-and-approve flow. |
+| Subscription | Subscription vending through the `Microsoft.Subscription` alias API, in the platform stack `iac/platform/05-subscriptions`. It needs an Enterprise Agreement or Microsoft Customer Agreement billing scope and a separate vending identity. The new subscription is placed under the configured management group. |
+| AKS cluster, container registry | Added to the shared platform stack (`iac/platform/20-shared-<env>`), not the application repository. The new cluster or registry becomes a shared, reusable target for later requests rather than a one-off for this application. |
+| Resource group, namespace, Storage, Key Vault, managed identity | Provisioned from the application repository's Terraform, with the normal plan-and-approve flow in Backstage. |
 
-Resources created at subscription or cluster level have higher cost and blast radius, so they require an extra approval step and are listed separately in the plan summary.
+**Platform-level resources follow the platform's own change process.** For a new subscription, AKS cluster or registry, the orchestrator opens a pull request in the platform repository that adds the definition. The platform team reviews it, `platform-plan.yml` plans it, and `platform-apply.yml` applies it behind the `platform` GitHub environment's **required reviewers**. Backstage shows this as the `PLATFORM_PROVISIONING` stage, with links to the pull request and the run, but **doesn't approve it**: the portal never approves changes to its own infrastructure. Once applied, the request continues with the new resource as an existing one.
+
+**Create new is implemented for every resource in milestone 1**, but the form only offers what the selected subscription can support. Discovery reports these capabilities (`GET /v1/subscriptions/{id}/capabilities`), and unsupported options are disabled with the reason, for example:
+- *New subscription:* disabled unless the billing account is EA or MCA. A free or pay-as-you-go account can't vend subscriptions.
+- *New AKS cluster:* disabled if the regional vCPU quota can't fit it.
+- *High availability:* rejected if the cluster doesn't span at least two zones.
+
+The first demo uses **Select existing** on a **free Azure subscription**; see [docs/operations/demo-environment.md](docs/operations/demo-environment.md).
 
 If discovery returns nothing to select, for example because the identity lacks `Reader` or nothing is allowlisted, the form disables **Select existing** and shows the reason instead of an empty dropdown.
 
@@ -144,8 +151,8 @@ flowchart LR
     end
 
     subgraph Python["Platform services · Python (FastAPI)"]
-        Disc[azure-discovery-service]
-        Orch[provisioning-orchestrator-service<br/>API + worker]
+        Disc[azure-discovery]
+        Orch[provisioning-orchestrator<br/>API + worker]
         Orch --> DB[(PostgreSQL<br/>workflow state + audit)]
         Orch -- validate --> Disc
         Disc --> Policy[/policies<br/>allowlists/]
@@ -170,9 +177,9 @@ flowchart LR
 | **Software Catalog** | Ownership, metadata and discovery of services, including generated applications |
 | **Scaffolder + Software Templates** | Self-service request form and repository generation, using the built-in `fetch:template`, `publish:github` and `catalog:register` actions |
 | **`sportify-platform-backend`** (TypeScript, thin bridge) | One small backend plugin. It forwards discovery and orchestrator calls to the Python services with the signed-in user's identity and a service token. It also adds two scaffolder actions, `sportify:request:submit` and `sportify:request:repository-created`. It contains no business logic |
-| **`sportify-platform`** (TypeScript, thin frontend) | A scaffolder field extension that provides the **Create new / Select existing** resource picker, and an entity card that shows provisioning status. Both only call the bridge |
-| **`azure-discovery-service`** (Python, FastAPI) | Standalone, read-only REST service. It lists the existing subscriptions visible to the discovery identity (the same ones shown in the Azure portal), then their resource groups, AKS clusters, registries and data services, using ARM and Azure Resource Graph. Results are filtered against the policy allowlists before they are returned |
-| **`provisioning-orchestrator-service`** (Python, FastAPI + worker) | Durable asynchronous workflow engine. It owns request validation, the state machine, idempotency, GitHub workflow dispatch, approval tracking, retries, cleanup and the audit log, with state stored in PostgreSQL |
+| **`sportify-platform`** (TypeScript, thin frontend) | A scaffolder field extension that provides the **Create new / Select existing** resource picker, the **Provisioning** entity tab (stage timeline, URLs), and the **Approvals** page. All of them only call the bridge |
+| **`azure-discovery`** (Python, FastAPI) | Standalone, read-only REST service. It lists the existing subscriptions visible to the discovery identity (the same ones shown in the Azure portal), then their resource groups, AKS clusters, registries and data services, using ARM and Azure Resource Graph. Results are filtered against the policy allowlists before they are returned |
+| **`provisioning-orchestrator`** (Python, FastAPI + worker) | Durable asynchronous workflow engine. It owns request validation, the state machine, idempotency, GitHub workflow dispatch, approval tracking, retries, cleanup and the audit log, with state stored in PostgreSQL |
 | **Policies** | Allowlists for subscriptions, regions, environments, clusters, resource types and operations, enforced on the server |
 | **TechDocs** | Architecture, onboarding, service and operations documentation |
 | **GitHub integration** | Repository creation, workflow dispatch, environment approvals and run status |
@@ -181,17 +188,17 @@ flowchart LR
 
 - **Backstage (TypeScript)** provides what it already does well: the catalog, scaffolder, TechDocs, sign-in, permissions and the GitHub integration. Custom TypeScript is limited to one bridge backend plugin and one small frontend plugin, built on the new backend system and its extension points.
 - **Python (FastAPI)** holds all platform business logic: Azure discovery, policy evaluation and workflow orchestration. It uses the official Azure SDKs for Python and can be tested and released independently of Backstage.
-- The browser only ever talks to Backstage. The Python services are reachable only from the Backstage backend and from GitHub webhooks, which are verified with an HMAC signature.
+- The browser only ever talks to Backstage. The Python services are reachable only from the Backstage backend and from each other (the orchestrator calls discovery). Two orchestrator paths are reachable from GitHub: webhooks (HMAC-verified) and Actions callbacks (verified with GitHub OIDC tokens).
 
 ### Request flow
 
 1. **Submit.** The developer fills in the whole scaffolder form. The resource pickers load their options from the discovery service through the bridge.
-2. **Validate.** `sportify:request:submit` sends the request to the orchestrator, using the scaffolder task ID as the idempotency key. The orchestrator re-validates every selection through the discovery service and the policies. It then returns a request ID, or rejects the request before any repository exists.
+2. **Validate.** `sportify:request:submit` sends the request to the orchestrator, using the scaffolder task ID as the idempotency key. The orchestrator re-validates every selection through the discovery service and the policies. It then returns a request ID, or rejects the request before any repository exists. If the request asks for a new subscription, AKS cluster or registry, the orchestrator first raises the platform pull request and waits for it to be applied (`PLATFORM_PROVISIONING`).
 3. **Repository.** The built-in `publish:github` creates the repository with **infrastructure code only**, and `catalog:register` registers it. `sportify:request:repository-created` reports it to the orchestrator, and the scaffolder task finishes.
 4. **Infrastructure.** The orchestrator dispatches the validate and plan workflows. The apply job is held until a reviewer **approves in the Backstage UI** (see [Approval in Backstage](#approval-in-backstage)). It then applies the saved plan.
 5. **Application.** Once the infrastructure is ready, the orchestrator opens a pull request that adds the application for the chosen stack: source, tests, Dockerfile and CI/CD. It merges the pull request when the checks pass.
 6. **Deploy.** CI builds, scans and pushes the image. The deploy workflow installs the Helm chart on AKS, then smoke-tests the endpoint.
-7. **Report.** The orchestrator follows every step through `workflow_run`, `deployment` and `deployment_protection_rule` webhooks, with periodic polling to catch lost events. The application, repository, workflow, registry, Azure and Backstage URLs appear on the entity page and in a Backstage notification.
+7. **Report.** The orchestrator follows every step through `workflow_run`, `deployment_status`, `deployment_protection_rule` and `pull_request` webhooks, plus Actions callbacks,, with periodic polling to catch lost events. The application, repository, workflow, registry, Azure and Backstage URLs appear on the entity page and in a Backstage notification.
 
 ### Approval in Backstage
 
@@ -229,11 +236,12 @@ Planned endpoints:
 | `POST` | `/v1/requests/{id}/cancel` | Cancel a request that has not started applying |
 | `POST` | `/v1/requests/{id}/cleanup` | Start controlled cleanup of resources the platform created |
 | `POST` | `/v1/webhooks/github` | Receive GitHub events (HMAC-verified) |
+| `POST` | `/v1/callbacks/actions` | Receive plan summaries, plan hashes and outputs from workflow runs (GitHub OIDC-verified) |
 | `GET` | `/healthz`, `/readyz` | Health checks |
 
 ### Azure discovery service
 
-Discovery runs as a separate Python service so it can use the official Azure SDKs for Python (`azure-identity`, `azure-mgmt-resource`, `azure-mgmt-resourcegraph`). It can also be developed, tested and deployed independently of the Backstage release cycle.
+Discovery runs as a separate Python service so it can use the official Azure SDKs for Python (`azure-identity`, `azure-mgmt-resource-subscriptions`, `azure-mgmt-resourcegraph`). It can also be developed, tested and deployed independently of the Backstage release cycle.
 
 Planned endpoints (all read-only):
 
@@ -242,6 +250,7 @@ Planned endpoints (all read-only):
 | `GET` | `/healthz` | Liveness |
 | `GET` | `/readyz` | Readiness, including whether an Azure credential can be acquired |
 | `GET` | `/v1/subscriptions` | Enabled subscriptions visible to the discovery identity, filtered by the allowlist |
+| `GET` | `/v1/subscriptions/{id}/capabilities` | Which **Create new** options this subscription supports, with reasons (billing account type for vending, regional vCPU quota, availability zones) |
 | `GET` | `/v1/subscriptions/{id}/resource-groups` | Allowlisted resource groups in an approved region |
 | `GET` | `/v1/subscriptions/{id}/aks-clusters` | Approved shared AKS clusters, including whether Workload Identity and the OIDC issuer are enabled, and node pool zones and node counts (for HA eligibility) |
 | `GET` | `/v1/subscriptions/{id}/container-registries` | Approved container registries |
@@ -269,7 +278,8 @@ The target feature set for the first milestone:
 
 - Backstage portal with catalog, scaffolder, TechDocs and GitHub integration
 - NestJS golden-path template with a real sample business endpoint, validation, health endpoints and tests
-- **Create new** or **Select existing** for every Azure resource (subscription, resource group, AKS, ACR, namespace, Storage/Key Vault), with dynamic, server-validated selections
+- **Create new** or **Select existing** for every Azure resource (subscription, resource group, AKS, ACR, namespace, Storage/Key Vault), with dynamic, server-validated selections. Options the subscription can't support (billing type, quota, zones) are disabled with the reason
+- **High-availability option** with a justification when deviating from the environment default
 - Durable workflow with explicit states, persistence, restart recovery, idempotency and duplicate detection
 - Terraform plan, security and policy checks, and plan review before apply
 - Approval in the Backstage UI for infrastructure changes, enforced by GitHub custom deployment protection rules and bound to the exact plan
@@ -289,9 +299,15 @@ stateDiagram-v2
     [*] --> REQUESTED
     REQUESTED --> VALIDATING
     VALIDATING --> REPOSITORY_CREATED
+    VALIDATING --> PLATFORM_PROVISIONING : new subscription / AKS / ACR
+    PLATFORM_PROVISIONING --> REPOSITORY_CREATED
+    PLATFORM_PROVISIONING --> FAILED
     VALIDATING --> FAILED
     REPOSITORY_CREATED --> INFRASTRUCTURE_PLANNED
+    REPOSITORY_CREATED --> FAILED : validate / plan failed
+    REPOSITORY_CREATED --> CANCELLED : cancelled
     INFRASTRUCTURE_PLANNED --> AWAITING_APPROVAL
+    INFRASTRUCTURE_PLANNED --> CANCELLED : cancelled
     AWAITING_APPROVAL --> PROVISIONING : approved in Backstage
     AWAITING_APPROVAL --> CANCELLED : rejected / cancelled
     PROVISIONING --> INFRASTRUCTURE_READY
@@ -312,6 +328,7 @@ stateDiagram-v2
 |---|---|
 | 1. Validate | Name, owner, environment, subscription, cluster, permissions and allowlisted selections are checked on the server |
 | 2. Discover | The Python discovery service uses Azure Resource Graph and ARM to confirm each resource's existence, type, region and eligibility, using a read-only identity |
+| 2a. Platform provisioning | *Only for a new subscription, AKS cluster or registry:* a platform pull request, planned and applied behind the `platform` environment reviewers |
 | 3. Repository | The built-in scaffolder action `publish:github` creates one GitHub repository per request, initially containing Terraform, the Helm chart, the infrastructure workflows, catalog metadata and docs |
 | 4. Validate infra | `terraform fmt`/`init`/`validate`, security scanning, policy checks and Helm linting run; the plan is retained and summarised |
 | 5. Provision | After approval in Backstage, the saved plan is applied and resource readiness and identity configuration are verified |
@@ -347,9 +364,12 @@ For a public demo, keep the platform repository public. Keep one generated examp
 
 | Identity | Scope | Auth |
 |---|---|---|
-| **Discovery** (used by `azure-discovery-service`) | Read-only (`Reader`) on approved subscriptions | Workload Identity on AKS, `az login` locally |
-| **Orchestrator** (used by `provisioning-orchestrator-service`) | GitHub App installation scoped to generated repositories: Actions (write, to dispatch workflows), Deployments (write, for protection rules), Contents and Pull requests (write, to open and merge the application pull request). No Azure access | GitHub App private key, held in Key Vault and mounted through the Secrets Store CSI driver |
+| **Discovery** (used by `azure-discovery`) | Read-only (`Reader`) on approved subscriptions | Workload Identity on AKS, `az login` locally |
+| **Backstage** (used by `backstage`) | No Azure resource access. Reads only its own Key Vault secrets, requests tokens to call the platform services, and signs in to PostgreSQL | Workload Identity |
+| **Orchestrator** (used by `provisioning-orchestrator`) | GitHub App installation on the generated repositories (Actions and Deployments write, to dispatch workflows and answer protection rules; Contents and Pull requests write, for the application pull request) and on the platform repository (Pull requests and Contents write, to raise platform change requests). No Azure resource access: it reads only its own Key Vault secrets and signs in to PostgreSQL | Workload Identity, plus the GitHub App private key from Key Vault through the Secrets Store CSI driver |
 | **Subscription vending** (only when a new subscription is requested) | Subscription creator on the billing scope, and management group placement | GitHub OIDC federated credential, used by a platform-team-approved workflow |
+| **Platform** (used by `platform-plan.yml` and `platform-apply.yml`) | Creates and changes shared platform infrastructure in `iac/platform`: AKS, ACR, Key Vault, PostgreSQL, DNS, identities and their role assignments. Plans on pull requests use a separate read-only plan identity | GitHub OIDC federated credential, `platform` environment with required reviewers |
+| **Platform deployment** (used by `images.yml` and `deploy-platform.yml`) | Pushes platform images to ACR and deploys to the `sportify-platform` namespace only | GitHub OIDC federated credential |
 | **Terraform provisioning** | Narrowly scoped to approved resource groups and role-assignment conditions | GitHub OIDC federated credential |
 | **Deployment** | Push to the approved ACR and deploy to the application's namespace only | GitHub OIDC federated credential |
 | **Application runtime** | User-assigned managed identity with access only to its own Storage account or Key Vault | Microsoft Entra Workload Identity |
@@ -366,7 +386,7 @@ Security principles:
 - The platform never runs user-supplied Terraform, shell scripts or pipeline definitions.
 - Containers run as non-root with a read-only root filesystem where possible, drop all capabilities, use the `RuntimeDefault` seccomp profile, and set resource requests and limits.
 
-Full details will be documented in `docs/security/`, including the exact role assignments for each identity.
+The secrets design is in [docs/security/secret-management.md](docs/security/secret-management.md). The exact role assignments for each identity will be listed in `docs/security/permissions.md` (Phase 6).
 
 ## Repository layout
 
@@ -382,6 +402,7 @@ sportify-azure-backstage/
 │   └── sportify-platform/           # resource picker field + status card
 ├── services/                        # Python, all platform logic
 │   ├── pyproject.toml               # uv workspace
+│   ├── libs/sportify-common/        # shared auth verification, settings, logging, OTel
 │   ├── azure-discovery/             # FastAPI, read-only Azure discovery
 │   │   ├── app/                     # routers, Azure clients, policy filter
 │   │   ├── tests/
@@ -391,6 +412,7 @@ sportify-azure-backstage/
 │       ├── migrations/              # Alembic
 │       ├── tests/
 │       └── Dockerfile
+├── deploy/charts/                   # Helm charts: backstage, azure-discovery, provisioning-orchestrator
 ├── templates/
 │   └── applications/
 │       └── nestjs/                  # golden-path software template
@@ -399,8 +421,9 @@ sportify-azure-backstage/
 │   │                                #   app-namespace, storage-account, key-vault, aks-cluster, ...)
 │   └── platform/                    # shared platform stacks, one state each
 │       ├── 00-bootstrap/            #   Terraform state storage
-│       ├── 10-identities/           #   platform identities + OIDC federation
-│       └── 20-shared-dev/           #   AKS, ACR, shared Gateway, DNS
+│       ├── 05-subscriptions/        #   subscription vending (EA/MCA billing only)
+│       ├── 10-identities/           #   platform identities, OIDC federation, Key Vault
+│       └── 20-shared-dev/           #   AKS (zonal user pool), ACR, Gateway, DNS, PostgreSQL
 ├── policies/                        # allowlists + OPA/Conftest rules for Terraform plans
 ├── docs/
 │   ├── architecture/
@@ -434,7 +457,7 @@ Each request produces one self-contained repository that the application team ow
 │       └── terraform.tfvars # rendered from the Backstage form
 ├── deploy/helm/application/
 │   ├── Chart.yaml  values.yaml  values-dev.yaml
-│   └── templates/           # Deployment, Service, ServiceAccount, HTTPRoute, optional HPA
+│   └── templates/           # Deployment, Service, ServiceAccount, HTTPRoute; HPA + PDB for HA
 ├── .github/workflows/
 │   ├── terraform-validate.yml
 │   ├── terraform-plan.yml
@@ -471,8 +494,10 @@ These are the planned prerequisites. Versions were checked on 2026-10-10; the fu
 
 - An Azure subscription with permission to create role assignments and federated credentials
 - A shared AKS **1.36** cluster with the OIDC issuer, Workload Identity, the managed Gateway API CRDs and the App Routing Gateway API implementation enabled, plus a DNS zone for application endpoints ([ADR-0003](docs/adr/0003-ingress-gateway-api.md))
-- An Azure Container Registry
+- An Azure Container Registry, a Key Vault (with the AKS Key Vault secrets provider add-on) and an Azure Database for PostgreSQL flexible server
 - An Azure Storage account for Terraform state
+- For HA requests, a user node pool spanning at least two availability zones
+- The first demo runs on a **free Azure subscription**. See [docs/operations/demo-environment.md](docs/operations/demo-environment.md) for its limits, sizing and preparation
 - A GitHub organisation, a GitHub App for Backstage (repository creation) and a separate GitHub App for the orchestrator (workflow dispatch, webhooks, application pull requests), registered as a custom deployment protection rule provider
 - Microsoft Entra app registrations or managed identities for each identity in the [identity model](#identity-and-security-model)
 
@@ -515,7 +540,10 @@ Mock adapters are only for local development and isolated tests. Live integratio
 | Bridge (TypeScript) | Backstage bridge plugin and scaffolder actions against a stubbed orchestrator |
 | Discovery service | pytest + FastAPI `TestClient` with a mocked Azure SDK: pagination, permission errors, missing resources, throttling, allowlist filtering |
 | Infrastructure | `terraform fmt -check`, `init`, `validate`, security scanning, policy tests |
-| Helm | `helm lint`, template rendering, schema validation, kind-based install test |
+| Helm | `helm lint`, template rendering, schema validation, Conftest rules on the rendered chart (no `Secret` objects, no secret-like env values), kind-based install test |
+| Contract | The bridge's generated TypeScript client against the Python services' OpenAPI documents |
+| Security | gitleaks and GitHub secret scanning, Trivy image and dependency scans, CodeQL |
+| Capabilities and HA | Disabled options and reasons (billing type, quota, zones); HA justification rules and zone checks |
 | Application | NestJS unit tests, health checks, container build test |
 | End to end | Complete golden path with mocked Azure and GitHub |
 | Resilience | Retry safety, duplicate requests, interrupted workflows, unauthorized selections, failed deployments |
@@ -559,15 +587,14 @@ Installing a Helm chart successfully does not make it production-ready. Remainin
 
 Planned documentation, published through TechDocs:
 
-- `docs/architecture/`: context, data flow, trust boundaries, failure recovery
 - [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md): proposed workflow, CI/CD workflow design and the detailed phased plan
 - [`COMPATIBILITY.md`](COMPATIBILITY.md): component version compatibility plan
 - [`docs/architecture/microservices.md`](docs/architecture/microservices.md): platform microservices architecture (Backstage, discovery, orchestrator)
 - [`docs/security/secret-management.md`](docs/security/secret-management.md): secret inventory, Key Vault, delivery, rotation and incident response
 - `docs/adr/`: Architecture Decision Records: [0001 Python platform services](docs/adr/0001-python-platform-services.md), [0002 Terraform structure](docs/adr/0002-terraform-structure.md), [0003 Ingress through the Gateway API](docs/adr/0003-ingress-gateway-api.md), [0004 High-availability option](docs/adr/0004-availability-tier-option.md)
-- `docs/security/`: identity boundaries and the exact Azure and GitHub permissions per identity
 - [`docs/developer-guide/golden-path.md`](docs/developer-guide/golden-path.md): the end-to-end golden path, approval in Backstage and the shared URLs
 - [`docs/operations/cleanup.md`](docs/operations/cleanup.md): cleanup and teardown; troubleshooting and recovery procedures will follow
+- [`docs/operations/demo-environment.md`](docs/operations/demo-environment.md): running the first demo on a free Azure subscription
 
 ## Contributing and security
 

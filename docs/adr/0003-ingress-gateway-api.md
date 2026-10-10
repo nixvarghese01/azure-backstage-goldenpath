@@ -29,6 +29,6 @@ The golden path exposes every application at a URL such as `https://orders-api.d
 
 ## Consequences
 
-- The application chart's template set is `Deployment`, `Service`, `ServiceAccount` and `HTTPRoute`, plus an optional `HorizontalPodAutoscaler`.
+- The application chart's template set is `Deployment`, `Service`, `ServiceAccount` and `HTTPRoute`, plus a `HorizontalPodAutoscaler` and `PodDisruptionBudget` when the HA tier is selected ([ADR-0004](0004-availability-tier-option.md)).
 - Request size limits, rate limiting and custom Envoy filters are not available through this implementation. They're documented as production gaps.
 - Istio control-plane versions follow the AKS version automatically, and AKS upgrades are the only upgrade path for ingress.

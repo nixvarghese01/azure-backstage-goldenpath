@@ -40,7 +40,7 @@ sequenceDiagram
     actor Dev as Developer
     actor Apr as Approver
     participant BS as Backstage<br/>(scaffolder + bridge)
-    participant Disc as azure-discovery-service
+    participant Disc as azure-discovery
     participant Orch as provisioning-orchestrator
     participant GH as GitHub<br/>(repo + Actions)
     participant Az as Azure / AKS
@@ -117,7 +117,7 @@ The template **Create → "Secure NestJS REST API"** is a single form with four 
 |---|---|---|
 | 1. Application | Name, description, owner | Owner from the Backstage catalog (the user's groups) |
 | 2. Stack | Stack, sample endpoint, OpenAPI docs, runtime capability | A stack registry: NestJS is enabled, other stacks are listed as *coming soon* and disabled |
-| 3. Infrastructure | **Create new / Select existing** for the subscription, resource group, AKS cluster, container registry, namespace and Storage or Key Vault | `azure-discovery-service`, called through the Backstage bridge; each picker is filtered by the selection above it |
+| 3. Infrastructure | **Create new / Select existing** for the subscription, resource group, AKS cluster, container registry, namespace and Storage or Key Vault. Options the subscription can't support are disabled with the reason | `azure-discovery` (including `/capabilities`), called through the Backstage bridge; each picker is filtered by the selection above it |
 | 4. Deployment | Environment, deploy target, endpoint host, **high availability (Yes/No) with reason, justification and SLO target**, repository visibility | Platform policy (`policies/`); cluster zone data from discovery |
 
 When the developer clicks **Create**:
@@ -132,7 +132,7 @@ When the developer clicks **Create**:
 |---|---|---|---|
 | 2.1 | `publish:github` creates `sportify-org/orders-api` containing **infrastructure only**: `infra/terraform`, the Helm chart, the `terraform-*` workflows, `catalog-info.yaml` and docs. Branch protection is applied. `catalog:register` adds it to the catalog | Backstage | `REPOSITORY_CREATED` |
 | 2.2 | `terraform-validate.yml`: `fmt -check`, `init`, `validate`, TFLint, security scan, policy checks, `helm lint` and `helm template` | GitHub Actions | `REPOSITORY_CREATED` |
-| 2.3 | `terraform-plan.yml`: logs in with the provisioning identity through OIDC and saves the plan as an artifact. A summary and the plan hash are sent to the orchestrator | GitHub Actions | `INFRASTRUCTURE_PLANNED` |
+| 2.3 | `terraform-plan.yml` (environment `dev-infra-plan`, no approval): logs in with the provisioning identity through OIDC and saves the plan as an artifact. A summary and the plan hash are sent to the orchestrator | GitHub Actions | `INFRASTRUCTURE_PLANNED` |
 | 2.4 | `terraform-apply.yml` is dispatched and **held** by the custom deployment protection rule on the `dev-infra` environment | Orchestrator, GitHub | `AWAITING_APPROVAL` |
 | 2.5 | Approval in Backstage (see [Approval in Backstage](#approval-in-backstage)) | Approver | `AWAITING_APPROVAL` |
 | 2.6 | Apply the **saved plan**, then check that the managed identity, federated credential and role assignment are ready | GitHub Actions | `PROVISIONING` → `INFRASTRUCTURE_READY` |
@@ -143,10 +143,13 @@ The plan for the example request:
 + azurerm_user_assigned_identity          id-orders-api-dev
 + azurerm_federated_identity_credential   system:serviceaccount:orders-api:orders-api
 + kubernetes_namespace                    orders-api
++ kubernetes_resource_quota               orders-api/default
++ kubernetes_limit_range                  orders-api/default
++ kubernetes_role_binding                 orders-api/deployer
 + azurerm_role_assignment                 Storage Blob Data Contributor → stsportifyshareddev
 = reused (data sources): sub-sportify-dev, rg-sportify-apps-dev,
   aks-sportify-shared-dev, acrsportifydev, stsportifyshareddev
-Plan: 4 to add, 0 to change, 0 to destroy.
+Plan: 7 to add, 0 to change, 0 to destroy.
 ```
 
 ## Approval in Backstage
@@ -183,7 +186,7 @@ Re-running the workflow from the GitHub UI does not bypass approval, because the
 |---|---|---|
 | Infrastructure apply | One approver in Backstage | Two approvers in Backstage |
 | Application deploy | Automatic | Approval in Backstage |
-| New subscription, AKS cluster or container registry | Platform-team approval in Backstage | Same |
+| New subscription, AKS cluster or container registry | Platform team, through the `platform` GitHub environment reviewers on the platform repository. Backstage shows the status and links but doesn't approve | Same |
 
 ## Step 3: Generate the application for the chosen stack
 
@@ -236,9 +239,9 @@ Each stage is reported as its own outcome:
 ```
 ✅ Request validated
 ✅ Repository created
-✅ Infrastructure provisioned   4 added · 0 changed · 0 destroyed · approved by <approver>
+✅ Infrastructure provisioned   7 added · 0 changed · 0 destroyed · approved by <approver>
 ✅ Application built            tests passed · 0 critical vulnerabilities
-✅ Deployed                     healthy · 2/2 pods ready
+✅ Deployed                     healthy · 1/1 pods ready (Standard tier)
 ```
 
 ## State timeline
@@ -256,7 +259,8 @@ Expected duration: about 10–15 minutes of automated work, plus the time taken 
 These are set up once by the platform team:
 
 - the shared AKS cluster with the OIDC issuer and Workload Identity enabled, the **App Routing Gateway API** with a shared `Gateway` ([ADR-0003](../adr/0003-ingress-gateway-api.md)), and a **DNS zone** for `*.dev.sportify.example`
-- the shared container registry and the Terraform state storage account
+- the shared container registry, the Terraform state storage account, the platform Key Vault (with the AKS Key Vault secrets provider add-on) and PostgreSQL
+- for the first demo, a **free Azure subscription** prepared as described in [demo-environment.md](../operations/demo-environment.md)
 - the discovery, provisioning and deployment identities with their federated credentials
 - a GitHub App for Backstage (repository creation) and a GitHub App for the orchestrator, registered as a **custom deployment protection rule** provider
 - generated repositories created as **public**. See [Repository visibility](../../README.md#repository-visibility) for what changes if they are made private.

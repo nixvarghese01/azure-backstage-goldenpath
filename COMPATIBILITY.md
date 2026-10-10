@@ -44,8 +44,15 @@ The component versions chosen for Sportify Azure Backstage milestone 1, why each
 | IaC | TFLint | **0.64.x** | 0.64.0 | |
 | IaC | tflint-ruleset-azurerm | **0.32.x** | 0.32.0 | ⚠️ Released before azurerm 5.0; see [compatibility risks](#4-compatibility-risks-and-mitigations) |
 | IaC | Conftest (OPA) | **0.71.x** (OPA 1.21) | 0.71.1 | Policies use Rego v1 syntax |
-| IaC | Checkov | **3.3.x** | 3.3.26 | Second IaC scanner, run on the plan JSON |
+| IaC | Checkov | **3.3.x** | 3.3.26 | Static IaC security scan in `terraform-validate.yml` (Trivy covers images and secrets) |
 | Security | Trivy | **0.75.x** | 0.75.0 | ⚠️ Installed by verified binary checksum (see [risk 3](#4-compatibility-risks-and-mitigations)) |
+| Security | gitleaks | **8.30.x** | 8.30.1 | Secret scanning, pre-commit and CI |
+| Python services | ruff | **0.17.x** | 0.17.0 | Lint and format |
+| Python services | mypy | **2.4.x** | 2.4.0 | Type checking |
+| Python services | pytest | **9.1.x** | 9.1.1 | Needs Python ≥3.10 |
+| Python services | testcontainers | **4.15.x** | 4.15.0 | PostgreSQL integration tests |
+| Python services | opentelemetry-sdk | **1.45.x** | 1.45.1 | Configured explicitly (risk 10) |
+| Kubernetes | Key Vault secrets provider | **AKS-managed add-on** (`azure-keyvault-secrets-provider`) | — | Secrets Store CSI driver plus the Azure provider; versions follow AKS |
 | Kubernetes | AKS Kubernetes | **1.36** | 1.37 (GA 2026-10) | 1.36 is supported until 2027-06 |
 | Kubernetes | kubectl | **1.36.x** | 1.37.x | Must be within ±1 minor version of the cluster |
 | Kubernetes | Ingress | **AKS App Routing, Gateway API** (`approuting-istio`) | — | **Not ingress-nginx**, which was retired in 2026-03 |

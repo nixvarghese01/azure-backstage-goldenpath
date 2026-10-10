@@ -8,7 +8,7 @@ How to remove what the golden path created, for example after recording a demo. 
 
 - The platform deletes **only resources it created** for the request. These are identified by the tag `managed-by: sportify-platform` and the `request-id` tag.
 - Resources selected through **Select existing** are never deleted. Only the role assignments the platform added to them are removed.
-- Shared platform infrastructure (AKS, ACR, state storage) is never removed by an application cleanup. It has its own teardown below.
+- Shared platform infrastructure (AKS, ACR, PostgreSQL, Key Vault, state storage) is never removed by an application cleanup. It has its own teardown below.
 
 ## 1. Remove one application
 
@@ -23,11 +23,11 @@ How to remove what the golden path created, for example after recording a demo. 
    - **Make it private.** Note that environments and protection rules stop being enforced on free plans.
    - **Delete** it.
 
-Manual fallback, if the platform is unavailable. Run it from the application repository with the provisioning identity:
+Manual fallback, if the platform is unavailable. Run it from the application repository. `helm uninstall` uses the **deployment** identity, and the Terraform steps use the **provisioning** identity:
 
 ```bash
-helm uninstall orders-api -n orders-api
-cd infra/terraform
+helm uninstall orders-api -n orders-api          # deployment identity
+cd infra/terraform                               # provisioning identity from here
 terraform init -backend-config=environments/dev/backend.hcl
 terraform plan -destroy -var-file=environments/dev/terraform.tfvars -out=destroy.tfplan
 terraform apply destroy.tfplan
@@ -38,9 +38,10 @@ terraform apply destroy.tfplan
 Only do this when no applications remain on the cluster. Destroy the stacks in `iac/platform/` of the platform repository in **reverse order**:
 
 1. Remove every application first (section 1).
-2. `iac/platform/20-shared-dev`: destroy the shared AKS cluster, shared Gateway, DNS zone and container registry.
-3. `iac/platform/10-identities`: remove the platform identities and federated credentials.
-4. `iac/platform/00-bootstrap`, **last**: export anything you want to keep from the state storage account, remove its `CanNotDelete` lock, migrate this stack's state back to local, then destroy it.
+2. `iac/platform/20-shared-dev`: destroy the shared AKS cluster, shared Gateway, DNS zone, container registry and PostgreSQL flexible server. Export anything you want to keep from PostgreSQL first.
+3. `iac/platform/10-identities`: remove the platform identities, federated credentials and the platform Key Vault. With purge protection on, the vault stays **soft-deleted and its name stays reserved** until the retention period ends. The demo uses the minimum 7-day retention for this reason ([demo-environment.md](demo-environment.md)).
+4. `iac/platform/05-subscriptions`, if used: vended subscriptions are cancelled through the billing process, not destroyed directly.
+5. `iac/platform/00-bootstrap`, **last**: export anything you want to keep from the state storage account, remove its `CanNotDelete` lock, migrate this stack's state back to local, then destroy it.
 
 ## 3. Verify nothing is left running
 

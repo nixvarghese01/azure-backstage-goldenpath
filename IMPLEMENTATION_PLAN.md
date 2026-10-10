@@ -11,6 +11,7 @@ The proposed workflow, CI/CD design and phased delivery plan for milestone 1 of 
 | [docs/architecture/microservices.md](docs/architecture/microservices.md) | Service boundaries, communication, deployment, resilience |
 | [docs/security/secret-management.md](docs/security/secret-management.md) | Secrets: inventory, storage, delivery, rotation |
 | [docs/operations/cleanup.md](docs/operations/cleanup.md) | Cleanup and teardown |
+| [docs/operations/demo-environment.md](docs/operations/demo-environment.md) | First demo on a free Azure subscription |
 
 > **Status:** Phase 1 (design) is complete. Each phase below ends with exit criteria. A phase counts as done only when its exit criteria have been run and their results recorded in the README's *Implementation status* table.
 
@@ -31,7 +32,7 @@ The proposed workflow, CI/CD design and phased delivery plan for milestone 1 of 
 
 ## 1. Scope and assumptions
 
-**In scope:** one golden path (NestJS → AKS, `dev` environment), with **Select existing** as the default and **Create new** for the namespace, runtime identity, resource group and Storage or Key Vault.
+**In scope:** one golden path (NestJS → AKS, `dev` environment), with **Create new** and **Select existing** implemented for every resource (options the subscription can't support are disabled with the reason) and the HA option. **The first demo uses Select existing on a free Azure subscription** ([demo-environment.md](docs/operations/demo-environment.md)).
 
 **Assumptions:**
 
@@ -39,10 +40,10 @@ The proposed workflow, CI/CD design and phased delivery plan for milestone 1 of 
 |---|---|
 | A1 | This is a **model project** that shows the design end to end. It is not a production rollout. |
 | A2 | Generated repositories are **public**, in a GitHub organisation you own (for example `sportify-org`). |
-| A3 | One Azure subscription is used for the demo, and you can create role assignments and federated credentials in it. |
+| A3 | One **free Azure subscription** is used for the first demo, and you can create role assignments and federated credentials in it. Its limits (30-day credit, vCPU quota, MOSP billing) are handled as described in [demo-environment.md](docs/operations/demo-environment.md). |
 | A4 | Development happens on Windows with **WSL2 (Ubuntu)** for Backstage. |
 | A5 | The versions are those in [COMPATIBILITY.md](COMPATIBILITY.md), checked on 2026-10-10. |
-| A6 | Azure costs are kept low with one small AKS node pool, the Basic or Standard ACR tier, a Burstable PostgreSQL tier and LRS Storage, and everything is torn down after the demo. Costs depend on the subscription and are not hardcoded anywhere. |
+| A6 | Azure costs are kept low with the sizing in [demo-environment.md](docs/operations/demo-environment.md) (AKS Free tier with one small node pool, ACR Basic, smallest Burstable PostgreSQL, LRS Storage), and everything is torn down after the demo. Costs depend on the subscription and are not hardcoded anywhere. |
 
 ---
 
@@ -82,6 +83,7 @@ flowchart TB
 |---|---|---|---|---|---|---|---|
 | 1 | Submit | Developer clicks **Create** | Backstage scaffolder → `sportify:request:submit` | Form values, user identity | Request ID | `REQUESTED` | Form errors shown inline; nothing is created |
 | 2 | Validate | Submit received | Orchestrator → discovery `/v1/validate`, policies | Request, allowlists | Validated request | `VALIDATING` | Rejected with reasons; no repository is created |
+| 2a | Platform provisioning *(only for a new subscription, AKS cluster or ACR)* | Validation passes | Orchestrator raises a platform-repo PR; `platform-plan.yml` and `platform-apply.yml` behind the `platform` environment reviewers | Platform definition | New shared resource | `PLATFORM_PROVISIONING` | `FAILED` with the PR or run link; the application request doesn't continue |
 | 3 | Repository | Validation passes | Scaffolder `fetch:template`, `publish:github`, `catalog:register` | Template and values | Repository URL, catalog entity | `REPOSITORY_CREATED` | Retried idempotently; an existing repository for the same request is reused |
 | 4 | Validate infrastructure | Repository recorded | `terraform-validate.yml` | Terraform, Helm chart | Check results | `REPOSITORY_CREATED` | `FAILED` with the failing check and a log link |
 | 5 | Plan | Validation passes | `terraform-plan.yml` (provisioning identity) | tfvars, state | Plan artifact, summary, **plan hash** | `INFRASTRUCTURE_PLANNED` | `FAILED`; no changes were made |
@@ -117,11 +119,12 @@ All workflows pin Actions to SHAs, declare least-privilege `permissions:` at the
 | `ci-templates.yml` | PR, push (paths `templates/`) | Render the NestJS template with fixture values, then run the generated repository's checks offline: `terraform validate`, `helm lint` and `helm template`, `npm test`, `docker build`, kind install | `contents: read` | — |
 | `ci-e2e.yml` | PR to `main`, nightly | Full golden path with **mocked** Azure and GitHub adapters: submit → … → `SUCCEEDED`, plus failure scenarios | `contents: read` | — |
 | `release-modules.yml` | Tag `iac/modules/<name>/vX.Y.Z` | Validate and test that module, publish release notes | `contents: write` | — |
-| `platform-plan.yml` | PR touching `iac/platform/**`, manual dispatch | Plan each changed stack, upload the plan, comment the summary | OIDC: **platform identity (read-only plan role)** | `platform-plan` |
+| `platform-plan.yml` | PR touching `iac/platform/**` (including orchestrator-raised platform requests), manual dispatch | Plan each changed stack with `-lock=false`, upload the plan, comment the summary | OIDC: **platform plan identity** (Reader on Azure, Storage Blob Data Reader on the `platform` state container) | `platform-plan` |
 | `platform-apply.yml` | Manual dispatch after merge | Apply the saved plan for one stack | OIDC: **platform identity** | `platform` (GitHub required reviewers) |
 | `images.yml` | Push to `main` | Build, scan and push the images for Backstage, `azure-discovery` and `provisioning-orchestrator` | OIDC: **deployment identity (platform)**, `acrPush` | — |
 | `deploy-platform.yml` | After `images.yml`, manual | Helm deploy into the `sportify-platform` namespace, then smoke tests | OIDC: **deployment identity (platform)** | `platform` |
 | `codeql.yml` / dependency review | PR | Static analysis and dependency review | `security-events: write` | — |
+| `ci-secrets.yml` | PR, push | gitleaks over the diff and history | `contents: read` | — |
 
 Platform infrastructure is approved through **GitHub environment reviewers**, not Backstage. The portal must not be the only way to approve changes to its own infrastructure.
 
@@ -129,7 +132,7 @@ Platform infrastructure is approved through **GitHub environment reviewers**, no
 
 | Workflow | Trigger | Jobs | Permissions / identity | Environment | Reports to orchestrator |
 |---|---|---|---|---|---|
-| `terraform-validate.yml` | PR touching `infra/` or `deploy/`; dispatch | `fmt -check`, `init -backend=false`, `validate`, TFLint, Checkov, `helm lint` and `helm template` | `contents: read` (no Azure) | — | `workflow_run` result |
+| `terraform-validate.yml` | PR touching `infra/` or `deploy/`; dispatch | `fmt -check`, `init -backend=false`, `validate`, TFLint, Checkov, `helm lint` and `helm template`, Conftest on the rendered chart, gitleaks | `contents: read` (no Azure) | — | `workflow_run` result |
 | `terraform-plan.yml` | Dispatch (orchestrator) | `init` (backend), `plan -out`, `show -json` → Conftest, summary, **SHA-256 of the plan file**, upload artifact | `contents: read`, `id-token: write`; OIDC **provisioning identity** | `dev-infra-plan` | Summary and hash (signed callback using the job's OIDC token) |
 | `terraform-apply.yml` | Dispatch (orchestrator) | Download the plan → **check the hash matches the approved hash** → `apply` → readiness checks → outputs | `contents: read`, `id-token: write`; OIDC **provisioning identity** | `dev-infra` (custom protection rule = approval in Backstage) | Result and non-sensitive outputs |
 | `application-ci.yml` | PR; push to `main` | lint → unit and integration tests → `docker build` → Trivy (image and dependencies) → push (only on `main`, as `:<sha>`) | PR: `contents: read`. Main: plus `id-token: write`; OIDC **deployment identity** (`AcrPush`) | — | Image tag and scan summary |
@@ -150,8 +153,8 @@ Platform infrastructure is approved through **GitHub environment reviewers**, no
 | Component | Local development (Phases 2–4) | Cloud demo (Phase 5 onwards) |
 |---|---|---|
 | Backstage | `yarn dev` in WSL2 | Container in the `sportify-platform` namespace on the shared AKS cluster |
-| `azure-discovery-service` | `uv run fastapi dev`, signed in with `az login` | Container, Workload Identity (**discovery identity**) |
-| `provisioning-orchestrator-service` | API + worker via `uv run` | Containers (API + worker), with the GitHub App key from Key Vault through the CSI driver |
+| `azure-discovery` | `uv run fastapi dev`, signed in with `az login` | Container, Workload Identity (**discovery identity**) |
+| `provisioning-orchestrator` | API + worker via `uv run` | Containers (API + worker), with the GitHub App key from Key Vault through the CSI driver |
 | PostgreSQL 17 | `docker compose` | Azure Database for PostgreSQL flexible server (Burstable), Entra authentication |
 | GitHub events | **Polling only**, through the reconciliation loop, because a local machine can't receive webhooks | Webhooks through the shared Gateway, plus polling |
 | Azure and GitHub | Mock adapters, or real ones when configured | Real |
@@ -173,12 +176,13 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 - [ ] Register **GitHub App #2, orchestrator**: Actions, Deployments, Contents, Pull requests, webhooks, and **custom deployment protection rule** support.
 - [ ] Confirm the Azure subscription, region allowlist (for example `uksouth`) and that you can create role assignments.
 - [ ] Set up WSL2 (Ubuntu) with the tool versions from [COMPATIBILITY.md](COMPATIBILITY.md).
+- [ ] Create the **free Azure subscription**, set budget alerts, register resource providers, and check or raise the regional vCPU quota ([demo-environment.md §5](docs/operations/demo-environment.md#5-preparation-checklist)).
 
 **Exit criteria:** `node -v` shows v24, `yarn -v` shows 4.13.0, `python3 --version` shows 3.14.x, `terraform version` shows 1.16.x, `helm version` shows v4.3.x and `az version` is at least 2.86. Both Apps are installed on the organisation.
 
 ### Phase 1: Architecture and documentation *(done)*
 
-**Deliverables:** README, ADR-0001 (Python services), ADR-0002 (Terraform structure), ADR-0003 (Gateway API), golden-path guide, cleanup runbook, compatibility plan, this plan.
+**Deliverables:** README, ADR-0001 (Python services), ADR-0002 (Terraform structure), ADR-0003 (Gateway API), ADR-0004 (HA option), golden-path guide, microservices architecture, secret management, cleanup runbook, demo environment, compatibility plan, this plan.
 
 **Exit criteria:** documents committed on `develop`. ✅
 
@@ -243,8 +247,9 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 - [ ] Discovery endpoints from the README, using Resource Graph (with skip-token paging), the subscriptions client, and the allowlist filter.
 - [ ] Typed errors for permission denied, not found and throttled responses; retries with backoff.
 - [ ] `POST /v1/validate` for complete selection sets, used by the orchestrator.
+- [ ] `GET /v1/subscriptions/{id}/capabilities`: billing account type (vending), regional vCPU quota, cluster zones. The picker disables unsupported **Create new** options and shows the reason.
 - [ ] Picker field connected to the live discovery service through the bridge.
-- [ ] Platform stack `10-identities`: discovery (`Reader`), provisioning, deployment, orchestrator and the federated credentials.
+- [ ] Platform stack `10-identities`: the backstage, discovery (`Reader`), orchestrator, platform, platform deployment, provisioning, deployment and vending identities; their federated credentials; the platform Key Vault with per-secret RBAC.
 
 **Exit criteria**
 
@@ -256,7 +261,8 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 
 **Tasks**
 
-- [ ] Platform stacks: `00-bootstrap` (state storage, then migrate its own state into it), and `20-shared-dev` (AKS 1.36 with OIDC, Workload Identity, managed Gateway API and App Routing Istio via `azapi`; ACR; DNS zone; shared Gateway).
+- [ ] Platform stacks: `00-bootstrap` (state storage, then migrate its own state into it), and `20-shared-dev` (AKS 1.36 with OIDC, Workload Identity, the Key Vault secrets provider add-on, managed Gateway API and App Routing Istio via `azapi`, and a zonal user pool where quota allows; ACR; DNS zone; shared Gateway; PostgreSQL flexible server), sized for the free subscription.
+- [ ] **Create new** for platform resources: the orchestrator raises platform-repo PRs for a new AKS cluster or ACR (applied behind `platform` reviewers), and the `05-subscriptions` vending stack (tested with mocks; not usable on the free subscription).
 - [ ] Deploy the platform to AKS with `images.yml` and `deploy-platform.yml`, and PostgreSQL flexible server.
 - [ ] Turn on webhooks through the Gateway, plus GitHub custom deployment protection rules.
 - [ ] Secret management: Key Vault (RBAC, purge protection, diagnostics), per-secret role assignments, the CSI secrets provider add-on, `SecretProviderClass` per platform service, Entra authentication to PostgreSQL, and webhook secret dual-acceptance.
@@ -306,7 +312,7 @@ Phases 3 and 4 can run in parallel after Phase 2. The dates are indicative and a
 ## 6. Demo script
 
 1. Sign in to Backstage as a member of `team-orders`.
-2. **Create → Secure NestJS REST API.** Fill in the four pages (select existing for the subscription, resource group, AKS cluster and ACR; create new for the namespace), then **Create**.
+2. **Create → Secure NestJS REST API.** Fill in the four pages (select existing for the subscription, resource group, AKS cluster and ACR; create new for the namespace; HA = No), then **Create**. Along the way, point out that **Create new subscription** is disabled with the reason "needs EA/MCA billing", and that HA = Yes is rejected because the demo cluster doesn't span two zones.
 3. Show the request page: `REPOSITORY_CREATED`, then the plan summary and `AWAITING_APPROVAL`.
 4. Try to re-run `terraform-apply` from GitHub. Show that it is blocked.
 5. Sign in as a member of `platform-approvers`. **Approvals → Approve**.
@@ -329,6 +335,7 @@ Phases 3 and 4 can run in parallel after Phase 2. The dates are indicative and a
 | Supply-chain compromise of CI tools | Low | High | SHA pins, checksum-verified binaries, scanners without credentials |
 | Backstage upgrade breaks the bridge plugin | Medium | Low | Thin plugins; monthly upgrade with CI |
 | Scope creep (more stacks or environments) | Medium | Medium | Milestone 1 is NestJS + `dev` only, as listed in §8 |
+| Free subscription limits: 30-day credit, low vCPU quota | High | Medium | Develop locally with mocks; use Azure only in Phase 5 and the demo; budget alerts; quota request in Phase 0; upgrade to pay-as-you-go only if needed ([demo-environment.md](docs/operations/demo-environment.md)) |
 
 ---
 
@@ -336,7 +343,7 @@ Phases 3 and 4 can run in parallel after Phase 2. The dates are indicative and a
 
 - Stacks other than NestJS (shown as *coming soon* in the form).
 - `test` and `prod` environments, multi-approver gates and multi-region.
-- Subscription vending, and creating a new AKS cluster or ACR from the form. These are designed but disabled in the form for milestone 1, which uses existing ones.
+- Showing subscription vending live: it needs an EA or MCA billing account, which the free demo subscription doesn't have. It is implemented and covered by mocked tests, and the form shows it as disabled with the reason.
 - Temporal orchestration (ADR-0001 records it as the upgrade path).
 - Private generated repositories (see the README's *Repository visibility* section).
 - Production hardening: NetworkPolicies, WAF and rate limiting, private endpoints with self-hosted runners, full observability.

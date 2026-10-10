@@ -22,7 +22,7 @@ Every Azure resource on the form offers **Create new** or **Select existing**. G
 | Shared platform stacks | Platform repo, `iac/platform/` | One state file per stack | Platform team's workflow (platform identity) |
 | Application infrastructure | Generated repo, `infra/terraform/` | One state file per application per environment | Generated repo's workflows (provisioning identity) |
 
-**Create new** for a subscription, AKS cluster or container registry is handled by the platform stacks, never by an application repository. An application repository always references these as existing resources.
+**Create new** for a subscription, AKS cluster or container registry is handled by the platform stacks, never by an application repository. The orchestrator raises a pull request in the platform repository that adds the definition, and it is applied behind the `platform` environment reviewers (see the README). An application repository always references these as existing resources.
 
 ### 2. Platform repository layout
 
@@ -38,11 +38,18 @@ iac/
 │   ├── role-assignment/         # allowlisted roles only
 │   ├── aks-cluster/             # shared cluster: OIDC issuer, Workload Identity, Entra RBAC
 │   ├── container-registry/
+│   ├── postgresql-flexible/     # Entra-only authentication, Burstable default
+│   ├── subscription-vending/    # Microsoft.Subscription alias (EA/MCA only)
 │   └── github-oidc-identity/    # platform identities federated to GitHub environments
 └── platform/                    # root modules ("stacks"), applied in order
     ├── 00-bootstrap/            # state storage account and containers
-    ├── 10-identities/           # discovery, provisioning, deployment, orchestrator, vending
-    └── 20-shared-dev/           # AKS, ACR, App Routing Gateway API + shared Gateway, DNS zone
+    ├── 05-subscriptions/        # optional subscription vending (EA/MCA billing only)
+    ├── 10-identities/           # identities (backstage, discovery, orchestrator, platform,
+    │                            #   platform deployment, provisioning, deployment, vending),
+    │                            #   federated credentials, platform Key Vault + per-secret RBAC
+    └── 20-shared-dev/           # AKS (system pool + zonal user pool, Key Vault secrets provider
+                                 #   add-on), ACR, App Routing Gateway API + shared Gateway,
+                                 #   DNS zone, PostgreSQL flexible server
 ```
 
 - Stacks are numbered to show their apply order, and each stack has its own state. Destroying the dev cluster stack can't touch identities or state storage.
@@ -162,6 +169,7 @@ The `naming` module produces every name and the standard tags, and all modules t
 | `request-id` | orchestrator request ID |
 | `lifecycle` | `application` or `platform` |
 | `repository` | `sportify-org/orders-api` |
+| `availability-tier` | `standard` or `ha` ([ADR-0004](0004-availability-tier-option.md)) |
 
 Cleanup relies on `managed-by` and `request-id` to find only the resources the platform created.
 
@@ -179,7 +187,8 @@ Cleanup relies on `managed-by` and `request-id` to find only the resources the p
 | Format | `terraform fmt -check -recursive` | `terraform-validate.yml` |
 | Validate | `terraform init -backend=false` + `terraform validate` | `terraform-validate.yml` |
 | Lint | TFLint with the `azurerm` ruleset | `terraform-validate.yml` |
-| Security | Trivy (config scan) or Checkov | `terraform-validate.yml` |
+| Security | Checkov (static IaC scan). Trivy is used for images and secrets, not IaC | `terraform-validate.yml` |
+| Helm policy | Conftest on the rendered chart: no `Secret` objects, no secret-like env values | `terraform-validate.yml` |
 | Module tests | `terraform test` using mock providers | Platform repo CI, per module |
 | Plan policy | Conftest with OPA rules in `policies/terraform/`, run on `terraform show -json` output | `terraform-plan.yml` |
 

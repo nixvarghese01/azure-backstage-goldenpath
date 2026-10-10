@@ -74,7 +74,7 @@ flowchart LR
 ### 3.2 `azure-discovery`
 
 - **Owns:** nothing persistent. It is the read-only view of Azure, filtered through the allowlists in `policies/`.
-- **Exposes:** `GET /v1/subscriptions`, `/resource-groups`, `/aks-clusters`, `/container-registries` and `/resources`; `POST /v1/validate`; `/healthz` and `/readyz`.
+- **Exposes:** `GET /v1/subscriptions`, `/capabilities`, `/resource-groups`, `/aks-clusters`, `/container-registries` and `/resources`; `POST /v1/validate`; `/healthz` and `/readyz`.
 - **Caching:** list endpoints may use a short in-memory cache, for example 60 seconds per subscription, to reduce Resource Graph throttling. **`/v1/validate` never uses the cache**, so validation is always made against live data.
 - **Does not:** write to Azure, store anything, or know about requests or workflows.
 
@@ -82,7 +82,7 @@ flowchart LR
 
 - **Owns:** requests, steps, approvals, webhook inbox, notification outbox and audit events (database `orchestrator`).
 - **`-api` process:** accepts submissions, status queries, approvals, cancellations and cleanup, GitHub webhooks and Actions callbacks. It **only writes to the database**, so requests stay fast and never wait on GitHub or Azure.
-- **`-worker` process:** claims pending steps, calls GitHub and the discovery service, moves state forward, processes the inbox, delivers the outbox and runs the reconciliation poll.
+- **`-worker` process:** claims pending steps, calls GitHub and the discovery service, moves state forward, processes the inbox, delivers the outbox and runs the reconciliation poll. For a new subscription, AKS cluster or registry, it raises a pull request in the platform repository and tracks it (`PLATFORM_PROVISIONING`).
 - **Why one service with two processes, not two services:** both processes share one data model and one transactional boundary (the state machine). Splitting them would mean sharing a database across services, or adding a message broker, without any benefit.
 - **Does not:** hold any Azure write permission. Terraform in GitHub Actions makes every Azure change.
 
@@ -96,7 +96,7 @@ Each database belongs to **exactly one service**. `backstage` and `provisioning-
 
 | From → To | Protocol | Authentication | Timeout | Retry |
 |---|---|---|---|---|
-| Browser → `backstage` | HTTPS through the shared Gateway | Backstage session (GitHub or Entra sign-in) | — | — |
+| Browser → `backstage` | HTTPS through the shared Gateway | Backstage session (GitHub sign-in through GitHub App #1) | — | — |
 | `backstage` (bridge) → `azure-discovery` | HTTP, ClusterIP | Entra access token from `backstage`'s workload identity, audience = discovery app ID | 5 s | 2 retries, jittered backoff (GET only) |
 | `backstage` (bridge) → `orchestrator-api` | HTTP, ClusterIP | Entra token as above, audience = orchestrator app ID | 5 s | POST retries are safe only with an `Idempotency-Key` header, which is always sent |
 | `orchestrator-worker` → `azure-discovery` | HTTP, ClusterIP | Entra token from the orchestrator's identity | 10 s | 3 retries, jittered backoff |
@@ -131,9 +131,9 @@ Only these two paths are exposed publicly, through an `HTTPRoute` on a separate 
 
 | Service | Workload identity (Entra) | Azure RBAC | Other credentials |
 |---|---|---|---|
-| `backstage` | `id-sportify-backstage` | None. It only requests tokens for the platform service audiences | GitHub App #1 key (Key Vault through CSI) |
+| `backstage` | `id-sportify-backstage` | None on Azure resources. `Key Vault Secrets User` on its own secrets only (per-secret scope) | GitHub App #1 key and client secret, session secret (Key Vault through CSI) |
 | `azure-discovery` | `id-sportify-discovery` | `Reader` on the approved subscriptions | — |
-| `provisioning-orchestrator` (api + worker) | `id-sportify-orchestrator` | None on Azure resources. `Key Vault Secrets User` on the platform vault | GitHub App #2 key and webhook secret (Key Vault through CSI) |
+| `provisioning-orchestrator` (api + worker) | `id-sportify-orchestrator` | None on Azure resources. `Key Vault Secrets User` on its own secrets only (per-secret scope) | GitHub App #2 key and webhook secret (Key Vault through CSI) |
 | PostgreSQL logins | Entra authentication mapped to the identities above | Per-database roles | No passwords |
 
 **Trust rules:**

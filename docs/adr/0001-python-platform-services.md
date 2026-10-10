@@ -23,10 +23,10 @@ Backstage's backend is Node.js. Any discovery or orchestration logic built as Ba
 ## Decision
 
 - Run **self-hosted Backstage** and use its built-in catalog, scaffolder (`fetch:template`, `publish:github`, `catalog:register`), TechDocs, auth, permissions and GitHub integration.
-- Keep custom TypeScript to **one thin backend bridge plugin** (forwarding calls with the user's identity, plus two scaffolder actions) and **one thin frontend plugin** (the resource picker field and the status card). Neither contains business logic.
+- Keep custom TypeScript to **one thin backend bridge plugin** (forwarding calls with the user's identity, plus two scaffolder actions) and **one thin frontend plugin** (the resource picker field, the Provisioning tab and the Approvals page). Neither contains business logic.
 - Put all platform logic in **Python FastAPI services**:
-  - `azure-discovery-service`: read-only, with the `Reader` identity only.
-  - `provisioning-orchestrator-service`: an API plus a worker, with state in PostgreSQL. It uses a GitHub App token and has no Azure access.
+  - `azure-discovery`: read-only, with the `Reader` identity only.
+  - `provisioning-orchestrator`: an API plus a worker, with state in PostgreSQL. It uses a GitHub App token and has no Azure resource access; it reads only its own Key Vault secrets.
 
 ### Orchestration engine
 
