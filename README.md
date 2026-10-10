@@ -52,13 +52,42 @@ The developer selects:
 | Owner / owning team | Resolved from the Backstage catalog |
 | Technology | NestJS (TypeScript) initially; the template architecture is extensible |
 | Environment | `dev` initially |
-| Azure subscription and resource group | Populated from Azure discovery and restricted to an allowlist |
-| Infrastructure | Reuse existing approved resources, or request additional ones |
-| AKS cluster and namespace | Shared, approved clusters only; one namespace per application |
-| Runtime capability | Azure Storage or Key Vault access through Workload Identity |
+| Azure subscription | **Select existing** only. Listed by the discovery service and restricted to an allowlist |
+| Resource group | **Create new** or **Select existing** |
+| AKS cluster | **Select existing** only. Shared, approved clusters |
+| Kubernetes namespace | **Create new** (default) or **Select existing** namespace owned by the same team |
+| Runtime capability | Azure Storage or Key Vault: **Create new** or **Select existing**, accessed through Workload Identity |
 | Repository visibility and deployment options | Limited to permitted values |
 
 Sensible defaults let a developer complete the path without filling in every optional field.
+
+### Create new or select existing
+
+For each Azure resource the application can own, the Backstage form shows two options:
+
+```
+Resource group      (•) Create new        ( ) Select existing
+                    Name: rg-orders-api-dev            [validated as you type]
+
+Storage account     ( ) Create new        (•) Select existing
+                    [ stordersshareddev  (uksouth, rg-shared-dev)  ▼ ]
+                      ↑ populated from azure-discovery-service
+```
+
+| | **Create new** | **Select existing** |
+|---|---|---|
+| Form input | Name field, pre-filled with a name that follows the naming convention | Dropdown filled from the discovery service. It shows only resources that are allowlisted, in an approved region and visible to the discovery identity |
+| Server-side validation | Naming rules, global name availability (e.g. Storage), region and SKU allowlist, quota | The ID is re-resolved through `POST /v1/validate`, confirming it still exists, its type and region are correct, and it is eligible for this team and environment |
+| Terraform | Generated as a `resource` block, tagged with owner, environment, application and `managed-by: sportify-platform` | Generated as a `data` block. The platform only adds role assignments and never modifies or destroys the existing resource |
+| Plan and approval | Shown as an addition in the plan summary; requires approval before apply | Shown as reuse. Role assignments still appear in the plan and require approval |
+| Cleanup on failure or deletion | Can be removed by the controlled cleanup procedure | Never deleted by the platform |
+
+Some resources are **select existing** only, by design:
+
+- **Subscriptions.** Creating subscriptions (subscription vending) belongs to the landing-zone process, not to an application request.
+- **AKS clusters and container registries.** These are shared platform infrastructure with their own lifecycle under `iac/`. The platform never creates a cluster per application.
+
+If discovery returns nothing to select, for example because the identity lacks `Reader` or nothing is allowlisted, the form disables **Select existing** and shows the reason instead of an empty dropdown.
 
 ## Architecture
 
@@ -140,7 +169,7 @@ The target feature set for the first milestone:
 
 - Backstage portal with catalog, scaffolder, TechDocs and GitHub integration
 - NestJS golden-path template with a real sample business endpoint, validation, health endpoints and tests
-- Dynamic, server-validated Azure resource selection
+- **Create new** or **Select existing** for each application-owned Azure resource, with dynamic, server-validated selections
 - Durable workflow with explicit states, persistence, restart recovery, idempotency and duplicate detection
 - Terraform plan, security and policy checks, and plan review before apply
 - Approval gates on infrastructure apply and deployment through GitHub Environments
