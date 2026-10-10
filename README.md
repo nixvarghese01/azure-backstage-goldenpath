@@ -71,6 +71,7 @@ The form collects:
 | Kubernetes namespace | **Create new** or **Select existing** namespace owned by the same team |
 | Runtime capability | Azure Storage or Key Vault: **Create new** or **Select existing**, accessed through Workload Identity |
 | Endpoint host | For example `orders-api.dev.sportify.example`; served by the cluster's shared Gateway (App Routing Gateway API) |
+| **High availability** | **Do you need HA?** Yes / No. The default is No in `dev` (Yes in a future `prod`). Choosing the non-default option requires a **reason and justification**, which is shown to the approver. See [High-availability option](#high-availability-option) |
 | Repository visibility and deployment options | Limited to permitted values. **Public** is the default (see [Repository visibility](#repository-visibility)) |
 
 Sensible defaults let a developer complete the path without filling in every optional field.
@@ -114,6 +115,21 @@ Some resources have stricter rules when **Create new** is chosen:
 Resources created at subscription or cluster level have higher cost and blast radius, so they require an extra approval step and are listed separately in the plan summary.
 
 If discovery returns nothing to select, for example because the identity lacks `Reader` or nothing is allowlisted, the form disables **Select existing** and shows the reason instead of an empty dropdown.
+
+### High-availability option
+
+The form asks **"Do you need high availability?"** so the cost and complexity of HA is a deliberate, recorded choice ([ADR-0004](docs/adr/0004-availability-tier-option.md)).
+
+| | Standard | High availability |
+|---|---|---|
+| Replicas / autoscaling | 1 / off | ≥2 / HPA 2–5 |
+| Disruption budget, zone spreading | — | PDB `minAvailable: 1`, spread across availability zones |
+| New Storage account | LRS | ZRS |
+| When a justification is needed | Opting out where HA is the default (future `prod`) | Opting in where Standard is the default (`dev`) |
+
+- The server checks that the selected cluster has a node pool spanning at least two zones. It rejects missing or placeholder justifications, and it warns when HA is paired with existing LRS storage.
+- The approval card shows an HA badge, the reason, the justification, the SLO target and the cost difference, if configured.
+- The decision is stored in the audit log and as catalog annotations.
 
 ## Architecture
 
@@ -227,7 +243,7 @@ Planned endpoints (all read-only):
 | `GET` | `/readyz` | Readiness, including whether an Azure credential can be acquired |
 | `GET` | `/v1/subscriptions` | Enabled subscriptions visible to the discovery identity, filtered by the allowlist |
 | `GET` | `/v1/subscriptions/{id}/resource-groups` | Allowlisted resource groups in an approved region |
-| `GET` | `/v1/subscriptions/{id}/aks-clusters` | Approved shared AKS clusters, including whether Workload Identity and the OIDC issuer are enabled |
+| `GET` | `/v1/subscriptions/{id}/aks-clusters` | Approved shared AKS clusters, including whether Workload Identity and the OIDC issuer are enabled, and node pool zones and node counts (for HA eligibility) |
 | `GET` | `/v1/subscriptions/{id}/container-registries` | Approved container registries |
 | `GET` | `/v1/subscriptions/{id}/resources?type=…` | Allowlisted Storage accounts and Key Vaults available for reuse |
 | `POST` | `/v1/validate` | Server-side eligibility check for a full selection set, used by the orchestrator |
@@ -548,7 +564,7 @@ Planned documentation, published through TechDocs:
 - [`COMPATIBILITY.md`](COMPATIBILITY.md): component version compatibility plan
 - [`docs/architecture/microservices.md`](docs/architecture/microservices.md): platform microservices architecture (Backstage, discovery, orchestrator)
 - [`docs/security/secret-management.md`](docs/security/secret-management.md): secret inventory, Key Vault, delivery, rotation and incident response
-- `docs/adr/`: Architecture Decision Records: [0001 Python platform services](docs/adr/0001-python-platform-services.md), [0002 Terraform structure](docs/adr/0002-terraform-structure.md), [0003 Ingress through the Gateway API](docs/adr/0003-ingress-gateway-api.md)
+- `docs/adr/`: Architecture Decision Records: [0001 Python platform services](docs/adr/0001-python-platform-services.md), [0002 Terraform structure](docs/adr/0002-terraform-structure.md), [0003 Ingress through the Gateway API](docs/adr/0003-ingress-gateway-api.md), [0004 High-availability option](docs/adr/0004-availability-tier-option.md)
 - `docs/security/`: identity boundaries and the exact Azure and GitHub permissions per identity
 - [`docs/developer-guide/golden-path.md`](docs/developer-guide/golden-path.md): the end-to-end golden path, approval in Backstage and the shared URLs
 - [`docs/operations/cleanup.md`](docs/operations/cleanup.md): cleanup and teardown; troubleshooting and recovery procedures will follow

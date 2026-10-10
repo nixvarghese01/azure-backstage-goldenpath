@@ -217,7 +217,8 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 - [ ] `templates/applications/nestjs/`: scaffolder template (four form pages), the infrastructure-only skeleton, and the application PR content (stack template).
 - [ ] Modules `naming`, `app-identity`, `app-namespace`, `role-assignment`, `storage-account`, each with `terraform test`.
 - [ ] Generated `infra/terraform` root using the create-new or select-existing `mode` variables.
-- [ ] Helm chart: Deployment, Service, ServiceAccount (Workload Identity), HTTPRoute, optional HPA, and hardened `securityContext`.
+- [ ] Helm chart: Deployment, Service, ServiceAccount (Workload Identity), HTTPRoute, and hardened `securityContext`. The `availability.tier` value switches replicas, HPA, PDB and topology spread ([ADR-0004](docs/adr/0004-availability-tier-option.md)).
+- [ ] HA option end to end: form field with conditional reason, justification and SLO; `/v1/validate` checks (cluster zones, ZRS in region, justification quality); tfvars tier for tags and storage SKU; HA badge on the approval card; catalog annotations and an audit entry.
 - [ ] NestJS app: `/v1/orders` (create, list, get) with validation, `/health/live` and `/health/ready`, Storage access through `DefaultAzureCredential`, and Vitest tests.
 - [ ] The five generated workflows from [§3.2](#32-generated-application-repository).
 - [ ] Policies: Conftest rules for regions, tags, roles, and preventing changes to unmanaged resources.

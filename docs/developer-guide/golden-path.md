@@ -29,6 +29,7 @@ The examples in this guide use the following request.
 | Namespace | Create new: `orders-api` |
 | Runtime capability | Storage, select existing: `stsportifyshareddev` (blob read and write) |
 | Endpoint host | `orders-api.dev.sportify.example` |
+| High availability | **No** (the `dev` default, so no justification is needed) |
 | Repository visibility | Public |
 
 ## Sequence
@@ -87,6 +88,27 @@ sequenceDiagram
     Orch-->>Dev: Backstage notification with URLs
 ```
 
+## High-availability choice
+
+Page 4 asks **"Do you need high availability?"** ([ADR-0004](../adr/0004-availability-tier-option.md)).
+
+```
+High availability   ( ) Yes   (•) No          ← default for dev
+  ℹ HA runs ≥2 replicas across zones, with a disruption budget and autoscaling, and uses
+    zone-redundant storage for new storage. It increases cost and needs approval.
+
+── when "Yes" is selected in dev ──────────────────────────────────────
+  Reason         [ Customer-facing                      ▼ ]
+  Justification  [ Public checkout API used by the web shop; outages block
+                   orders. Needs to survive a zone failure.               ]
+  SLO target     [ 99.9 %  ▼ ]
+```
+
+| Choice in `dev` | Effect |
+|---|---|
+| **No** (default) | 1 replica, no HPA or PDB, LRS for new storage. No justification needed |
+| **Yes** | ≥2 replicas, HPA 2–5, PDB, zone spreading, ZRS for new storage. **Reason and justification required.** The server checks that the cluster spans at least 2 zones. The approval card shows an HA badge |
+
 ## Step 1: Submit everything in Backstage
 
 The template **Create → "Secure NestJS REST API"** is a single form with four pages, followed by a review page.
@@ -96,7 +118,7 @@ The template **Create → "Secure NestJS REST API"** is a single form with four 
 | 1. Application | Name, description, owner | Owner from the Backstage catalog (the user's groups) |
 | 2. Stack | Stack, sample endpoint, OpenAPI docs, runtime capability | A stack registry: NestJS is enabled, other stacks are listed as *coming soon* and disabled |
 | 3. Infrastructure | **Create new / Select existing** for the subscription, resource group, AKS cluster, container registry, namespace and Storage or Key Vault | `azure-discovery-service`, called through the Backstage bridge; each picker is filtered by the selection above it |
-| 4. Deployment | Environment, deploy target, endpoint host, repository visibility | Platform policy (`policies/`) |
+| 4. Deployment | Environment, deploy target, endpoint host, **high availability (Yes/No) with reason, justification and SLO target**, repository visibility | Platform policy (`policies/`); cluster zone data from discovery |
 
 When the developer clicks **Create**:
 
@@ -135,6 +157,7 @@ The approval decision is made in Backstage, and GitHub enforces it.
 
 - the requester, application, environment and time
 - the plan summary: resources added, changed, destroyed and reused
+- the **availability tier**, with an **HA badge**, reason, justification, SLO target and any warnings (for example, existing LRS storage) when HA was requested
 - the policy check and security scan results
 - the cost estimate, only when a reliable estimate is configured
 - links to the full plan and the workflow run
