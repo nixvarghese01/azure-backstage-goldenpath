@@ -108,23 +108,29 @@ If discovery returns nothing to select, for example because the identity lacks `
 flowchart LR
     Dev([Developer]) --> Portal
 
-    subgraph Backstage["Backstage (platform monorepo)"]
-        Portal[Frontend app<br/>Catalog · Scaffolder · TechDocs]
-        Portal --> API[Backend]
-        API --> Orch[provisioning-orchestrator plugin]
-        Orch --> DB[(Workflow state<br/>+ audit log)]
-        Portal --> Status[provisioning-status plugin]
-        Status --> Orch
+    subgraph Backstage["Backstage · TypeScript (built-ins + thin bridges)"]
+        Portal[Frontend<br/>Catalog · Scaffolder · TechDocs<br/>+ resource picker · status card]
+        Portal --> API[Backend<br/>built-in plugins]
+        API --> Bridge[sportify-platform-backend<br/>bridge plugin]
     end
 
-    API -- REST --> Disc[azure-discovery-service<br/>Python · FastAPI]
-    Disc --> Policy[/policies<br/>allowlists/]
+    subgraph Python["Platform services · Python (FastAPI)"]
+        Disc[azure-discovery-service]
+        Orch[provisioning-orchestrator-service<br/>API + worker]
+        Orch --> DB[(PostgreSQL<br/>workflow state + audit)]
+        Orch -- validate --> Disc
+        Disc --> Policy[/policies<br/>allowlists/]
+    end
+
+    Bridge -- service token + user --> Disc
+    Bridge -- service token + user --> Orch
+    API -- publish:github --> GH
     Disc -- read-only --> ARG[Azure Resource Graph / ARM]
-    Orch --> GH[GitHub<br/>repo + Actions]
+    Orch -- GitHub App --> GH[GitHub<br/>repo + Actions]
+    GH -- webhooks --> Orch
     GH -- OIDC --> TF[Terraform<br/>plan / apply]
     TF --> Azure[(Azure: RG, UAMI,<br/>Storage / Key Vault, ACR)]
     GH -- OIDC --> AKS[Shared AKS cluster]
-    GH -- workflow events --> Orch
     AKS -- Workload Identity --> Azure
 ```
 
@@ -133,16 +139,51 @@ flowchart LR
 | Component | Responsibility |
 |---|---|
 | **Software Catalog** | Ownership, metadata and discovery of services, including generated applications |
-| **Scaffolder + Software Templates** | Self-service request form and repository generation |
+| **Scaffolder + Software Templates** | Self-service request form and repository generation, using the built-in `fetch:template`, `publish:github` and `catalog:register` actions |
+| **`sportify-platform-backend`** (TypeScript, thin bridge) | One small backend plugin. It forwards discovery and orchestrator calls to the Python services with the signed-in user's identity and a service token. It also adds two scaffolder actions, `sportify:request:submit` and `sportify:request:repository-created`. It contains no business logic |
+| **`sportify-platform`** (TypeScript, thin frontend) | A scaffolder field extension that provides the **Create new / Select existing** resource picker, and an entity card that shows provisioning status. Both only call the bridge |
 | **`azure-discovery-service`** (Python, FastAPI) | Standalone, read-only REST service. It lists the existing subscriptions visible to the discovery identity (the same ones shown in the Azure portal), then their resource groups, AKS clusters, registries and data services, using ARM and Azure Resource Graph. Results are filtered against the policy allowlists before they are returned |
-| **`azure-discovery-backend` plugin** | Thin Backstage backend module that calls the discovery service on the server side. It backs the scaffolder's dynamic dropdowns and lets the orchestrator re-validate submitted selections. The browser never calls the discovery service directly |
-| **`provisioning-orchestrator` plugin** | Durable asynchronous workflow engine: validation, policy, GitHub orchestration, approvals, retries and audit |
-| **`provisioning-status` plugin** | Shows stage progress, approvals, plan summaries, deployment state, health and failure diagnostics on the entity page |
+| **`provisioning-orchestrator-service`** (Python, FastAPI + worker) | Durable asynchronous workflow engine. It owns request validation, the state machine, idempotency, GitHub workflow dispatch, approval tracking, retries, cleanup and the audit log, with state stored in PostgreSQL |
 | **Policies** | Allowlists for subscriptions, regions, environments, clusters, resource types and operations, enforced on the server |
 | **TechDocs** | Architecture, onboarding, service and operations documentation |
 | **GitHub integration** | Repository creation, workflow dispatch, environment approvals and run status |
 
-The platform uses Backstage's new backend system and its extension points wherever they apply. Business logic lives in backend plugins, not in frontend components. Built-in capabilities are preferred over custom plugins when they meet the requirement.
+**Split between Backstage and Python** (see [ADR-0001](docs/adr/0001-python-platform-services.md)):
+
+- **Backstage (TypeScript)** provides what it already does well: the catalog, scaffolder, TechDocs, sign-in, permissions and the GitHub integration. Custom TypeScript is limited to one bridge backend plugin and one small frontend plugin, built on the new backend system and its extension points.
+- **Python (FastAPI)** holds all platform business logic: Azure discovery, policy evaluation and workflow orchestration. It uses the official Azure SDKs for Python and can be tested and released independently of Backstage.
+- The browser only ever talks to Backstage. The Python services are reachable only from the Backstage backend and from GitHub webhooks, which are verified with an HMAC signature.
+
+### Request flow
+
+1. The developer fills in the scaffolder form. The resource picker loads its options from the discovery service through the bridge.
+2. `sportify:request:submit` sends the request to the orchestrator, using the scaffolder task ID as the idempotency key. The orchestrator re-validates every selection through the discovery service and the policies, then returns a request ID, or rejects the request before any repository exists.
+3. The built-in `publish:github` creates the repository and `catalog:register` registers it.
+4. `sportify:request:repository-created` reports the repository to the orchestrator, and the scaffolder task finishes.
+5. The orchestrator continues asynchronously. It dispatches the generated repository's workflows through a GitHub App, follows their progress through `workflow_run` and `deployment` webhooks, and polls periodically to catch any lost events. The status card shows each stage.
+
+### Provisioning orchestrator service
+
+The orchestrator is a FastAPI API plus a separate worker process, both sharing one PostgreSQL database:
+
+- **State machine.** Each request is a row with an explicit state (see [Workflow lifecycle](#workflow-lifecycle)). Every state change goes through one transition function that rejects illegal transitions.
+- **Durable jobs.** The worker claims pending steps with `SELECT ... FOR UPDATE SKIP LOCKED`, so several workers or a restarted worker never process the same step twice. In-flight requests resume after a restart.
+- **Idempotency.** Each request has an idempotency key and each step has a deduplication key. A duplicate submission returns the existing request. Repeated webhooks for the same run are ignored.
+- **Approvals.** Approval of `terraform-apply` and deployment is enforced by GitHub Environments with required reviewers. The orchestrator reflects the pending approval as `AWAITING_APPROVAL` and records who approved it.
+- **No Azure write access.** The orchestrator only uses a GitHub App token. All Azure changes are made by Terraform in GitHub Actions using OIDC identities.
+- **Audit.** An append-only `audit_events` table records who requested, who approved, which workflow run produced which result and what changed. Secrets and sensitive Terraform output are never stored.
+
+Planned endpoints:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/v1/requests` | Submit and validate a request (idempotent) |
+| `GET` | `/v1/requests/{id}` | Current state, stage history and diagnostics |
+| `POST` | `/v1/requests/{id}/repository` | Record the created repository and start the asynchronous workflow |
+| `POST` | `/v1/requests/{id}/cancel` | Cancel a request that has not started applying |
+| `POST` | `/v1/requests/{id}/cleanup` | Start controlled cleanup of resources the platform created |
+| `POST` | `/v1/webhooks/github` | Receive GitHub events (HMAC-verified) |
+| `GET` | `/healthz`, `/readyz` | Health checks |
 
 ### Azure discovery service
 
@@ -166,7 +207,7 @@ Design rules:
 - Authentication uses `DefaultAzureCredential`: Workload Identity on AKS, and `az login` or environment credentials for local development. No client secrets are stored in the repository.
 - The identity has only the `Reader` role. The service never calls write operations.
 - Resource Graph results are paginated using skip tokens. Throttling (`429`) and transient errors are retried with backoff. Permission errors and missing resources produce typed error responses, never empty success responses.
-- Only Backstage's backend calls the service, using service-to-service authentication. Discovery results are suggestions only: the orchestrator re-validates every submitted ID through `/v1/validate` before acting on it.
+- Only the Backstage bridge and the orchestrator call the service, using service-to-service authentication. Discovery results are suggestions only: the orchestrator re-validates every submitted ID through `/v1/validate` before acting on it.
 
 **Microsoft Graph** is used only for supported Microsoft Entra operations. It does not provision Azure infrastructure; Terraform does.
 
@@ -194,7 +235,7 @@ The target feature set for the first milestone:
 
 ## Workflow lifecycle
 
-The orchestrator models each request as a persisted state machine:
+The Python orchestrator models each request as a state machine persisted in PostgreSQL:
 
 ```mermaid
 stateDiagram-v2
@@ -224,7 +265,7 @@ stateDiagram-v2
 |---|---|
 | 1. Validate | Name, owner, environment, subscription, cluster, permissions and allowlisted selections are checked on the server |
 | 2. Discover | The Python discovery service uses Azure Resource Graph and ARM to confirm each resource's existence, type, region and eligibility, using a read-only identity |
-| 3. Repository | One GitHub repository is created per request, containing the application, Terraform, Helm, workflows, catalog metadata and docs |
+| 3. Repository | The built-in scaffolder action `publish:github` creates one GitHub repository per request, containing the application, Terraform, Helm, workflows, catalog metadata and docs |
 | 4. Validate infra | `terraform fmt`/`init`/`validate`, security scanning, policy checks and Helm linting run; the plan is retained and summarised |
 | 5. Provision | After approval, the plan is applied and resource readiness and identity configuration are verified |
 | 6. Build | Tests run, the image is built, dependencies and the image are scanned, and the image is pushed to the approved registry |
@@ -234,7 +275,7 @@ stateDiagram-v2
 
 Durability guarantees:
 
-- State and execution metadata are persisted, and in-flight workflows resume after a Backstage restart.
+- State and execution metadata are persisted in PostgreSQL. In-flight workflows resume after a restart of Backstage or the orchestrator.
 - Idempotency keys prevent duplicate repositories, and repeated callbacks are ignored.
 - An approved plan is applied at most once.
 - A failed deployment can never be marked as succeeded.
@@ -246,6 +287,7 @@ Durability guarantees:
 | Identity | Scope | Auth |
 |---|---|---|
 | **Discovery** (used by `azure-discovery-service`) | Read-only (`Reader`) on approved subscriptions | Workload Identity on AKS, `az login` locally |
+| **Orchestrator** (used by `provisioning-orchestrator-service`) | GitHub App installation scoped to generated repositories: Actions, Deployments and Contents (read). No Azure access | GitHub App private key, held in Key Vault and mounted through the Secrets Store CSI driver |
 | **Subscription vending** (only when a new subscription is requested) | Subscription creator on the billing scope, and management group placement | GitHub OIDC federated credential, used by a platform-team-approved workflow |
 | **Terraform provisioning** | Narrowly scoped to approved resource groups and role-assignment conditions | GitHub OIDC federated credential |
 | **Deployment** | Push to the approved ACR and deploy to the application's namespace only | GitHub OIDC federated credential |
@@ -273,15 +315,19 @@ sportify-azure-backstage/
 ├── packages/
 │   ├── app/                         # Backstage frontend
 │   └── backend/                     # Backstage backend (new backend system)
-├── plugins/
-│   ├── azure-discovery-backend/     # calls azure-discovery-service
-│   ├── provisioning-orchestrator-backend/
-│   └── provisioning-status/         # frontend entity card / page
-├── services/
-│   └── azure-discovery/             # Python FastAPI discovery service
-│       ├── app/                     # routers, Azure clients, policy filter
-│       ├── tests/                   # pytest with mocked Azure SDK
-│       ├── pyproject.toml
+├── plugins/                         # TypeScript, kept thin
+│   ├── sportify-platform-backend/   # bridge + scaffolder actions
+│   └── sportify-platform/           # resource picker field + status card
+├── services/                        # Python, all platform logic
+│   ├── pyproject.toml               # uv workspace
+│   ├── azure-discovery/             # FastAPI, read-only Azure discovery
+│   │   ├── app/                     # routers, Azure clients, policy filter
+│   │   ├── tests/
+│   │   └── Dockerfile
+│   └── provisioning-orchestrator/   # FastAPI API + worker
+│       ├── app/                     # API, state machine, worker, GitHub client
+│       ├── migrations/              # Alembic
+│       ├── tests/
 │       └── Dockerfile
 ├── templates/
 │   └── applications/
@@ -342,7 +388,8 @@ These are the planned prerequisites. Exact pinned versions will be recorded in `
 **Local development**
 
 - Node.js (an Active LTS release supported by the chosen Backstage version) and Yarn
-- Python 3.12+ and [uv](https://docs.astral.sh/uv/) for the discovery service
+- Python 3.12+ and [uv](https://docs.astral.sh/uv/) for the platform services
+- PostgreSQL (run through Docker Compose for local development)
 - Azure CLI (`az login`) for running discovery locally against real subscriptions
 - Docker
 - Terraform, TFLint and a Terraform security scanner (e.g. Trivy or Checkov)
@@ -355,7 +402,7 @@ These are the planned prerequisites. Exact pinned versions will be recorded in `
 - A shared AKS cluster with the OIDC issuer and Workload Identity enabled
 - An Azure Container Registry
 - An Azure Storage account for Terraform state
-- A GitHub organisation, plus a GitHub App for Backstage with scoped repository permissions
+- A GitHub organisation, a GitHub App for Backstage (repository creation) and a separate GitHub App for the orchestrator (workflow dispatch and webhooks)
 - Microsoft Entra app registrations or managed identities for each identity in the [identity model](#identity-and-security-model)
 
 ## Local development
@@ -366,17 +413,21 @@ These are the planned prerequisites. Exact pinned versions will be recorded in `
 # install dependencies
 yarn install
 
-# start Backstage (frontend + backend) with mocked Azure/GitHub adapters
-yarn dev
+# start PostgreSQL
+docker compose up -d postgres
 
-# start the discovery service (in a second terminal)
-cd services/azure-discovery
-uv sync
-uv run fastapi dev app/main.py        # http://localhost:8000/docs
+# start the Python platform services (one terminal each)
+cd services && uv sync
+uv run --package azure-discovery fastapi dev azure-discovery/app/main.py --port 8001
+uv run --package provisioning-orchestrator fastapi dev provisioning-orchestrator/app/main.py --port 8002
+uv run --package provisioning-orchestrator python -m app.worker
+
+# start Backstage (frontend + backend)
+yarn dev
 
 # run all tests
 yarn test:all
-(cd services/azure-discovery && uv run pytest)
+(cd services && uv run pytest)
 
 # lint and type-check
 yarn lint:all && yarn tsc
@@ -388,8 +439,9 @@ Mock adapters are only for local development and isolated tests. Live integratio
 
 | Level | Coverage |
 |---|---|
-| Unit | Request validation, policy decisions, state transitions, error handling |
-| Backend integration | Backstage APIs and the orchestrator against a real database |
+| Unit (Python) | Request validation, policy decisions, state transitions, error handling |
+| Orchestrator integration | FastAPI API and worker against a real PostgreSQL (Testcontainers): idempotency, concurrent workers, restart recovery, webhook replay |
+| Bridge (TypeScript) | Backstage bridge plugin and scaffolder actions against a stubbed orchestrator |
 | Discovery service | pytest + FastAPI `TestClient` with a mocked Azure SDK: pagination, permission errors, missing resources, throttling, allowlist filtering |
 | Infrastructure | `terraform fmt -check`, `init`, `validate`, security scanning, policy tests |
 | Helm | `helm lint`, template rendering, schema validation, kind-based install test |
@@ -404,7 +456,7 @@ Mock adapters are only for local development and isolated tests. Live integratio
 |---|---|---|
 | 1 | Repository inspection, gap analysis, architecture documentation | 🟡 In progress |
 | 2 | Backstage portal, catalog, scaffolder, local dev environment | ⚪ Not started |
-| 3 | NestJS golden path: repository generation, Terraform validation, workflow execution, Helm deploy, status reporting | ⚪ Not started |
+| 3 | NestJS golden path: Python orchestrator, repository generation, Terraform validation, workflow execution, Helm deploy, status reporting | ⚪ Not started |
 | 4 | Azure discovery service (Python FastAPI) and secure identity integration | ⚪ Not started |
 | 5 | Real Azure provisioning, approvals, state management, failure recovery, cleanup | ⚪ Not started |
 | 6 | Full automated testing, security checks, documentation, reproducible demo | ⚪ Not started |
