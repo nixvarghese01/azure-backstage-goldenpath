@@ -6,7 +6,7 @@ Sportify Azure Backstage lets developers request a production-shaped service thr
 
 > **This is a model project.** It is a reference design that shows how an enterprise-grade IDP on Backstage and Azure can be structured, secured and operated. The implementation is deliberately scoped to one golden path, to demonstrate the design end to end. It is not intended for wide production rollout as-is. Where a production platform would make a different trade-off, the [ADRs](docs/adr/) say so.
 
-> **Project status: Phase 1 (architecture and planning).**
+> **Project status: Phase 1 (architecture and planning) complete; Phase 2 next.**
 > This README describes the target design and the first golden path. Nothing listed under [Features](#features) is implemented yet unless the [Implementation status](#implementation-status) table says so. The table is the source of truth and is updated as each phase is completed and verified.
 
 ---
@@ -70,7 +70,7 @@ The form collects:
 | Container registry | **Create new** or **Select existing** |
 | Kubernetes namespace | **Create new** or **Select existing** namespace owned by the same team |
 | Runtime capability | Azure Storage or Key Vault: **Create new** or **Select existing**, accessed through Workload Identity |
-| Endpoint host | For example `orders-api.dev.sportify.example`; served by the cluster's shared ingress |
+| Endpoint host | For example `orders-api.dev.sportify.example`; served by the cluster's shared Gateway (App Routing Gateway API) |
 | Repository visibility and deployment options | Limited to permitted values. **Public** is the default (see [Repository visibility](#repository-visibility)) |
 
 Sensible defaults let a developer complete the path without filling in every optional field.
@@ -383,7 +383,7 @@ sportify-azure-backstage/
 │   └── platform/                    # shared platform stacks, one state each
 │       ├── 00-bootstrap/            #   Terraform state storage
 │       ├── 10-identities/           #   platform identities + OIDC federation
-│       └── 20-shared-dev/           #   AKS, ACR, ingress, DNS
+│       └── 20-shared-dev/           #   AKS, ACR, shared Gateway, DNS
 ├── policies/                        # allowlists + OPA/Conftest rules for Terraform plans
 ├── docs/
 │   ├── architecture/
@@ -417,7 +417,7 @@ Each request produces one self-contained repository that the application team ow
 │       └── terraform.tfvars # rendered from the Backstage form
 ├── deploy/helm/application/
 │   ├── Chart.yaml  values.yaml  values-dev.yaml
-│   └── templates/           # Deployment, Service, ServiceAccount, optional HPA/Ingress
+│   └── templates/           # Deployment, Service, ServiceAccount, HTTPRoute, optional HPA
 ├── .github/workflows/
 │   ├── terraform-validate.yml
 │   ├── terraform-plan.yml
@@ -436,23 +436,24 @@ The Terraform `.tf` files are the same in every generated repository. The scaffo
 
 ## Prerequisites
 
-These are the planned prerequisites. Exact pinned versions will be recorded in `docs/adr/` once each phase is implemented.
+These are the planned prerequisites. Versions were checked on 2026-10-10; the full matrix, constraints and risks are in **[COMPATIBILITY.md](COMPATIBILITY.md)**.
 
 **Local development**
 
-- Node.js (an Active LTS release supported by the chosen Backstage version) and Yarn
-- Python 3.12+ and [uv](https://docs.astral.sh/uv/) for the platform services
+- **WSL2 (Ubuntu) or a dev container on Windows.** Backstage needs a Unix-like OS.
+- Node.js **24 LTS** and Yarn **4.13** (as pinned by Backstage 1.55)
+- Python **3.14** and [uv](https://docs.astral.sh/uv/) **0.13** for the platform services
 - PostgreSQL (run through Docker Compose for local development)
-- Azure CLI (`az login`) for running discovery locally against real subscriptions
+- Azure CLI **≥ 2.86** (`az login`) for running discovery locally against real subscriptions
 - Docker
-- Terraform, TFLint and a Terraform security scanner (e.g. Trivy or Checkov)
-- Helm and kubectl
-- A local Kubernetes cluster (kind or k3d) for chart testing
+- Terraform **1.16**, TFLint **0.64**, Checkov **3.3**, Conftest **0.71** and Trivy **0.75** (checksum-verified)
+- Helm **4.3**, kubectl **1.36** and kubelogin **0.2.21**
+- kind **0.33** with a `v1.36.x` node image, matching AKS, for chart testing
 
 **Live Azure and GitHub execution**
 
 - An Azure subscription with permission to create role assignments and federated credentials
-- A shared AKS cluster with the OIDC issuer and Workload Identity enabled, plus a shared ingress controller and a DNS zone for application endpoints
+- A shared AKS **1.36** cluster with the OIDC issuer, Workload Identity, the managed Gateway API CRDs and the App Routing Gateway API implementation enabled, plus a DNS zone for application endpoints ([ADR-0003](docs/adr/0003-ingress-gateway-api.md))
 - An Azure Container Registry
 - An Azure Storage account for Terraform state
 - A GitHub organisation, a GitHub App for Backstage (repository creation) and a separate GitHub App for the orchestrator (workflow dispatch, webhooks, application pull requests), registered as a custom deployment protection rule provider
@@ -507,7 +508,7 @@ Mock adapters are only for local development and isolated tests. Live integratio
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1 | Repository inspection, gap analysis, architecture documentation | 🟡 In progress |
+| 1 | Repository inspection, gap analysis, architecture documentation | ✅ Done (design documents, see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)) |
 | 2 | Backstage portal, catalog, scaffolder, local dev environment | ⚪ Not started |
 | 3 | NestJS golden path: Python orchestrator, repository generation, Terraform validation, workflow execution, Helm deploy, status reporting | ⚪ Not started |
 | 4 | Azure discovery service (Python FastAPI) and secure identity integration | ⚪ Not started |
@@ -532,7 +533,7 @@ After the NestJS golden path works reliably:
 
 - More application templates (Next.js, Python, .NET, Go, Java) on the same extensible template architecture
 - Additional environments (test, prod) with stricter approvals
-- NetworkPolicies, ingress hardening, observability (OpenTelemetry, Azure Monitor) and environment-specific controls
+- NetworkPolicies, Gateway hardening (TLS policy, rate limiting through Application Gateway for Containers or the Istio add-on), observability (OpenTelemetry, Azure Monitor) and environment-specific controls
 - Cost estimation integration, with configurable pricing assumptions and no hardcoded "free tier" claims
 
 Installing a Helm chart successfully does not make it production-ready. Remaining production requirements will be tracked in `docs/operations/production-readiness.md`.
@@ -542,7 +543,9 @@ Installing a Helm chart successfully does not make it production-ready. Remainin
 Planned documentation, published through TechDocs:
 
 - `docs/architecture/`: context, data flow, trust boundaries, failure recovery
-- `docs/adr/`: Architecture Decision Records: [0001 Python platform services](docs/adr/0001-python-platform-services.md), [0002 Terraform structure](docs/adr/0002-terraform-structure.md)
+- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md): proposed workflow, CI/CD workflow design and the detailed phased plan
+- [`COMPATIBILITY.md`](COMPATIBILITY.md): component version compatibility plan
+- `docs/adr/`: Architecture Decision Records: [0001 Python platform services](docs/adr/0001-python-platform-services.md), [0002 Terraform structure](docs/adr/0002-terraform-structure.md), [0003 Ingress through the Gateway API](docs/adr/0003-ingress-gateway-api.md)
 - `docs/security/`: identity boundaries and the exact Azure and GitHub permissions per identity
 - [`docs/developer-guide/golden-path.md`](docs/developer-guide/golden-path.md): the end-to-end golden path, approval in Backstage and the shared URLs
 - [`docs/operations/cleanup.md`](docs/operations/cleanup.md): cleanup and teardown; troubleshooting and recovery procedures will follow

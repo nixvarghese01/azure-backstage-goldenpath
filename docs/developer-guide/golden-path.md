@@ -232,7 +232,7 @@ Expected duration: about 10–15 minutes of automated work, plus the time taken 
 
 These are set up once by the platform team:
 
-- the shared AKS cluster with the OIDC issuer and Workload Identity enabled, plus a **shared ingress controller** and a **DNS zone** for `*.dev.sportify.example`
+- the shared AKS cluster with the OIDC issuer and Workload Identity enabled, the **App Routing Gateway API** with a shared `Gateway` ([ADR-0003](../adr/0003-ingress-gateway-api.md)), and a **DNS zone** for `*.dev.sportify.example`
 - the shared container registry and the Terraform state storage account
 - the discovery, provisioning and deployment identities with their federated credentials
 - a GitHub App for Backstage (repository creation) and a GitHub App for the orchestrator, registered as a **custom deployment protection rule** provider

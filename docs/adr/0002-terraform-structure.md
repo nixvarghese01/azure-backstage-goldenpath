@@ -7,7 +7,7 @@
 
 The platform manages two kinds of infrastructure with different lifecycles and owners:
 
-- **Shared platform infrastructure**, owned by the platform team: Terraform state storage, platform identities, the shared AKS cluster, the container registry, the ingress controller and DNS. It changes rarely, and a mistake affects every application.
+- **Shared platform infrastructure**, owned by the platform team: Terraform state storage, platform identities, the shared AKS cluster, the container registry, the shared Gateway (ingress) and DNS. It changes rarely, and a mistake affects every application.
 - **Application infrastructure**, owned by the application team: the resource group (if new), runtime managed identity, federated credential, namespace, role assignments, and Storage or Key Vault (if new). There is one set per application per environment, and it is created through the golden path.
 
 Every Azure resource on the form offers **Create new** or **Select existing**. Generated code must be reviewable, identical in structure across applications, and safe for the platform to plan and apply without running user-supplied Terraform.
@@ -42,7 +42,7 @@ iac/
 └── platform/                    # root modules ("stacks"), applied in order
     ├── 00-bootstrap/            # state storage account and containers
     ├── 10-identities/           # discovery, provisioning, deployment, orchestrator, vending
-    └── 20-shared-dev/           # AKS, ACR, ingress controller, DNS zone for dev
+    └── 20-shared-dev/           # AKS, ACR, App Routing Gateway API + shared Gateway, DNS zone
 ```
 
 - Stacks are numbered to show their apply order, and each stack has its own state. Destroying the dev cluster stack can't touch identities or state storage.
@@ -125,10 +125,14 @@ locals {
 
 ### 6. Versions
 
-- Terraform `required_version` is pinned to the current minor release line at implementation time, for example `~> 1.N.0`.
-- The `azurerm` provider is pinned to a minor version within 4.x, the `kubernetes` provider within 2.x. The `azuread` provider is not needed, because federated credentials on managed identities are `azurerm` resources.
+These were checked on 2026-10-10. The full matrix and its reasons are in [COMPATIBILITY.md](../../COMPATIBILITY.md).
+
+- Terraform `required_version = "~> 1.16.0"` (latest 1.16.5).
+- `azurerm ~> 5.9`. The 5.x line has been current since 2026-07, and new code starts there rather than on 4.x.
+- `kubernetes ~> 3.3`. The 3.x line has been current since 2025-12.
+- `azapi ~> 2.13`, **in the platform AKS stack only**, to enable the App Routing Gateway API `ingressProfile` settings until `azurerm` supports them natively ([ADR-0003](0003-ingress-gateway-api.md)).
+- The `azuread` provider is not needed, because federated credentials on managed identities are `azurerm` resources.
 - `.terraform.lock.hcl` is committed, with hashes for `linux_amd64` (runners) and the developers' platforms.
-- The exact versions chosen are recorded in this ADR when Phase 3 is implemented.
 
 ### 7. State
 
@@ -164,7 +168,7 @@ Cleanup relies on `managed-by` and `request-id` to find only the resources the p
 ### 9. Kubernetes resources in Terraform
 
 - The application's **namespace, ResourceQuota, LimitRange and deployer RoleBinding** are managed by Terraform (`app-namespace`), because they are infrastructure that has to exist before deployment.
-- **Workloads** (Deployment, Service, ServiceAccount, HPA, Ingress) are managed by **Helm**, not Terraform.
+- **Workloads** (Deployment, Service, ServiceAccount, HTTPRoute, HPA) are managed by **Helm**, not Terraform.
 - The provisioning identity has a narrow cluster role, `sportify-namespace-provisioner`, limited to namespaces, quotas, limit ranges and role bindings. The deployment identity is bound only inside its application's namespace.
 - The `kubernetes` provider is only ever used against an *existing* cluster, never one created in the same configuration.
 

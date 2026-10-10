@@ -38,7 +38,7 @@ terraform apply destroy.tfplan
 Only do this when no applications remain on the cluster. Destroy the stacks in `iac/platform/` of the platform repository in **reverse order**:
 
 1. Remove every application first (section 1).
-2. `iac/platform/20-shared-dev`: destroy the shared AKS cluster, ingress controller, DNS zone and container registry.
+2. `iac/platform/20-shared-dev`: destroy the shared AKS cluster, shared Gateway, DNS zone and container registry.
 3. `iac/platform/10-identities`: remove the platform identities and federated credentials.
 4. `iac/platform/00-bootstrap`, **last**: export anything you want to keep from the state storage account, remove its `CanNotDelete` lock, migrate this stack's state back to local, then destroy it.
 
