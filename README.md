@@ -52,10 +52,11 @@ The developer selects:
 | Owner / owning team | Resolved from the Backstage catalog |
 | Technology | NestJS (TypeScript) initially; the template architecture is extensible |
 | Environment | `dev` initially |
-| Azure subscription | **Select existing** only. Listed by the discovery service and restricted to an allowlist |
+| Azure subscription | **Create new** or **Select existing** |
 | Resource group | **Create new** or **Select existing** |
-| AKS cluster | **Select existing** only. Shared, approved clusters |
-| Kubernetes namespace | **Create new** (default) or **Select existing** namespace owned by the same team |
+| AKS cluster | **Create new** or **Select existing** |
+| Container registry | **Create new** or **Select existing** |
+| Kubernetes namespace | **Create new** or **Select existing** namespace owned by the same team |
 | Runtime capability | Azure Storage or Key Vault: **Create new** or **Select existing**, accessed through Workload Identity |
 | Repository visibility and deployment options | Limited to permitted values |
 
@@ -63,16 +64,23 @@ Sensible defaults let a developer complete the path without filling in every opt
 
 ### Create new or select existing
 
-For each Azure resource the application can own, the Backstage form shows two options:
+For every Azure resource, from the subscription down to the Storage account, the Backstage form shows two options. **Select existing** is the default, because most requests reuse infrastructure that already exists. The first golden path uses **Select existing** throughout.
 
 ```
-Resource group      (•) Create new        ( ) Select existing
-                    Name: rg-orders-api-dev            [validated as you type]
+Subscription        ( ) Create new        (•) Select existing
+                    [ sub-sportify-dev  ▼ ]   ← populated from azure-discovery-service
 
-Storage account     ( ) Create new        (•) Select existing
-                    [ stordersshareddev  (uksouth, rg-shared-dev)  ▼ ]
-                      ↑ populated from azure-discovery-service
+Resource group      ( ) Create new        (•) Select existing
+                    [ rg-sportify-apps-dev  (uksouth)  ▼ ]
+
+AKS cluster         ( ) Create new        (•) Select existing
+                    [ aks-sportify-shared-dev  ▼ ]
+
+Storage account     (•) Create new        ( ) Select existing
+                    Name: storordersapidev           [validated as you type]
 ```
+
+Each selection narrows the next one: the resource groups listed depend on the chosen subscription, and the clusters depend on the chosen resource group or subscription.
 
 | | **Create new** | **Select existing** |
 |---|---|---|
@@ -82,10 +90,15 @@ Storage account     ( ) Create new        (•) Select existing
 | Plan and approval | Shown as an addition in the plan summary; requires approval before apply | Shown as reuse. Role assignments still appear in the plan and require approval |
 | Cleanup on failure or deletion | Can be removed by the controlled cleanup procedure | Never deleted by the platform |
 
-Some resources are **select existing** only, by design:
+Some resources have stricter rules when **Create new** is chosen:
 
-- **Subscriptions.** Creating subscriptions (subscription vending) belongs to the landing-zone process, not to an application request.
-- **AKS clusters and container registries.** These are shared platform infrastructure with their own lifecycle under `iac/`. The platform never creates a cluster per application.
+| Resource | Create new behaviour |
+|---|---|
+| Subscription | Uses subscription vending through the `Microsoft.Subscription` alias API. It needs an Enterprise Agreement or Microsoft Customer Agreement billing scope, a separate vending identity and platform-team approval. The new subscription is placed under the configured management group. |
+| AKS cluster, container registry | Provisioned through the shared platform modules in `iac/`, not the application repository. They require platform-team approval, and the new cluster or registry becomes a shared, reusable target for later requests rather than a one-off for this application. |
+| Resource group, namespace, Storage, Key Vault, managed identity | Provisioned from the application repository's Terraform, with the normal plan-and-approve flow. |
+
+Resources created at subscription or cluster level have higher cost and blast radius, so they require an extra approval step and are listed separately in the plan summary.
 
 If discovery returns nothing to select, for example because the identity lacks `Reader` or nothing is allowlisted, the form disables **Select existing** and shows the reason instead of an empty dropdown.
 
@@ -161,7 +174,7 @@ Design rules:
 
 - **Shared platform infrastructure** (AKS cluster, container registry, Terraform state storage, platform identities) has its own lifecycle and is managed under `iac/`.
 - **Application infrastructure** (namespace, user-assigned managed identity, federated credential, Storage account or Key Vault, role assignments) lives in each application's repository.
-- The platform never creates a new AKS cluster per application. It never destroys shared resources automatically when an application deployment fails.
+- When a request chooses **Create new** for an AKS cluster or registry, the new resource is built through the shared platform lifecycle and becomes reusable. It is never a single-application cluster. The platform never destroys shared resources automatically when an application deployment fails.
 
 ## Features
 
@@ -169,7 +182,7 @@ The target feature set for the first milestone:
 
 - Backstage portal with catalog, scaffolder, TechDocs and GitHub integration
 - NestJS golden-path template with a real sample business endpoint, validation, health endpoints and tests
-- **Create new** or **Select existing** for each application-owned Azure resource, with dynamic, server-validated selections
+- **Create new** or **Select existing** for every Azure resource (subscription, resource group, AKS, ACR, namespace, Storage/Key Vault), with dynamic, server-validated selections
 - Durable workflow with explicit states, persistence, restart recovery, idempotency and duplicate detection
 - Terraform plan, security and policy checks, and plan review before apply
 - Approval gates on infrastructure apply and deployment through GitHub Environments
@@ -233,6 +246,7 @@ Durability guarantees:
 | Identity | Scope | Auth |
 |---|---|---|
 | **Discovery** (used by `azure-discovery-service`) | Read-only (`Reader`) on approved subscriptions | Workload Identity on AKS, `az login` locally |
+| **Subscription vending** (only when a new subscription is requested) | Subscription creator on the billing scope, and management group placement | GitHub OIDC federated credential, used by a platform-team-approved workflow |
 | **Terraform provisioning** | Narrowly scoped to approved resource groups and role-assignment conditions | GitHub OIDC federated credential |
 | **Deployment** | Push to the approved ACR and deploy to the application's namespace only | GitHub OIDC federated credential |
 | **Application runtime** | User-assigned managed identity with access only to its own Storage account or Key Vault | Microsoft Entra Workload Identity |
