@@ -32,6 +32,8 @@ Backstage's backend is Node.js. Any discovery or orchestration logic built as Ba
 
 For milestone 1, the orchestrator uses a **PostgreSQL-backed state machine and job table** (`SELECT ... FOR UPDATE SKIP LOCKED`). The workflow is mostly event-driven: it dispatches a GitHub workflow and then waits for a webhook. An explicit state table fits this well and adds no infrastructure beyond PostgreSQL.
 
+Because this is a model project meant to showcase the design, the state table is also the more readable choice. States, idempotency keys and locking are visible in a small amount of code, and the whole demo runs with `docker compose up`. A production rollout with many workflow types, long-running timers or high volume should move to Temporal (see below).
+
 Alternatives for this engine:
 
 | Engine | Why not now |
