@@ -1,0 +1,239 @@
+# Golden path: secure NestJS API on AKS
+
+This guide describes the planned happy path, from submitting a request in Backstage to receiving the URLs of a running application. Read it alongside the [README](../../README.md) and [ADR-0001](../adr/0001-python-platform-services.md).
+
+> **Status:** design. The steps below describe the intended behaviour of milestone 1. See the README's *Implementation status* table for what is built and verified.
+
+## Summary
+
+1. **Submit everything in Backstage.** One form collects the application, stack, infrastructure and deployment choices. Nothing runs until the developer clicks **Create**.
+2. **Provision infrastructure.** The platform creates the repository with infrastructure code, validates and plans it, waits for **approval in Backstage**, then applies the plan.
+3. **Generate the application.** It is generated for the chosen stack, with a basic Dockerfile and CI/CD, as a pull request into the same repository.
+4. **Deploy** to the selected AKS cluster and namespace, then verify the deployment.
+5. **Share the URLs** on the Backstage entity page and in a notification.
+
+## Example request
+
+The examples in this guide use the following request.
+
+| Field | Value |
+|---|---|
+| Application | `orders-api`: "Order management REST API" |
+| Owner | `team-orders` |
+| Stack | NestJS (TypeScript) |
+| Environment | `dev` |
+| Subscription | Select existing: `sub-sportify-dev` |
+| Resource group | Select existing: `rg-sportify-apps-dev` |
+| AKS cluster | Select existing: `aks-sportify-shared-dev` |
+| Container registry | Select existing: `acrsportifydev` |
+| Namespace | Create new: `orders-api` |
+| Runtime capability | Storage, select existing: `stsportifyshareddev` (blob read and write) |
+| Endpoint host | `orders-api.dev.sportify.example` |
+| Repository visibility | Public |
+
+## Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Developer
+    actor Apr as Approver
+    participant BS as Backstage<br/>(scaffolder + bridge)
+    participant Disc as azure-discovery-service
+    participant Orch as provisioning-orchestrator
+    participant GH as GitHub<br/>(repo + Actions)
+    participant Az as Azure / AKS
+
+    Dev->>BS: Open "Secure NestJS REST API" template
+    BS->>Disc: List subscriptions, RGs, clusters, registries, storage
+    Disc->>Az: Resource Graph / ARM (read-only)
+    Disc-->>BS: Allowlisted options
+    Dev->>BS: Fill all 4 pages, click Create
+    BS->>Orch: sportify:request:submit (idempotency key = task ID)
+    Orch->>Disc: POST /v1/validate (re-check every selection)
+    Orch-->>BS: requestId (state VALIDATING → accepted)
+    BS->>GH: publish:github (infrastructure-only repository)
+    BS->>BS: catalog:register
+    BS->>Orch: sportify:request:repository-created
+    Note over Orch: REPOSITORY_CREATED
+
+    Orch->>GH: Dispatch terraform-validate, terraform-plan
+    GH->>Az: OIDC (provisioning identity), terraform plan
+    GH-->>Orch: workflow_run completed + plan summary + plan hash
+    Note over Orch: INFRASTRUCTURE_PLANNED
+    Orch->>GH: Dispatch terraform-apply (env dev-infra)
+    GH-->>Orch: deployment_protection_rule (job held)
+    Note over Orch: AWAITING_APPROVAL
+    Orch-->>Apr: Backstage notification
+    Apr->>BS: Review plan, click Approve
+    BS->>Orch: POST /v1/requests/{id}/approval (approver identity)
+    Orch->>Orch: Check permission, requester ≠ approver, plan hash
+    Orch->>GH: Approve protection rule
+    Note over Orch: PROVISIONING
+    GH->>Az: terraform apply (saved plan) + readiness checks
+    GH-->>Orch: workflow_run completed + outputs
+    Note over Orch: INFRASTRUCTURE_READY
+
+    Orch->>GH: Open PR "Add orders-api application (NestJS)"
+    GH->>GH: application-ci on PR (test, build, scan)
+    Orch->>GH: Merge PR when checks pass
+    Note over Orch: APPLICATION_BUILDING
+    GH->>Az: application-ci on main: push image to ACR
+    GH->>Az: application-deploy: helm upgrade --install
+    Note over Orch: DEPLOYING
+    GH->>Az: rollout status + smoke test via endpoint
+    GH-->>Orch: deployment status success
+    Note over Orch: SUCCEEDED
+    Orch-->>Dev: Backstage notification with URLs
+```
+
+## Step 1: Submit everything in Backstage
+
+The template **Create → "Secure NestJS REST API"** is a single form with four pages, followed by a review page.
+
+| Page | Fields | Source of options |
+|---|---|---|
+| 1. Application | Name, description, owner | Owner from the Backstage catalog (the user's groups) |
+| 2. Stack | Stack, sample endpoint, OpenAPI docs, runtime capability | A stack registry: NestJS is enabled, other stacks are listed as *coming soon* and disabled |
+| 3. Infrastructure | **Create new / Select existing** for the subscription, resource group, AKS cluster, container registry, namespace and Storage or Key Vault | `azure-discovery-service`, called through the Backstage bridge; each picker is filtered by the selection above it |
+| 4. Deployment | Environment, deploy target, endpoint host, repository visibility | Platform policy (`policies/`) |
+
+When the developer clicks **Create**:
+
+- `sportify:request:submit` sends the full request to the orchestrator. The scaffolder task ID is the idempotency key, so submitting twice returns the same request.
+- The orchestrator validates everything on the server: naming rules, duplicates, team membership, the environment policy, and every Azure ID through `POST /v1/validate`. An invalid request is rejected here, **before** any repository exists.
+- The developer is taken to the request's status page.
+
+## Step 2: Provision infrastructure
+
+| # | Action | Actor | State |
+|---|---|---|---|
+| 2.1 | `publish:github` creates `sportify-org/orders-api` containing **infrastructure only**: `infra/terraform`, the Helm chart, the `terraform-*` workflows, `catalog-info.yaml` and docs. Branch protection is applied. `catalog:register` adds it to the catalog | Backstage | `REPOSITORY_CREATED` |
+| 2.2 | `terraform-validate.yml`: `fmt -check`, `init`, `validate`, TFLint, security scan, policy checks, `helm lint` and `helm template` | GitHub Actions | `REPOSITORY_CREATED` |
+| 2.3 | `terraform-plan.yml`: logs in with the provisioning identity through OIDC and saves the plan as an artifact. A summary and the plan hash are sent to the orchestrator | GitHub Actions | `INFRASTRUCTURE_PLANNED` |
+| 2.4 | `terraform-apply.yml` is dispatched and **held** by the custom deployment protection rule on the `dev-infra` environment | Orchestrator, GitHub | `AWAITING_APPROVAL` |
+| 2.5 | Approval in Backstage (see [Approval in Backstage](#approval-in-backstage)) | Approver | `AWAITING_APPROVAL` |
+| 2.6 | Apply the **saved plan**, then check that the managed identity, federated credential and role assignment are ready | GitHub Actions | `PROVISIONING` → `INFRASTRUCTURE_READY` |
+
+The plan for the example request:
+
+```
++ azurerm_user_assigned_identity          id-orders-api-dev
++ azurerm_federated_identity_credential   system:serviceaccount:orders-api:orders-api
++ kubernetes_namespace                    orders-api
++ azurerm_role_assignment                 Storage Blob Data Contributor → stsportifyshareddev
+= reused (data sources): sub-sportify-dev, rg-sportify-apps-dev,
+  aks-sportify-shared-dev, acrsportifydev, stsportifyshareddev
+Plan: 4 to add, 0 to change, 0 to destroy.
+```
+
+## Approval in Backstage
+
+The approval decision is made in Backstage, and GitHub enforces it.
+
+**What the approver sees.** Members of the approver group, for example `platform-approvers`, receive a Backstage notification linking to **Sportify → Approvals**. The approval card shows:
+
+- the requester, application, environment and time
+- the plan summary: resources added, changed, destroyed and reused
+- the policy check and security scan results
+- the cost estimate, only when a reliable estimate is configured
+- links to the full plan and the workflow run
+- a comment box and **Approve** / **Reject** buttons
+
+**How the decision is enforced:**
+
+1. The `dev-infra` GitHub Environment has a **custom deployment protection rule** owned by the orchestrator's GitHub App. GitHub holds the apply job and sends a `deployment_protection_rule` webhook to the orchestrator.
+2. The approver clicks **Approve**. The Backstage bridge forwards the decision with the approver's identity.
+3. The orchestrator checks that:
+   - the approver holds the Backstage permission `sportify.request.approve` for the environment
+   - the approver is **not** the requester (separation of duties)
+   - the approval is bound to the **exact plan hash** (a new plan needs a new approval)
+   - the request has not already been decided (a duplicate click or replayed request has no effect)
+4. The orchestrator approves the protection rule through the GitHub API, and the apply job runs. **Reject** rejects the rule instead: the job fails cleanly, the state becomes `CANCELLED`, and the reason is shown.
+5. The decision, approver, comment, plan hash and workflow run ID are written to `audit_events`.
+
+Re-running the workflow from the GitHub UI does not bypass approval, because the job still waits for the orchestrator to release the protection rule.
+
+**Approval gates by environment:**
+
+| Gate | dev | test / prod (future) |
+|---|---|---|
+| Infrastructure apply | One approver in Backstage | Two approvers in Backstage |
+| Application deploy | Automatic | Approval in Backstage |
+| New subscription, AKS cluster or container registry | Platform-team approval in Backstage | Same |
+
+## Step 3: Generate the application for the chosen stack
+
+The application is added only **after** the infrastructure is ready. A failed provisioning run therefore never leaves a half-working application, and the Helm values contain real infrastructure outputs.
+
+| # | Action | Actor | State |
+|---|---|---|---|
+| 3.1 | Open a pull request, "Add orders-api application (NestJS)", generated from the chosen stack's template | Orchestrator (GitHub App) | `APPLICATION_BUILDING` |
+| 3.2 | `application-ci.yml` runs on the pull request: lint, unit tests, integration tests, container build and dependency scan | GitHub Actions | `APPLICATION_BUILDING` |
+| 3.3 | Merge the pull request once the required checks pass | Orchestrator (GitHub App) | `APPLICATION_BUILDING` |
+| 3.4 | `application-ci.yml` runs on `main`: build, image scan, then push `acrsportifydev.azurecr.io/orders-api:<git-sha>` using the deployment identity (OIDC) | GitHub Actions | `APPLICATION_BUILDING` |
+
+The pull request contains:
+
+- `src/`: NestJS application with the `/v1/orders` sample endpoint (create, list and get), DTO validation, config management, Storage access through `DefaultAzureCredential`, and `/health/live` and `/health/ready`
+- `test/`: unit tests plus the integration test structure
+- `Dockerfile`: a basic multi-stage build with a small runtime image, a non-root user and no secrets
+- `.github/workflows/application-ci.yml` and `application-deploy.yml`, with Actions pinned to commit SHAs and least-privilege `permissions:`
+- `deploy/helm/application/values-dev.yaml`, filled in with the identity client ID, namespace, image repository and endpoint host from the infrastructure outputs
+
+## Step 4: Deploy to the selected resources
+
+| # | Action | State |
+|---|---|---|
+| 4.1 | `application-deploy.yml` (environment `dev`) logs in with the deployment identity, which has namespace-scoped access only | `DEPLOYING` |
+| 4.2 | `helm upgrade --install` into the `orders-api` namespace on `aks-sportify-shared-dev`, with the Workload Identity labels and annotations | `DEPLOYING` |
+| 4.3 | `kubectl rollout status` waits for the new pods | `DEPLOYING` |
+| 4.4 | A smoke test through the endpoint checks `/health/ready` (including the Storage dependency) and `GET /v1/orders` | `DEPLOYING` |
+| 4.5 | The deployment status is reported as success | `SUCCEEDED` |
+
+The containers run as non-root, with a read-only root filesystem, all capabilities dropped, the `RuntimeDefault` seccomp profile, resource requests and limits, and liveness and readiness probes. No Azure credentials exist in the code, the image, the Helm values or the repository.
+
+## Step 5: Share the URLs
+
+The URLs are shown on the Backstage entity page (`orders-api` → *Overview* and *Provisioning*). They are also sent as a Backstage notification to the requester and the owning team.
+
+| What | URL |
+|---|---|
+| Application endpoint | `https://orders-api.dev.sportify.example` |
+| API docs (Swagger) | `https://orders-api.dev.sportify.example/docs` |
+| Health | `https://orders-api.dev.sportify.example/health/ready` |
+| Repository | `https://github.com/sportify-org/orders-api` |
+| Workflow runs | `https://github.com/sportify-org/orders-api/actions` |
+| Container image | `acrsportifydev.azurecr.io/orders-api:<git-sha>` |
+| Azure resource group | Azure portal link to `rg-sportify-apps-dev` |
+| Backstage entity | `https://backstage.sportify.example/catalog/default/component/orders-api` |
+
+Each stage is reported as its own outcome:
+
+```
+✅ Request validated
+✅ Repository created
+✅ Infrastructure provisioned   4 added · 0 changed · 0 destroyed · approved by <approver>
+✅ Application built            tests passed · 0 critical vulnerabilities
+✅ Deployed                     healthy · 2/2 pods ready
+```
+
+## State timeline
+
+```
+REQUESTED → VALIDATING → REPOSITORY_CREATED → INFRASTRUCTURE_PLANNED
+→ AWAITING_APPROVAL → PROVISIONING → INFRASTRUCTURE_READY
+→ APPLICATION_BUILDING → DEPLOYING → SUCCEEDED
+```
+
+Expected duration: about 10–15 minutes of automated work, plus the time taken to approve.
+
+## Prerequisites for this path
+
+These are set up once by the platform team:
+
+- the shared AKS cluster with the OIDC issuer and Workload Identity enabled, plus a **shared ingress controller** and a **DNS zone** for `*.dev.sportify.example`
+- the shared container registry and the Terraform state storage account
+- the discovery, provisioning and deployment identities with their federated credentials
+- a GitHub App for Backstage (repository creation) and a GitHub App for the orchestrator, registered as a **custom deployment protection rule** provider
+- generated repositories created as **public**. See [Repository visibility](../../README.md#repository-visibility) for what changes if they are made private.

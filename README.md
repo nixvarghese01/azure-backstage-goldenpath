@@ -18,6 +18,7 @@ Sportify Azure Backstage lets developers request a production-shaped service thr
 - [Architecture](#architecture)
 - [Features](#features)
 - [Workflow lifecycle](#workflow-lifecycle)
+- [Repository visibility](#repository-visibility)
 - [Identity and security model](#identity-and-security-model)
 - [Repository layout](#repository-layout)
 - [Generated application repository](#generated-application-repository)
@@ -46,13 +47,22 @@ The goal is one complete, enterprise-quality vertical slice rather than many unf
 
 > A developer requests a secure **NestJS REST API** through Backstage. The platform creates a dedicated GitHub repository, provisions or reuses approved Azure infrastructure, and deploys the application to **Azure Kubernetes Service**.
 
-The developer selects:
+The developer **submits everything in one Backstage form** first. Then the platform:
+
+1. provisions the infrastructure, after **approval in the Backstage UI**
+2. generates the application for the **chosen stack**, with a basic Dockerfile and CI/CD
+3. deploys it to the selected AKS cluster
+4. **shares the URLs** on the Backstage entity page
+
+The full step-by-step flow, with a sequence diagram, is in **[docs/developer-guide/golden-path.md](docs/developer-guide/golden-path.md)**.
+
+The form collects:
 
 | Input | Notes |
 |---|---|
 | Application name and description | Validated against naming rules and checked for duplicates |
 | Owner / owning team | Resolved from the Backstage catalog |
-| Technology | NestJS (TypeScript) initially; the template architecture is extensible |
+| Stack | Chosen from the available stacks. NestJS (TypeScript) is enabled; other stacks are listed as *coming soon* and added later as templates |
 | Environment | `dev` initially |
 | Azure subscription | **Create new** or **Select existing** |
 | Resource group | **Create new** or **Select existing** |
@@ -60,7 +70,8 @@ The developer selects:
 | Container registry | **Create new** or **Select existing** |
 | Kubernetes namespace | **Create new** or **Select existing** namespace owned by the same team |
 | Runtime capability | Azure Storage or Key Vault: **Create new** or **Select existing**, accessed through Workload Identity |
-| Repository visibility and deployment options | Limited to permitted values |
+| Endpoint host | For example `orders-api.dev.sportify.example`; served by the cluster's shared ingress |
+| Repository visibility and deployment options | Limited to permitted values. **Public** is the default (see [Repository visibility](#repository-visibility)) |
 
 Sensible defaults let a developer complete the path without filling in every optional field.
 
@@ -158,11 +169,26 @@ flowchart LR
 
 ### Request flow
 
-1. The developer fills in the scaffolder form. The resource picker loads its options from the discovery service through the bridge.
-2. `sportify:request:submit` sends the request to the orchestrator, using the scaffolder task ID as the idempotency key. The orchestrator re-validates every selection through the discovery service and the policies, then returns a request ID, or rejects the request before any repository exists.
-3. The built-in `publish:github` creates the repository and `catalog:register` registers it.
-4. `sportify:request:repository-created` reports the repository to the orchestrator, and the scaffolder task finishes.
-5. The orchestrator continues asynchronously. It dispatches the generated repository's workflows through a GitHub App, follows their progress through `workflow_run` and `deployment` webhooks, and polls periodically to catch any lost events. The status card shows each stage.
+1. **Submit.** The developer fills in the whole scaffolder form. The resource pickers load their options from the discovery service through the bridge.
+2. **Validate.** `sportify:request:submit` sends the request to the orchestrator, using the scaffolder task ID as the idempotency key. The orchestrator re-validates every selection through the discovery service and the policies. It then returns a request ID, or rejects the request before any repository exists.
+3. **Repository.** The built-in `publish:github` creates the repository with **infrastructure code only**, and `catalog:register` registers it. `sportify:request:repository-created` reports it to the orchestrator, and the scaffolder task finishes.
+4. **Infrastructure.** The orchestrator dispatches the validate and plan workflows. The apply job is held until a reviewer **approves in the Backstage UI** (see [Approval in Backstage](#approval-in-backstage)). It then applies the saved plan.
+5. **Application.** Once the infrastructure is ready, the orchestrator opens a pull request that adds the application for the chosen stack: source, tests, Dockerfile and CI/CD. It merges the pull request when the checks pass.
+6. **Deploy.** CI builds, scans and pushes the image. The deploy workflow installs the Helm chart on AKS, then smoke-tests the endpoint.
+7. **Report.** The orchestrator follows every step through `workflow_run`, `deployment` and `deployment_protection_rule` webhooks, with periodic polling to catch lost events. The application, repository, workflow, registry, Azure and Backstage URLs appear on the entity page and in a Backstage notification.
+
+### Approval in Backstage
+
+Reviewers approve infrastructure changes in the Backstage UI. GitHub enforces the decision:
+
+- Each infrastructure environment (for example `dev-infra`) has a **custom deployment protection rule** owned by the orchestrator's GitHub App. GitHub holds the apply job until the orchestrator releases it.
+- Approvers get a Backstage notification. On the **Approvals** page or the request's *Provisioning* tab, they see the plan summary (added, changed, destroyed, reused), the policy and security results, and links to the full plan, then click **Approve** or **Reject**.
+- Before releasing the job, the orchestrator checks:
+  - the `sportify.request.approve` permission
+  - that the approver is not the requester
+  - that the approval matches the **exact plan hash**, so a changed plan needs a new approval
+  - that the request has not already been decided
+- Re-running the workflow from GitHub does not bypass approval, and every decision is written to the audit log.
 
 ### Provisioning orchestrator service
 
@@ -171,7 +197,7 @@ The orchestrator is a FastAPI API plus a separate worker process, both sharing o
 - **State machine.** Each request is a row with an explicit state (see [Workflow lifecycle](#workflow-lifecycle)). Every state change goes through one transition function that rejects illegal transitions.
 - **Durable jobs.** The worker claims pending steps with `SELECT ... FOR UPDATE SKIP LOCKED`, so several workers or a restarted worker never process the same step twice. In-flight requests resume after a restart.
 - **Idempotency.** Each request has an idempotency key and each step has a deduplication key. A duplicate submission returns the existing request. Repeated webhooks for the same run are ignored.
-- **Approvals.** Approval of `terraform-apply` and deployment is enforced by GitHub Environments with required reviewers. The orchestrator reflects the pending approval as `AWAITING_APPROVAL` and records who approved it.
+- **Approvals.** Decisions are made in the Backstage UI and enforced through GitHub custom deployment protection rules (see [Approval in Backstage](#approval-in-backstage)). The orchestrator holds the request in `AWAITING_APPROVAL` and binds each approval to a plan hash.
 - **No Azure write access.** The orchestrator only uses a GitHub App token. All Azure changes are made by Terraform in GitHub Actions using OIDC identities.
 - **Audit.** An append-only `audit_events` table records who requested, who approved, which workflow run produced which result and what changed. Secrets and sensitive Terraform output are never stored.
 
@@ -182,6 +208,8 @@ Planned endpoints:
 | `POST` | `/v1/requests` | Submit and validate a request (idempotent) |
 | `GET` | `/v1/requests/{id}` | Current state, stage history and diagnostics |
 | `POST` | `/v1/requests/{id}/repository` | Record the created repository and start the asynchronous workflow |
+| `GET` | `/v1/approvals?status=pending` | Pending approvals visible to the caller |
+| `POST` | `/v1/requests/{id}/approval` | Approve or reject the current plan (plan hash, comment) |
 | `POST` | `/v1/requests/{id}/cancel` | Cancel a request that has not started applying |
 | `POST` | `/v1/requests/{id}/cleanup` | Start controlled cleanup of resources the platform created |
 | `POST` | `/v1/webhooks/github` | Receive GitHub events (HMAC-verified) |
@@ -228,11 +256,12 @@ The target feature set for the first milestone:
 - **Create new** or **Select existing** for every Azure resource (subscription, resource group, AKS, ACR, namespace, Storage/Key Vault), with dynamic, server-validated selections
 - Durable workflow with explicit states, persistence, restart recovery, idempotency and duplicate detection
 - Terraform plan, security and policy checks, and plan review before apply
-- Approval gates on infrastructure apply and deployment through GitHub Environments
+- Approval in the Backstage UI for infrastructure changes, enforced by GitHub custom deployment protection rules and bound to the exact plan
 - Container build, tests, dependency and image vulnerability scanning, and push to an approved registry
 - Hardened Helm deployment to a shared AKS namespace
 - Microsoft Entra Workload Identity for credential-free access to Azure Storage or Key Vault
-- Per-stage status, workflow history and actionable diagnostics in Backstage
+- Choice of application stack from a stack registry (NestJS first)
+- Per-stage status, workflow history, actionable diagnostics and shared URLs (app, docs, repository, workflows, image, Azure) in Backstage
 - Audit events covering who requested, who approved, what changed and which workflow ran
 
 ## Workflow lifecycle
@@ -247,7 +276,7 @@ stateDiagram-v2
     VALIDATING --> FAILED
     REPOSITORY_CREATED --> INFRASTRUCTURE_PLANNED
     INFRASTRUCTURE_PLANNED --> AWAITING_APPROVAL
-    AWAITING_APPROVAL --> PROVISIONING : approved
+    AWAITING_APPROVAL --> PROVISIONING : approved in Backstage
     AWAITING_APPROVAL --> CANCELLED : rejected / cancelled
     PROVISIONING --> INFRASTRUCTURE_READY
     PROVISIONING --> FAILED
@@ -267,13 +296,13 @@ stateDiagram-v2
 |---|---|
 | 1. Validate | Name, owner, environment, subscription, cluster, permissions and allowlisted selections are checked on the server |
 | 2. Discover | The Python discovery service uses Azure Resource Graph and ARM to confirm each resource's existence, type, region and eligibility, using a read-only identity |
-| 3. Repository | The built-in scaffolder action `publish:github` creates one GitHub repository per request, containing the application, Terraform, Helm, workflows, catalog metadata and docs |
+| 3. Repository | The built-in scaffolder action `publish:github` creates one GitHub repository per request, initially containing Terraform, the Helm chart, the infrastructure workflows, catalog metadata and docs |
 | 4. Validate infra | `terraform fmt`/`init`/`validate`, security scanning, policy checks and Helm linting run; the plan is retained and summarised |
-| 5. Provision | After approval, the plan is applied and resource readiness and identity configuration are verified |
-| 6. Build | Tests run, the image is built, dependencies and the image are scanned, and the image is pushed to the approved registry |
-| 7. Deploy | Helm deploys to the approved namespace, then rollout and health are verified |
+| 5. Provision | After approval in Backstage, the saved plan is applied and resource readiness and identity configuration are verified |
+| 6. Generate and build | A pull request adds the application for the chosen stack (source, tests, Dockerfile, CI/CD). Tests run, and the image is built, scanned and pushed to the approved registry |
+| 7. Deploy | Helm deploys to the approved namespace, then rollout, health and the endpoint are verified |
 | 8. Secure access | The application reaches Storage or Key Vault through a user-assigned managed identity and Workload Identity |
-| 9. Register and report | The application appears in the catalog with its repository, environment, provisioning, deployment, health and history |
+| 9. Register and report | The catalog entity shows the repository, environment, provisioning, deployment, health, history and all shared URLs |
 
 Durability guarantees:
 
@@ -284,12 +313,26 @@ Durability guarantees:
 - Partial failures report which resources were created and point to a controlled recovery or cleanup procedure.
 - Secrets, tokens and sensitive Terraform output are never written to logs or the audit trail.
 
+## Repository visibility
+
+Generated repositories are created **public** by default. The design depends on GitHub features that work on public repositories on every plan: branch protection, environments and custom deployment protection rules.
+
+If you later make a generated repository private:
+
+| Plan | What happens |
+|---|---|
+| Enterprise Cloud | Everything keeps working. |
+| Team / Pro | Approval in Backstage still works, but GitHub can no longer hold the job. The apply workflow must check the approval with the orchestrator, and the Azure federated credential must trust only the infrastructure environment. This is weaker, documented fallback. |
+| Free | Environments and protection rules are not enforced. Don't run the flow again on that repository. It is suitable only as an archived reference. |
+
+For a public demo, keep the platform repository public. Keep one generated example public and **archived** (read-only) so others can browse the generated output. Then follow [docs/operations/cleanup.md](docs/operations/cleanup.md) to remove Azure resources. GitHub plan features change over time, so check GitHub's current plan documentation.
+
 ## Identity and security model
 
 | Identity | Scope | Auth |
 |---|---|---|
 | **Discovery** (used by `azure-discovery-service`) | Read-only (`Reader`) on approved subscriptions | Workload Identity on AKS, `az login` locally |
-| **Orchestrator** (used by `provisioning-orchestrator-service`) | GitHub App installation scoped to generated repositories: Actions, Deployments and Contents (read). No Azure access | GitHub App private key, held in Key Vault and mounted through the Secrets Store CSI driver |
+| **Orchestrator** (used by `provisioning-orchestrator-service`) | GitHub App installation scoped to generated repositories: Actions (write, to dispatch workflows), Deployments (write, for protection rules), Contents and Pull requests (write, to open and merge the application pull request). No Azure access | GitHub App private key, held in Key Vault and mounted through the Secrets Store CSI driver |
 | **Subscription vending** (only when a new subscription is requested) | Subscription creator on the billing scope, and management group placement | GitHub OIDC federated credential, used by a platform-team-approved workflow |
 | **Terraform provisioning** | Narrowly scoped to approved resource groups and role-assignment conditions | GitHub OIDC federated credential |
 | **Deployment** | Push to the approved ACR and deploy to the application's namespace only | GitHub OIDC federated credential |
@@ -401,10 +444,10 @@ These are the planned prerequisites. Exact pinned versions will be recorded in `
 **Live Azure and GitHub execution**
 
 - An Azure subscription with permission to create role assignments and federated credentials
-- A shared AKS cluster with the OIDC issuer and Workload Identity enabled
+- A shared AKS cluster with the OIDC issuer and Workload Identity enabled, plus a shared ingress controller and a DNS zone for application endpoints
 - An Azure Container Registry
 - An Azure Storage account for Terraform state
-- A GitHub organisation, a GitHub App for Backstage (repository creation) and a separate GitHub App for the orchestrator (workflow dispatch and webhooks)
+- A GitHub organisation, a GitHub App for Backstage (repository creation) and a separate GitHub App for the orchestrator (workflow dispatch, webhooks, application pull requests), registered as a custom deployment protection rule provider
 - Microsoft Entra app registrations or managed identities for each identity in the [identity model](#identity-and-security-model)
 
 ## Local development
@@ -493,8 +536,8 @@ Planned documentation, published through TechDocs:
 - `docs/architecture/`: context, data flow, trust boundaries, failure recovery
 - `docs/adr/`: Architecture Decision Records
 - `docs/security/`: identity boundaries and the exact Azure and GitHub permissions per identity
-- `docs/developer-guide/`: using the golden path
-- `docs/operations/`: troubleshooting, cleanup and recovery procedures
+- [`docs/developer-guide/golden-path.md`](docs/developer-guide/golden-path.md): the end-to-end golden path, approval in Backstage and the shared URLs
+- [`docs/operations/cleanup.md`](docs/operations/cleanup.md): cleanup and teardown; troubleshooting and recovery procedures will follow
 
 ## Contributing and security
 
