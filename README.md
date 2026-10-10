@@ -69,13 +69,14 @@ flowchart LR
     subgraph Backstage["Backstage (platform monorepo)"]
         Portal[Frontend app<br/>Catalog · Scaffolder · TechDocs]
         Portal --> API[Backend]
-        API --> Disc[azure-discovery plugin]
         API --> Orch[provisioning-orchestrator plugin]
         Orch --> DB[(Workflow state<br/>+ audit log)]
         Portal --> Status[provisioning-status plugin]
         Status --> Orch
     end
 
+    API -- REST --> Disc[azure-discovery-service<br/>Python · FastAPI]
+    Disc --> Policy[/policies<br/>allowlists/]
     Disc -- read-only --> ARG[Azure Resource Graph / ARM]
     Orch --> GH[GitHub<br/>repo + Actions]
     GH -- OIDC --> TF[Terraform<br/>plan / apply]
@@ -91,7 +92,8 @@ flowchart LR
 |---|---|
 | **Software Catalog** | Ownership, metadata and discovery of services, including generated applications |
 | **Scaffolder + Software Templates** | Self-service request form and repository generation |
-| **`azure-discovery` plugin** | Read-only discovery of approved subscriptions, resource groups, AKS clusters, registries and data services through Azure Resource Graph and ARM |
+| **`azure-discovery-service`** (Python, FastAPI) | Standalone, read-only REST service. It lists the existing subscriptions visible to the discovery identity (the same ones shown in the Azure portal), then their resource groups, AKS clusters, registries and data services, using ARM and Azure Resource Graph. Results are filtered against the policy allowlists before they are returned |
+| **`azure-discovery-backend` plugin** | Thin Backstage backend module that calls the discovery service on the server side. It backs the scaffolder's dynamic dropdowns and lets the orchestrator re-validate submitted selections. The browser never calls the discovery service directly |
 | **`provisioning-orchestrator` plugin** | Durable asynchronous workflow engine: validation, policy, GitHub orchestration, approvals, retries and audit |
 | **`provisioning-status` plugin** | Shows stage progress, approvals, plan summaries, deployment state, health and failure diagnostics on the entity page |
 | **Policies** | Allowlists for subscriptions, regions, environments, clusters, resource types and operations, enforced on the server |
@@ -99,6 +101,30 @@ flowchart LR
 | **GitHub integration** | Repository creation, workflow dispatch, environment approvals and run status |
 
 The platform uses Backstage's new backend system and its extension points wherever they apply. Business logic lives in backend plugins, not in frontend components. Built-in capabilities are preferred over custom plugins when they meet the requirement.
+
+### Azure discovery service
+
+Discovery runs as a separate Python service so it can use the official Azure SDKs for Python (`azure-identity`, `azure-mgmt-resource`, `azure-mgmt-resourcegraph`). It can also be developed, tested and deployed independently of the Backstage release cycle.
+
+Planned endpoints (all read-only):
+
+| Method | Path | Returns |
+|---|---|---|
+| `GET` | `/healthz` | Liveness |
+| `GET` | `/readyz` | Readiness, including whether an Azure credential can be acquired |
+| `GET` | `/v1/subscriptions` | Enabled subscriptions visible to the discovery identity, filtered by the allowlist |
+| `GET` | `/v1/subscriptions/{id}/resource-groups` | Allowlisted resource groups in an approved region |
+| `GET` | `/v1/subscriptions/{id}/aks-clusters` | Approved shared AKS clusters, including whether Workload Identity and the OIDC issuer are enabled |
+| `GET` | `/v1/subscriptions/{id}/container-registries` | Approved container registries |
+| `GET` | `/v1/subscriptions/{id}/resources?type=…` | Allowlisted Storage accounts and Key Vaults available for reuse |
+| `POST` | `/v1/validate` | Server-side eligibility check for a full selection set, used by the orchestrator |
+
+Design rules:
+
+- Authentication uses `DefaultAzureCredential`: Workload Identity on AKS, and `az login` or environment credentials for local development. No client secrets are stored in the repository.
+- The identity has only the `Reader` role. The service never calls write operations.
+- Resource Graph results are paginated using skip tokens. Throttling (`429`) and transient errors are retried with backoff. Permission errors and missing resources produce typed error responses, never empty success responses.
+- Only Backstage's backend calls the service, using service-to-service authentication. Discovery results are suggestions only: the orchestrator re-validates every submitted ID through `/v1/validate` before acting on it.
 
 **Microsoft Graph** is used only for supported Microsoft Entra operations. It does not provision Azure infrastructure; Terraform does.
 
@@ -155,7 +181,7 @@ stateDiagram-v2
 | Stage | What happens |
 |---|---|
 | 1. Validate | Name, owner, environment, subscription, cluster, permissions and allowlisted selections are checked on the server |
-| 2. Discover | Azure Resource Graph and ARM confirm each resource's existence, type, region and eligibility, using a read-only identity |
+| 2. Discover | The Python discovery service uses Azure Resource Graph and ARM to confirm each resource's existence, type, region and eligibility, using a read-only identity |
 | 3. Repository | One GitHub repository is created per request, containing the application, Terraform, Helm, workflows, catalog metadata and docs |
 | 4. Validate infra | `terraform fmt`/`init`/`validate`, security scanning, policy checks and Helm linting run; the plan is retained and summarised |
 | 5. Provision | After approval, the plan is applied and resource readiness and identity configuration are verified |
@@ -177,7 +203,7 @@ Durability guarantees:
 
 | Identity | Scope | Auth |
 |---|---|---|
-| **Discovery** | Read-only (`Reader`) on approved subscriptions | Workload identity or OIDC federation |
+| **Discovery** (used by `azure-discovery-service`) | Read-only (`Reader`) on approved subscriptions | Workload Identity on AKS, `az login` locally |
 | **Terraform provisioning** | Narrowly scoped to approved resource groups and role-assignment conditions | GitHub OIDC federated credential |
 | **Deployment** | Push to the approved ACR and deploy to the application's namespace only | GitHub OIDC federated credential |
 | **Application runtime** | User-assigned managed identity with access only to its own Storage account or Key Vault | Microsoft Entra Workload Identity |
@@ -205,9 +231,15 @@ sportify-azure-backstage/
 │   ├── app/                         # Backstage frontend
 │   └── backend/                     # Backstage backend (new backend system)
 ├── plugins/
-│   ├── azure-discovery-backend/
+│   ├── azure-discovery-backend/     # calls azure-discovery-service
 │   ├── provisioning-orchestrator-backend/
 │   └── provisioning-status/         # frontend entity card / page
+├── services/
+│   └── azure-discovery/             # Python FastAPI discovery service
+│       ├── app/                     # routers, Azure clients, policy filter
+│       ├── tests/                   # pytest with mocked Azure SDK
+│       ├── pyproject.toml
+│       └── Dockerfile
 ├── templates/
 │   └── applications/
 │       └── nestjs/                  # golden-path software template
@@ -267,6 +299,8 @@ These are the planned prerequisites. Exact pinned versions will be recorded in `
 **Local development**
 
 - Node.js (an Active LTS release supported by the chosen Backstage version) and Yarn
+- Python 3.12+ and [uv](https://docs.astral.sh/uv/) for the discovery service
+- Azure CLI (`az login`) for running discovery locally against real subscriptions
 - Docker
 - Terraform, TFLint and a Terraform security scanner (e.g. Trivy or Checkov)
 - Helm and kubectl
@@ -292,8 +326,14 @@ yarn install
 # start Backstage (frontend + backend) with mocked Azure/GitHub adapters
 yarn dev
 
+# start the discovery service (in a second terminal)
+cd services/azure-discovery
+uv sync
+uv run fastapi dev app/main.py        # http://localhost:8000/docs
+
 # run all tests
 yarn test:all
+(cd services/azure-discovery && uv run pytest)
 
 # lint and type-check
 yarn lint:all && yarn tsc
@@ -307,7 +347,7 @@ Mock adapters are only for local development and isolated tests. Live integratio
 |---|---|
 | Unit | Request validation, policy decisions, state transitions, error handling |
 | Backend integration | Backstage APIs and the orchestrator against a real database |
-| Mocked Azure | Discovery pagination, permission errors, missing resources, transient failures |
+| Discovery service | pytest + FastAPI `TestClient` with a mocked Azure SDK: pagination, permission errors, missing resources, throttling, allowlist filtering |
 | Infrastructure | `terraform fmt -check`, `init`, `validate`, security scanning, policy tests |
 | Helm | `helm lint`, template rendering, schema validation, kind-based install test |
 | Application | NestJS unit tests, health checks, container build test |
@@ -322,7 +362,7 @@ Mock adapters are only for local development and isolated tests. Live integratio
 | 1 | Repository inspection, gap analysis, architecture documentation | 🟡 In progress |
 | 2 | Backstage portal, catalog, scaffolder, local dev environment | ⚪ Not started |
 | 3 | NestJS golden path: repository generation, Terraform validation, workflow execution, Helm deploy, status reporting | ⚪ Not started |
-| 4 | Azure discovery and secure identity integration | ⚪ Not started |
+| 4 | Azure discovery service (Python FastAPI) and secure identity integration | ⚪ Not started |
 | 5 | Real Azure provisioning, approvals, state management, failure recovery, cleanup | ⚪ Not started |
 | 6 | Full automated testing, security checks, documentation, reproducible demo | ⚪ Not started |
 
