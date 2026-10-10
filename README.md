@@ -161,7 +161,7 @@ flowchart LR
 | **TechDocs** | Architecture, onboarding, service and operations documentation |
 | **GitHub integration** | Repository creation, workflow dispatch, environment approvals and run status |
 
-**Split between Backstage and Python** (see [ADR-0001](docs/adr/0001-python-platform-services.md)):
+**Split between Backstage and Python** (see [ADR-0001](docs/adr/0001-python-platform-services.md); service boundaries, communication, data ownership, deployment and resilience are described in [docs/architecture/microservices.md](docs/architecture/microservices.md)):
 
 - **Backstage (TypeScript)** provides what it already does well: the catalog, scaffolder, TechDocs, sign-in, permissions and the GitHub integration. Custom TypeScript is limited to one bridge backend plugin and one small frontend plugin, built on the new backend system and its extension points.
 - **Python (FastAPI)** holds all platform business logic: Azure discovery, policy evaluation and workflow orchestration. It uses the official Azure SDKs for Python and can be tested and released independently of Backstage.
@@ -343,6 +343,7 @@ Security principles:
 - No single administrator identity is used for all operations.
 - OIDC federation is preferred over long-lived client secrets.
 - Credentials, certificates, Terraform state, sensitive plans, kubeconfig files and application secrets are never committed.
+- **Secret management:** Workload Identity and OIDC replace most credentials. The few remaining secrets (GitHub App keys, webhook secret, session secret) live in Key Vault, with RBAC per secret, and reach pods through the Secrets Store CSI driver as read-only files, without Kubernetes `Secret` objects. Rotation is documented and scanning is enforced. See [docs/security/secret-management.md](docs/security/secret-management.md).
 - Terraform state is stored in an Azure Storage backend with Entra ID-only authentication (no storage account keys), separate `platform` and `apps` containers with separate access, versioning, soft delete, a delete lock and blob-lease locking. Local state is used only for isolated tests and the one-time bootstrap ([ADR-0002](docs/adr/0002-terraform-structure.md)).
 - GitHub Actions are pinned to reviewed commit SHAs and use least-privilege `permissions:`. Protected environments gate apply and deploy.
 - Untrusted pull request code never runs with privileged credentials.
@@ -545,6 +546,8 @@ Planned documentation, published through TechDocs:
 - `docs/architecture/`: context, data flow, trust boundaries, failure recovery
 - [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md): proposed workflow, CI/CD workflow design and the detailed phased plan
 - [`COMPATIBILITY.md`](COMPATIBILITY.md): component version compatibility plan
+- [`docs/architecture/microservices.md`](docs/architecture/microservices.md): platform microservices architecture (Backstage, discovery, orchestrator)
+- [`docs/security/secret-management.md`](docs/security/secret-management.md): secret inventory, Key Vault, delivery, rotation and incident response
 - `docs/adr/`: Architecture Decision Records: [0001 Python platform services](docs/adr/0001-python-platform-services.md), [0002 Terraform structure](docs/adr/0002-terraform-structure.md), [0003 Ingress through the Gateway API](docs/adr/0003-ingress-gateway-api.md)
 - `docs/security/`: identity boundaries and the exact Azure and GitHub permissions per identity
 - [`docs/developer-guide/golden-path.md`](docs/developer-guide/golden-path.md): the end-to-end golden path, approval in Backstage and the shared URLs

@@ -8,6 +8,8 @@ The proposed workflow, CI/CD design and phased delivery plan for milestone 1 of 
 | [docs/developer-guide/golden-path.md](docs/developer-guide/golden-path.md) | Step-by-step golden path from the developer's point of view |
 | [COMPATIBILITY.md](COMPATIBILITY.md) | Component versions, constraints and risks |
 | [docs/adr/](docs/adr/) | Architecture decisions |
+| [docs/architecture/microservices.md](docs/architecture/microservices.md) | Service boundaries, communication, deployment, resilience |
+| [docs/security/secret-management.md](docs/security/secret-management.md) | Secrets: inventory, storage, delivery, rotation |
 | [docs/operations/cleanup.md](docs/operations/cleanup.md) | Cleanup and teardown |
 
 > **Status:** Phase 1 (design) is complete. Each phase below ends with exit criteria. A phase counts as done only when its exit criteria have been run and their results recorded in the README's *Implementation status* table.
@@ -190,6 +192,7 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 - [ ] Set up the `services/` uv workspace with `azure-discovery` and `provisioning-orchestrator` skeletons: health endpoints, settings, structured logging, Dockerfiles.
 - [ ] Create the `sportify-platform-backend` bridge plugin: service-to-service authentication, forwarding with the user's identity, and a stub `sportify:request:submit` action.
 - [ ] Add `ci-backstage.yml` and `ci-python.yml`.
+- [ ] Secret hygiene from day one: `.gitignore` entries, `.env.example`, a gitleaks pre-commit hook and CI job, GitHub secret scanning with push protection, and `scripts/dev-secrets.sh` fetching the dev GitHub App keys from a dev Key Vault into `~/.config/sportify/`.
 
 **Deliverables:** a running portal, two Python services, and the bridge, all running locally.
 
@@ -255,6 +258,7 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 - [ ] Platform stacks: `00-bootstrap` (state storage, then migrate its own state into it), and `20-shared-dev` (AKS 1.36 with OIDC, Workload Identity, managed Gateway API and App Routing Istio via `azapi`; ACR; DNS zone; shared Gateway).
 - [ ] Deploy the platform to AKS with `images.yml` and `deploy-platform.yml`, and PostgreSQL flexible server.
 - [ ] Turn on webhooks through the Gateway, plus GitHub custom deployment protection rules.
+- [ ] Secret management: Key Vault (RBAC, purge protection, diagnostics), per-secret role assignments, the CSI secrets provider add-on, `SecretProviderClass` per platform service, Entra authentication to PostgreSQL, and webhook secret dual-acceptance.
 - [ ] Run the real golden path for `orders-api`.
 - [ ] Recovery: partial-failure reporting, retrying a failed step, the cleanup endpoint and the destroy-plan flow.
 
@@ -263,6 +267,7 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 - A real request reaches `SUCCEEDED`. `https://orders-api.dev.<domain>/health/ready` returns 200 and reports Storage access through Workload Identity, with no secrets anywhere.
 - Re-running `terraform-apply` from the GitHub UI without approval stays blocked.
 - An application cleanup removes only the platform-created resources (checked with `az resource list --tag managed-by=sportify-platform`).
+- The secret-management verification checklist ([secret-management.md §11](docs/security/secret-management.md#11-verification-exit-criteria-for-phase-5-and-6)) passes, including a GitHub App key rotation without failed dispatches.
 
 ### Phase 6: Hardening, tests, documentation and demo *(about 3–4 days)*
 
