@@ -343,7 +343,7 @@ Security principles:
 - No single administrator identity is used for all operations.
 - OIDC federation is preferred over long-lived client secrets.
 - Credentials, certificates, Terraform state, sensitive plans, kubeconfig files and application secrets are never committed.
-- Terraform state is stored in an Azure Storage backend with RBAC, versioning, soft delete and blob-lease locking. Local state is used only for isolated tests.
+- Terraform state is stored in an Azure Storage backend with Entra ID-only authentication (no storage account keys), separate `platform` and `apps` containers with separate access, versioning, soft delete, a delete lock and blob-lease locking. Local state is used only for isolated tests and the one-time bootstrap ([ADR-0002](docs/adr/0002-terraform-structure.md)).
 - GitHub Actions are pinned to reviewed commit SHAs and use least-privilege `permissions:`. Protected environments gate apply and deploy.
 - Untrusted pull request code never runs with privileged credentials.
 - The platform never runs user-supplied Terraform, shell scripts or pipeline definitions.
@@ -377,10 +377,14 @@ sportify-azure-backstage/
 ├── templates/
 │   └── applications/
 │       └── nestjs/                  # golden-path software template
-├── iac/
-│   ├── modules/                     # reusable Terraform modules
-│   └── examples/                    # shared platform infra (AKS, ACR, state)
-├── policies/                        # allowlists and policy-as-code
+├── iac/                             # see ADR-0002
+│   ├── modules/                     # reusable, versioned modules (naming, app-identity,
+│   │                                #   app-namespace, storage-account, key-vault, aks-cluster, ...)
+│   └── platform/                    # shared platform stacks, one state each
+│       ├── 00-bootstrap/            #   Terraform state storage
+│       ├── 10-identities/           #   platform identities + OIDC federation
+│       └── 20-shared-dev/           #   AKS, ACR, ingress, DNS
+├── policies/                        # allowlists + OPA/Conftest rules for Terraform plans
 ├── docs/
 │   ├── architecture/
 │   ├── adr/
@@ -405,10 +409,12 @@ Each request produces one self-contained repository that the application team ow
 <application-name>/
 ├── src/                     # NestJS app: REST endpoints, config, validation, health
 ├── test/                    # unit + integration test structure
-├── infra/terraform/
-│   ├── modules/
-│   ├── environments/dev/
+├── infra/terraform/         # one root module, see ADR-0002
 │   ├── main.tf  variables.tf  outputs.tf  providers.tf  versions.tf
+│   ├── .terraform.lock.hcl
+│   └── environments/dev/
+│       ├── backend.hcl      # state location only
+│       └── terraform.tfvars # rendered from the Backstage form
 ├── deploy/helm/application/
 │   ├── Chart.yaml  values.yaml  values-dev.yaml
 │   └── templates/           # Deployment, Service, ServiceAccount, optional HPA/Ingress
@@ -425,6 +431,8 @@ Each request produces one self-contained repository that the application team ow
 ```
 
 Application code and infrastructure live in the same repository. The infrastructure definitions and workflows are generated before any provisioning runs.
+
+The Terraform `.tf` files are the same in every generated repository. The scaffolder renders only `terraform.tfvars`, and the modules come from this repository's `iac/modules/`, pinned to a version tag. Existing resources are read through `data` sources and never modified or destroyed. See [ADR-0002](docs/adr/0002-terraform-structure.md).
 
 ## Prerequisites
 
@@ -534,7 +542,7 @@ Installing a Helm chart successfully does not make it production-ready. Remainin
 Planned documentation, published through TechDocs:
 
 - `docs/architecture/`: context, data flow, trust boundaries, failure recovery
-- `docs/adr/`: Architecture Decision Records
+- `docs/adr/`: Architecture Decision Records: [0001 Python platform services](docs/adr/0001-python-platform-services.md), [0002 Terraform structure](docs/adr/0002-terraform-structure.md)
 - `docs/security/`: identity boundaries and the exact Azure and GitHub permissions per identity
 - [`docs/developer-guide/golden-path.md`](docs/developer-guide/golden-path.md): the end-to-end golden path, approval in Backstage and the shared URLs
 - [`docs/operations/cleanup.md`](docs/operations/cleanup.md): cleanup and teardown; troubleshooting and recovery procedures will follow

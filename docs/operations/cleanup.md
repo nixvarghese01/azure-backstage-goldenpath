@@ -27,20 +27,20 @@ Manual fallback, if the platform is unavailable. Run it from the application rep
 
 ```bash
 helm uninstall orders-api -n orders-api
-cd infra/terraform/environments/dev
-terraform init        # uses the Azure Storage backend
-terraform plan -destroy -out destroy.tfplan
+cd infra/terraform
+terraform init -backend-config=environments/dev/backend.hcl
+terraform plan -destroy -var-file=environments/dev/terraform.tfvars -out=destroy.tfplan
 terraform apply destroy.tfplan
 ```
 
 ## 2. Tear down shared demo infrastructure
 
-Only do this when no applications remain on the cluster. Run it from `iac/examples/` in the platform repository:
+Only do this when no applications remain on the cluster. Destroy the stacks in `iac/platform/` of the platform repository in **reverse order**:
 
 1. Remove every application first (section 1).
-2. Destroy the shared AKS cluster, ingress controller, DNS records and container registry.
-3. Remove the platform identities and federated credentials.
-4. **Last:** export anything you want to keep from the Terraform state storage account, then delete it.
+2. `iac/platform/20-shared-dev`: destroy the shared AKS cluster, ingress controller, DNS zone and container registry.
+3. `iac/platform/10-identities`: remove the platform identities and federated credentials.
+4. `iac/platform/00-bootstrap`, **last**: export anything you want to keep from the state storage account, remove its `CanNotDelete` lock, migrate this stack's state back to local, then destroy it.
 
 ## 3. Verify nothing is left running
 
