@@ -176,7 +176,7 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 - [ ] Register **GitHub App #2, orchestrator**: Actions, Deployments, Contents, Pull requests, webhooks, and **custom deployment protection rule** support.
 - [ ] Confirm the Azure subscription, region allowlist (for example `uksouth`) and that you can create role assignments.
 - [ ] Set up WSL2 (Ubuntu) with the tool versions from [COMPATIBILITY.md](COMPATIBILITY.md).
-- [ ] Create the **free Azure subscription**, set budget alerts, register resource providers, and check or raise the regional vCPU quota ([demo-environment.md §5](docs/operations/demo-environment.md#5-preparation-checklist)).
+- [ ] **Don't create the free Azure subscription yet.** Its 30-day credit starts at sign-up, and Phases 2–3 need no Azure resources. Create it when Phase 3 is nearly finished (see Phase 4).
 
 **Exit criteria:** `node -v` shows v24, `yarn -v` shows 4.13.0, `python3 --version` shows 3.14.x, `terraform version` shows 1.16.x, `helm version` shows v4.3.x and `az version` is at least 2.86. Both Apps are installed on the organisation.
 
@@ -244,6 +244,7 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 
 **Tasks**
 
+- [ ] Create the **free Azure subscription** now, as late as possible so the 30-day credit covers Phases 4–6: set budget alerts, register resource providers, and check or raise the regional vCPU quota ([demo-environment.md §5](docs/operations/demo-environment.md#5-preparation-checklist)).
 - [ ] Discovery endpoints from the README, using Resource Graph (with skip-token paging), the subscriptions client, and the allowlist filter.
 - [ ] Typed errors for permission denied, not found and throttled responses; retries with backoff.
 - [ ] `POST /v1/validate` for complete selection sets, used by the orchestrator.
@@ -305,7 +306,7 @@ gantt
     Phase 6 hardening & demo     :p6, after p5, 4d
 ```
 
-Phases 3 and 4 can run in parallel after Phase 2. The dates are indicative and are not commitments.
+Phase 4's mocked work can run in parallel with Phase 3, but its live Azure checks wait until the free subscription exists, so that Phases 4–6 fit inside the 30-day credit window. The dates are indicative and are not commitments.
 
 ---
 
