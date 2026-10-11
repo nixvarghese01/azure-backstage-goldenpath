@@ -1,0 +1,14 @@
+title = "sportify-azure-backstage gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented placeholders and dev-only values"
+regexes = [
+  '''dev-only-not-a-secret''',
+  '''dev-only-change-me''',
+]
+paths = [
+  '''deploy/local/\.env\.example$''',
+]

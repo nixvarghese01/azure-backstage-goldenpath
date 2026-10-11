@@ -1,0 +1,6 @@
+# Platform team owns everything by default; security-sensitive paths require their review.
+*                       @sportify-org/platform-team
+/.github/workflows/     @sportify-org/platform-team
+/iac/                   @sportify-org/platform-team
+/policies/              @sportify-org/platform-team
+/templates/             @sportify-org/platform-team

@@ -1,0 +1,54 @@
+# --- Secrets and local configuration (never commit) ---
+.env
+.env.*
+!deploy/local/.env.example
+app-config.local.yaml
+app-config.*.local.yaml
+*.pem
+*.key
+*.pfx
+*.p12
+kubeconfig*
+.kube/
+
+# --- Terraform ---
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars.json
+# Rendered environment tfvars hold no secrets and are committed in generated repos.
+
+# --- Node / Backstage ---
+node_modules/
+dist/
+dist-types/
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+coverage/
+*.tsbuildinfo
+site/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
