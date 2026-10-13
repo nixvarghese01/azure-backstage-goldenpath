@@ -31,3 +31,7 @@
 **/secrets
 **/.yarn/cache
 **/.yarn/install-state.gz
+# Workspace-local toolchains and caches, and .NET build output in the starter templates
+.tools
+templates/**/bin
+templates/**/obj
