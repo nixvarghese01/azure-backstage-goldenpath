@@ -78,7 +78,11 @@ All Actions are pinned to a **full commit SHA**, with the version in a trailing 
 | `hashicorp/setup-terraform` | v4 | v4.0.1 |
 | `azure/setup-helm` | v5 | v5.0.1 |
 | `azure/setup-kubectl` | v5 | v5.2.0 |
-| `docker/build-push-action` | v7 | v7.4.0 |
+| `docker/build-push-action` | v7 | v7.4.0 (not used: the workflows call the Docker CLI directly) |
+| `actions/upload-artifact` | v7 | v7.0.2 |
+| `actions/download-artifact` | v8 | v8.0.2 |
+| `github/codeql-action` | v4 | v4.38.3 |
+| `actions/dependency-review-action` | v5 | v5.0.0 |
 | Trivy | binary v0.75.x, checksum-verified | — |
 
 ## 3. Dependency map

@@ -1,0 +1,40 @@
+# Keeps pinned versions current. Review every update: GitHub Action SHA bumps must be checked against
+# the upstream release tag before merging (COMPATIBILITY.md risks 3-4).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
+
+  - package-ecosystem: uv
+    directory: /services
+    schedule: { interval: weekly }
+    groups:
+      python-minor: { update-types: [minor, patch] }
+
+  - package-ecosystem: npm
+    directory: /portal
+    schedule: { interval: monthly }   # Backstage itself is upgraded with `backstage-cli versions:bump`
+    ignore:
+      - dependency-name: "@backstage/*"
+    groups:
+      portal-minor: { update-types: [minor, patch] }
+
+  - package-ecosystem: terraform
+    directories:
+      - /iac/modules/*
+      - /iac/platform/*
+      - /templates/applications/nestjs/skeleton/infra/terraform
+    schedule: { interval: weekly }
+    groups:
+      terraform: { patterns: ["*"] }
+
+  - package-ecosystem: docker
+    directories:
+      - /services/azure-discovery
+      - /services/provisioning-orchestrator
+      - /portal/packages/backend
+      - /templates/applications/nestjs/application
+    schedule: { interval: weekly }
