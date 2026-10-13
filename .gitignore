@@ -33,9 +33,9 @@ iac/modules/**/.terraform.lock.hcl
 node_modules/
 dist/
 dist-types/
-.yarn/*
-!.yarn/releases
-!.yarn/plugins
+**/.yarn/*
+!**/.yarn/releases
+!**/.yarn/plugins
 coverage/
 *.tsbuildinfo
 site/

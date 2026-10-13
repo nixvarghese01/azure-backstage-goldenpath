@@ -1,0 +1,15 @@
+# Time-boxed risk acceptances for Trivy (ci-security). Each entry needs a reason and an expiry;
+# an expired entry stops suppressing the finding and fails CI again, forcing a fresh decision.
+vulnerabilities:
+  - id: CVE-2026-104852
+    paths: ["portal/yarn.lock"]
+    statement: >-
+      @graphql-tools/utils 8.x comes only through mockttp (HTTP mocking in @backstage/backend-openapi-utils).
+      The fix is 12.x, a breaking major under an exact pin; wait for Backstage to move off it.
+    expired_at: 2026-12-15
+  - id: CVE-2026-102990
+    paths: ["portal/yarn.lock"]
+    statement: >-
+      basic-ftp 5.x comes only through get-uri (mockttp proxy support and openapi-generator-cli dev tooling);
+      the portal never fetches ftp:// URLs. The fix is 6.x, a breaking major; wait for upstream.
+    expired_at: 2026-12-15

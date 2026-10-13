@@ -26,5 +26,7 @@
   "devDependencies": {
     "@backstage/cli": "backstage:^"
   },
-  "files": ["dist"]
+  "files": [
+    "dist"
+  ]
 }

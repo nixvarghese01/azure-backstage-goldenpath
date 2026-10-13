@@ -16,7 +16,7 @@ const componentPage = (
     <EntityLayout.Route path="/" title="Overview">
       <Grid container spacing={3}>
         <Grid item md={6}>
-          <EntityAboutCard variant="gridItem" />
+          <EntityAboutCard />
         </Grid>
         <Grid item md={6}>
           <EntityLinksCard />
@@ -37,7 +37,7 @@ const groupPage = (
     <EntityLayout.Route path="/" title="Overview">
       <Grid container spacing={3}>
         <Grid item md={6}>
-          <EntityOwnershipCard variant="gridItem" />
+          <EntityOwnershipCard />
         </Grid>
         <Grid item md={6}>
           <EntityMembersListCard />
@@ -50,7 +50,7 @@ const groupPage = (
 const defaultPage = (
   <EntityLayout>
     <EntityLayout.Route path="/" title="Overview">
-      <EntityAboutCard variant="gridItem" />
+      <EntityAboutCard />
     </EntityLayout.Route>
   </EntityLayout>
 );

@@ -16,6 +16,7 @@
   "dependencies": {
     "@backstage/app-defaults": "backstage:^",
     "@backstage/catalog-model": "backstage:^",
+    "@backstage/cli": "backstage:^",
     "@backstage/core-app-api": "backstage:^",
     "@backstage/core-components": "backstage:^",
     "@backstage/core-plugin-api": "backstage:^",
@@ -41,13 +42,22 @@
     "react-router-dom": "^6.26.0"
   },
   "devDependencies": {
-    "@backstage/cli": "backstage:^",
     "@backstage/test-utils": "backstage:^",
     "@testing-library/react": "^16.0.0"
   },
   "browserslist": {
-    "production": [">0.2%", "not dead", "not op_mini all"],
-    "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   },
-  "files": ["dist"]
+  "files": [
+    "dist"
+  ]
 }

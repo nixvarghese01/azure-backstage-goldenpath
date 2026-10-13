@@ -5,10 +5,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
     && rm -rf /var/lib/apt/lists/* && corepack enable
 WORKDIR /src/portal
 COPY portal/ ./
-# The handwritten workspace has no lockfile yet. Once committed, builds enforce it.
-RUN yarn plugin import https://versions.backstage.io/v1/tags/main/yarn-plugin \
-    && if [ -f yarn.lock ]; then yarn install --immutable; else YARN_ENABLE_IMMUTABLE_INSTALLS=false yarn install; fi
-RUN yarn build:backend --config app-config.container.yaml
+# The Backstage Yarn plugin and yarn.lock are committed, so installs are reproducible.
+RUN yarn install --immutable
+# --config resolves from packages/backend; the container config needs no GitHub App credentials file.
+RUN yarn build:backend --config ../../app-config.container.yaml
 # Assemble the standard backend skeleton and bundle with production dependencies only.
 RUN mkdir /runtime && tar -xzf packages/backend/dist/skeleton.tar.gz -C /runtime \
     && cp package.json yarn.lock .yarnrc.yml backstage.json /runtime/ \

@@ -28,4 +28,5 @@ jobs:
       - run: yarn tsc
       - run: yarn lint:all
       - run: yarn test:all
-      - run: yarn build:backend
+      # Container config: the default config $includes GitHub App credentials, which CI doesn't have.
+      - run: yarn build:backend --config ../../app-config.container.yaml

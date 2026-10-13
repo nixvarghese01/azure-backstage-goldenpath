@@ -1,7 +1,7 @@
 import { createApp } from '@backstage/app-defaults';
 import { AppRouter, FlatRoutes } from '@backstage/core-app-api';
 import { AlertDisplay, OAuthRequestDialog, SignInPage } from '@backstage/core-components';
-import { configApiRef, githubAuthApiRef, useApi } from '@backstage/core-plugin-api';
+import { type SignInPageProps, configApiRef, githubAuthApiRef, useApi } from '@backstage/core-plugin-api';
 import { CatalogEntityPage, CatalogIndexPage, catalogPlugin } from '@backstage/plugin-catalog';
 import { NotificationsPage } from '@backstage/plugin-notifications';
 import { ScaffolderPage, scaffolderPlugin } from '@backstage/plugin-scaffolder';
@@ -14,6 +14,7 @@ import {
   SportifyAvailabilityPickerExtension,
   SportifyAzureResourcePickerExtension,
   SportifyStackPickerExtension,
+  SportifyEndpointHostPickerExtension,
 } from '@internal/plugin-sportify-platform';
 import React from 'react';
 import { Navigate, Route } from 'react-router-dom';
@@ -21,10 +22,10 @@ import { apis } from './apis';
 import { entityPage } from './components/catalog/EntityPage';
 import { Root } from './components/Root';
 
-function PlatformSignInPage(props: React.ComponentProps<typeof SignInPage>) {
+function PlatformSignInPage(props: SignInPageProps) {
   const config = useApi(configApiRef);
   if (config.getString('auth.environment') === 'local-docker') {
-    return <SignInPage {...props} auto provider="guest" />;
+    return <SignInPage {...props} providers={['guest']} />;
   }
   return (
     <SignInPage {...props} auto
@@ -56,6 +57,7 @@ const routes = (
         <SportifyAzureResourcePickerExtension />
         <SportifyAvailabilityPickerExtension />
         <SportifyStackPickerExtension />
+        <SportifyEndpointHostPickerExtension />
       </ScaffolderFieldExtensions>
     </Route>
     <Route path="/docs" element={<TechDocsIndexPage />} />
