@@ -125,7 +125,7 @@ There is no message broker. The orchestrator uses **PostgreSQL-backed patterns**
 | GitHub webhooks (`workflow_run`, `deployment_status`, `deployment_protection_rule`, `pull_request`) | `POST /v1/webhooks/github` | HMAC-SHA256 (`X-Hub-Signature-256`) with the App's webhook secret; installation ID allowlist |
 | Actions callbacks (plan summary, plan hash, outputs) | `POST /v1/callbacks/actions` | **GitHub OIDC token** from the job: issuer `token.actions.githubusercontent.com`, expected audience, and `repository`/`environment` claims that must match the request's repository and stage |
 
-Only these two paths are exposed publicly, through an `HTTPRoute` on a separate host (for example `platform-hooks.dev.sportify.example`). Every other orchestrator endpoint is reachable only inside the cluster.
+Only these two paths are exposed publicly, through an `HTTPRoute` on a separate host (for example `platform-hooks.dev.xycorp.local`). Every other orchestrator endpoint is reachable only inside the cluster.
 
 ## 5. Identities and trust boundaries
 
@@ -163,8 +163,8 @@ flowchart TB
         GW["Gateway (approuting-istio)"]
     end
     subgraph NS["namespace: sportify-platform"]
-        R1["HTTPRoute backstage.dev.sportify.example"] --> SBS[Service backstage]
-        R2["HTTPRoute platform-hooks.dev.sportify.example<br/>/v1/webhooks/github · /v1/callbacks/actions"] --> SOA[Service orchestrator-api]
+        R1["HTTPRoute backstage.dev.xycorp.local"] --> SBS[Service backstage]
+        R2["HTTPRoute platform-hooks.dev.xycorp.local<br/>/v1/webhooks/github · /v1/callbacks/actions"] --> SOA[Service orchestrator-api]
         SBS --> PBS["Deployment backstage ×2"]
         SOA --> POA["Deployment orchestrator-api ×2"]
         SD[Service azure-discovery] --> PD["Deployment azure-discovery ×2"]

@@ -1,32 +1,42 @@
 import { Progress } from '@backstage/core-components';
 import { useApi } from '@backstage/core-plugin-api';
 import type { FieldExtensionComponentProps } from '@backstage/plugin-scaffolder-react';
-import { FormControl, FormControlLabel, FormHelperText, FormLabel, Radio, RadioGroup } from '@material-ui/core';
-import React from 'react';
+import { FormHelperText, MenuItem, TextField } from '@material-ui/core';
+import React, { useEffect } from 'react';
 import useAsync from 'react-use/esm/useAsync';
 import { sportifyApiRef } from '../api';
 
-/** Lists the platform's stacks; stacks that aren't enabled yet are shown but disabled ("coming soon"). */
+/** Dropdown of the platform's stacks, preselected with the default; stacks not enabled yet are "coming soon". */
 export const StackPicker = ({ formData, onChange, schema, rawErrors, required }: FieldExtensionComponentProps<string>) => {
   const api = useApi(sportifyApiRef);
   const { value: stacks, loading, error } = useAsync(() => api.stacks(), [api]);
+  const fallback = (schema.default as string | undefined) ?? 'nestjs';
+
+  useEffect(() => {
+    if (!formData) onChange(fallback);
+  }, [formData, fallback]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (loading) return <Progress />;
   return (
-    <FormControl required={required} error={!!rawErrors?.length || !!error}>
-      <FormLabel>{schema.title ?? 'Stack'}</FormLabel>
-      <RadioGroup value={formData ?? ''} onChange={e => onChange(e.target.value)}>
+    <>
+      <TextField
+        select
+        fullWidth
+        size="small"
+        required={required}
+        error={!!rawErrors?.length || !!error}
+        label={schema.title ?? 'Stack'}
+        value={formData ?? fallback}
+        onChange={e => onChange(e.target.value)}
+      >
         {(stacks ?? []).map(s => (
-          <FormControlLabel
-            key={s.id}
-            value={s.id}
-            control={<Radio />}
-            disabled={!s.enabled}
-            label={s.enabled ? s.name : `${s.name} (coming soon)`}
-          />
+          <MenuItem key={s.id} value={s.id} disabled={!s.enabled}>
+            {s.name}{s.id === fallback ? ' (default)' : ''}{s.enabled ? '' : ' (coming soon)'}
+          </MenuItem>
         ))}
-      </RadioGroup>
-      {error && <FormHelperText>Couldn't load stacks: {error.message}</FormHelperText>}
+      </TextField>
+      {error && <FormHelperText error>Couldn't load stacks: {error.message}</FormHelperText>}
       {schema.description && <FormHelperText>{schema.description}</FormHelperText>}
-    </FormControl>
+    </>
   );
 };

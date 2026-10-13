@@ -104,3 +104,16 @@ def test_new_aks_cluster_blocked_by_quota(client, inventory) -> None:
 
 def test_disabled_stack_rejected(client) -> None:
     assert "stack_not_available" in _codes(_validate(client, stack="fastapi"))
+
+
+def test_endpoint_host_defaults_to_the_gateway_domain(client) -> None:
+    body = _validate(client)
+    assert body["resolved"]["endpoint_host"] == "orders-api.dev.xycorp.local"
+
+
+def test_custom_endpoint_host_is_kept_and_checked(client) -> None:
+    body = _validate(client, endpoint_host="Orders.Example.com")
+    assert body["valid"] is True
+    assert body["resolved"]["endpoint_host"] == "orders.example.com"
+    assert "outside_gateway_domain" in [w["code"] for w in body["warnings"]]
+    assert "invalid_host" in _codes(_validate(client, endpoint_host="not a host"))

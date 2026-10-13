@@ -63,6 +63,27 @@ Options the subscription can't support are **disabled in the form, with the reas
 6. Run the golden-path demo ([IMPLEMENTATION_PLAN.md §6](../../IMPLEMENTATION_PLAN.md#6-demo-script)). Record evidence.
 7. **Tear down the same day** ([cleanup.md](cleanup.md)), then check *Cost Management* the next day.
 
+## Reaching an application without your own domain
+
+Applications are named `<name>.dev.xycorp.local` (the cluster's `gateway.base_domain` in
+`policies/allowlist.yaml`). You don't need to own a domain or run DNS:
+
+- **Pipelines need nothing.** The deploy smoke test reads the shared Gateway's IP and calls the app with
+  `curl --resolve <host>:80:<gateway-ip>`, so the name never has to resolve.
+- **Your browser** needs one hosts entry per application. Find the IP with
+  `kubectl get gateway sportify-gateway -n sportify-gateway -o jsonpath='{.status.addresses[0].value}'`,
+  then add `<gateway-ip>  orders-api.dev.xycorp.local` to `/etc/hosts` or
+  `C:\Windows\System32\drivers\etc\hosts`.
+- **No hosts file at all:** set `base_domain` to `<gateway-ip>.nip.io`. Public wildcard DNS then resolves
+  `orders-api.<gateway-ip>.nip.io` to the Gateway, with nothing to configure.
+- **A team network** can serve `dev.xycorp.local` from an Azure Private DNS zone linked to the network your
+  users resolve from, with a wildcard record pointing at the Gateway.
+
+`.local` is reserved for multicast DNS (RFC 6762). Public DNS can't serve it, `20-shared-dev` refuses a
+public `.local` zone, and macOS and many Linux desktops send `.local` lookups to mDNS first, so hosts
+entries are the most reliable option there. Use a domain you own (and a public zone) when applications must
+be reachable from the internet.
+
 ## 6. Timing
 
 - Plan to **build and record the demo within the 30-day credit window**. Most development (Phases 2–4) runs locally with mocked Azure adapters and uses no Azure resources at all.

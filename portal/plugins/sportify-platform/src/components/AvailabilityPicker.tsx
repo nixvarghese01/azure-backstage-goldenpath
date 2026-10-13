@@ -1,18 +1,8 @@
-import type { FieldExtensionComponentProps, FieldValidation } from '@backstage/plugin-scaffolder-react';
+import type { FieldExtensionComponentProps } from '@backstage/plugin-scaffolder-react';
+import type { FieldValidation } from '@rjsf/utils';
 import type { AvailabilitySelection } from '@internal/plugin-sportify-platform-common';
-import {
-  Box,
-  FormControl,
-  FormControlLabel,
-  FormLabel,
-  MenuItem,
-  Radio,
-  RadioGroup,
-  TextField,
-  Typography,
-} from '@material-ui/core';
-import { Alert } from '@material-ui/lab';
-import React from 'react';
+import { Box, FormControl, FormHelperText, MenuItem, TextField, Typography } from '@material-ui/core';
+import React, { useEffect } from 'react';
 
 // Mirrors policies/allowlist.yaml (ha.*). The server re-validates; this is only for a good UX.
 const REASONS: Record<string, string> = {
@@ -32,25 +22,33 @@ function deviates(value: AvailabilitySelection | undefined, environment: string)
   return (value?.tier === 'ha') !== (HA_DEFAULT[environment] ?? false);
 }
 
-/** ADR-0004: "Do you need high availability?" with a justification when deviating from the default. */
+/** ADR-0004: availability dropdown preselected with the environment default; deviating needs a justification. */
 export const AvailabilityPicker = (props: FieldExtensionComponentProps<AvailabilitySelection>) => {
   const { formData, onChange, formContext } = props;
   const environment: string = (formContext as any)?.formData?.environment ?? 'dev';
-  const value: AvailabilitySelection = formData ?? { tier: HA_DEFAULT[environment] ? 'ha' : 'standard' };
+  const defaultTier = HA_DEFAULT[environment] ? 'ha' : 'standard';
+  const value: AvailabilitySelection = formData ?? { tier: defaultTier };
   const set = (patch: Partial<AvailabilitySelection>) => onChange({ ...value, ...patch });
   const needsJustification = deviates(value, environment);
 
+  useEffect(() => {
+    if (!formData) onChange({ tier: defaultTier });
+  }, [formData, defaultTier]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <FormControl component="fieldset" fullWidth>
-      <FormLabel component="legend">Do you need high availability?</FormLabel>
-      <RadioGroup row value={value.tier} onChange={e => set({ tier: e.target.value as 'standard' | 'ha' })}>
-        <FormControlLabel value="ha" control={<Radio />} label="Yes" />
-        <FormControlLabel value="standard" control={<Radio />} label={`No${HA_DEFAULT[environment] ? '' : ' (default)'}`} />
-      </RadioGroup>
-      <Alert severity="info">
-        HA runs at least 2 replicas across availability zones, with a disruption budget and autoscaling, and uses
-        zone-redundant storage when creating new storage. It increases cost and needs approval.
-      </Alert>
+    <FormControl fullWidth>
+      <TextField select fullWidth size="small" label="Availability" value={value.tier}
+        onChange={e => set({ tier: e.target.value as 'standard' | 'ha' })}>
+        <MenuItem value="standard">
+          Standard - one pod, minimum resources{defaultTier === 'standard' ? ' (default)' : ''}
+        </MenuItem>
+        <MenuItem value="ha">
+          High availability - 2+ pods across zones, autoscaling{defaultTier === 'ha' ? ' (default)' : ''}
+        </MenuItem>
+      </TextField>
+      <FormHelperText>
+        HA adds a disruption budget and zone-redundant storage for new storage. It increases cost and needs approval.
+      </FormHelperText>
       {needsJustification && (
         <Box mt={2} display="flex" flexDirection="column" gridGap={16}>
           <Typography variant="body2">

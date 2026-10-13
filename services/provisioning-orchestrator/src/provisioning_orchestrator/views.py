@@ -100,6 +100,7 @@ def to_out(req: Request, backstage_base: str, org: str) -> RequestOut:
         stack=req.stack,
         requested_by=req.requested_by,
         ready_for_repository=req.ready_for_repository,
+        endpoint_host=req.spec.get("endpoint_host", ""),
         validation={k: validation.get(k) for k in ("valid", "errors", "warnings", "platform_changes")},
         repository=req.repository,
         platform=req.platform,

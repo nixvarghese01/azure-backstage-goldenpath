@@ -48,7 +48,7 @@ variable "kubelogin_mode" {
 }
 
 variable "gateway_hostname" {
-  description = "Wildcard listener hostname, e.g. *.dev.sportify.example. null = accept any host."
+  description = "Wildcard listener hostname, e.g. *.dev.xycorp.local. null = accept any host."
   type        = string
   default     = null
 }

@@ -42,7 +42,7 @@ techdocs:
 scaffolder:
   defaultAuthor:
     name: Sportify Platform
-    email: platform@sportify.example
+    email: platform@xycorp.local
 sportify:
   approverGroup: group:default/platform-approvers
   submitTimeoutMinutes: 360

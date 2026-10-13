@@ -6,6 +6,7 @@ export {
   SportifyAzureResourcePickerExtension,
   SportifyAvailabilityPickerExtension,
   SportifyStackPickerExtension,
+  SportifyEndpointHostPickerExtension,
 } from './plugin';
 export { sportifyApiRef, SportifyClient } from './api';
 export type { SportifyApi } from './api';

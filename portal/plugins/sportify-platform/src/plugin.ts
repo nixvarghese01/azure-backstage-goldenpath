@@ -11,6 +11,7 @@ import { createScaffolderFieldExtension } from '@backstage/plugin-scaffolder-rea
 import { SportifyClient, sportifyApiRef } from './api';
 import { AvailabilityPicker, validateAvailability } from './components/AvailabilityPicker';
 import { AzureResourcePicker, validateInfrastructure } from './components/AzureResourcePicker';
+import { EndpointHostPicker, validateEndpointHost } from './components/EndpointHostPicker';
 import { StackPicker } from './components/StackPicker';
 
 export const approvalsRouteRef = createRouteRef({ id: 'sportify-approvals' });
@@ -62,5 +63,13 @@ export const SportifyStackPickerExtension = sportifyPlugin.provide(
   createScaffolderFieldExtension({
     name: 'SportifyStackPicker',
     component: StackPicker,
+  }),
+);
+
+export const SportifyEndpointHostPickerExtension = sportifyPlugin.provide(
+  createScaffolderFieldExtension({
+    name: 'SportifyEndpointHostPicker',
+    component: EndpointHostPicker,
+    validation: validateEndpointHost,
   }),
 );

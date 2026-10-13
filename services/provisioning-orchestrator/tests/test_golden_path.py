@@ -1,5 +1,7 @@
 """End-to-end golden path with mocked GitHub and discovery: submit -> ... -> SUCCEEDED."""
 
+from provisioning_orchestrator.models import Request
+
 from tests.conftest import APPROVER, REQUESTER, SERVICE, callback, drain, submission, webhook
 
 PLAN_HASH = "a" * 64
@@ -107,15 +109,13 @@ def test_golden_path_reaches_succeeded(client, worker, github) -> None:
 
     callback(client, rid, "ci", "success", 4, {"image": "acrsportifydev.azurecr.io/orders-api:abc123"})
     callback(client, rid, "deploy", "started", 5)
-    callback(
-        client, rid, "deploy", "success", 5, {"endpoint": "orders-api.dev.sportify.example", "pods": "1/1"}
-    )
+    callback(client, rid, "deploy", "success", 5, {"endpoint": "orders-api.dev.xycorp.local", "pods": "1/1"})
     drain(worker)
 
     body = _get(client, rid)
     assert body["state"] == "SUCCEEDED"
     assert [o["status"] for o in body["outcomes"]] == ["succeeded"] * 5
-    assert body["urls"]["application"] == "https://orders-api.dev.sportify.example"
+    assert body["urls"]["application"] == "https://orders-api.dev.xycorp.local"
     assert body["urls"]["api_docs"].endswith("/docs")
 
 
@@ -253,7 +253,7 @@ def test_cleanup_destroys_with_approval_and_unregisters(client, worker, github, 
     drain(worker)
     callback(client, rid, "ci", "success", 4, {"image": "acr/orders-api:1"})
     callback(client, rid, "deploy", "started", 5)
-    callback(client, rid, "deploy", "success", 5, {"endpoint": "orders-api.dev.sportify.example"})
+    callback(client, rid, "deploy", "success", 5, {"endpoint": "orders-api.dev.xycorp.local"})
     drain(worker)
     assert _get(client, rid)["state"] == "SUCCEEDED"
 
@@ -291,3 +291,13 @@ def test_cleanup_destroys_with_approval_and_unregisters(client, worker, github, 
     drain(worker)
     assert _get(client, rid)["state"] == "CLEANED_UP"
     assert {"unregistered": "component:default/orders-api"} in ctx.backstage.sent
+
+
+def test_empty_endpoint_host_takes_the_validated_default(client, worker, discovery, ctx) -> None:
+    discovery.result = {**discovery.result, "resolved": {"endpoint_host": "orders-api.dev.xycorp.local"}}
+    rid = client.post("/v1/requests", json=submission(endpoint_host=""), headers=REQUESTER).json()["id"]
+    drain(worker)
+    assert discovery.calls[0]["endpoint_host"] == ""
+    with ctx.sessions() as s:
+        assert s.get(Request, rid).spec["endpoint_host"] == "orders-api.dev.xycorp.local"
+    assert _get(client, rid)["endpoint_host"] == "orders-api.dev.xycorp.local"

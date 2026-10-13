@@ -30,6 +30,8 @@ export interface InfrastructureSelection {
   containerRegistry: Selection;
   namespace: Selection;
   runtimeCapability: RuntimeCapability;
+  /** Gateway domain of the selected cluster; the endpoint host defaults to <name>.<baseDomain>. */
+  baseDomain?: string;
 }
 
 /** Value produced by the SportifyAvailabilityPicker field (ADR-0004). */
@@ -66,6 +68,8 @@ export interface RequestView {
   stack: string;
   requested_by: string;
   ready_for_repository: boolean;
+  /** The requested host, or the platform default (<name>.<gateway domain>) once validated. */
+  endpoint_host: string;
   validation: { valid?: boolean; errors?: Finding[]; warnings?: Finding[]; platform_changes?: string[] };
   repository: { owner?: string; name?: string; url?: string };
   platform: { pr_url?: string; changes?: string[] };

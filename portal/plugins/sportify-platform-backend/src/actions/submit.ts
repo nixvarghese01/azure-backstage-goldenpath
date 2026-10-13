@@ -16,7 +16,7 @@ export function toOrchestratorRequest(input: {
   stack: string;
   infrastructure: InfrastructureSelection;
   availability: { tier: string; reason?: string; justification?: string; sloTarget?: string };
-  endpointHost: string;
+  endpointHost?: string;
   repoVisibility: string;
 }) {
   const i = input.infrastructure;
@@ -41,7 +41,8 @@ export function toOrchestratorRequest(input: {
       justification: input.availability.justification,
       slo_target: input.availability.sloTarget,
     },
-    endpoint_host: input.endpointHost,
+    // Empty: the server uses <name>.<gateway domain> of the selected cluster.
+    endpoint_host: input.endpointHost ?? '',
     repository_visibility: input.repoVisibility,
   };
 }
@@ -64,7 +65,7 @@ export function createSubmitAction(opts: { client: PlatformClient; config: Confi
         stack: z => z.string(),
         infrastructure: z => z.any(),
         availability: z => z.any(),
-        endpointHost: z => z.string(),
+        endpointHost: z => z.string().optional(),
         repoVisibility: z => z.string(),
       },
       output: {
@@ -74,6 +75,7 @@ export function createSubmitAction(opts: { client: PlatformClient; config: Confi
         acrName: z => z.string(),
         aksName: z => z.string(),
         aksResourceGroup: z => z.string(),
+        endpointHost: z => z.string(),
       },
     },
     async handler(ctx) {
@@ -99,8 +101,10 @@ export function createSubmitAction(opts: { client: PlatformClient; config: Confi
 
       const deadline = Date.now() + timeoutMs;
       let last = '';
+      let endpointHost = ctx.input.endpointHost ?? '';
       for (;;) {
         const r = await client.orchestrator<RequestView>('GET', `/v1/requests/${requestId}`);
+        endpointHost = r.endpoint_host || endpointHost;
         if (r.state !== last) {
           ctx.logger.info(`Request ${requestId}: ${r.state}`);
           last = r.state;
@@ -124,6 +128,7 @@ export function createSubmitAction(opts: { client: PlatformClient; config: Confi
       ctx.output('acrName', infra.containerRegistry.name ?? '');
       ctx.output('aksName', infra.aksCluster.name ?? '');
       ctx.output('aksResourceGroup', infra.aksCluster.resourceGroup ?? '');
+      ctx.output('endpointHost', endpointHost);
     },
   });
 }

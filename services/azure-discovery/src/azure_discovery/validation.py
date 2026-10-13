@@ -137,7 +137,8 @@ def validate_request(
             c.error("aks_cluster", "capability_unavailable", caps.create_new["aks_cluster"].reason or "")
     elif existing_sub_ok:
         name = aks.name or _name_from_id(aks.id) or ""
-        if not policy.aks_cluster(sub_id, name, env):
+        aks_entry = policy.aks_cluster(sub_id, name, env)
+        if not aks_entry:
             c.error("aks_cluster", "not_allowlisted", f"Cluster '{name}' is not an approved shared cluster.")
         else:
             cluster = next(
@@ -153,6 +154,8 @@ def validate_request(
                 )
             else:
                 resolved["aks_cluster_id"] = cluster.id
+            if aks_entry.gateway:
+                _resolve_endpoint_host(req, aks_entry.gateway.base_domain, resolved, c)
 
     # ---- container registry ----
     acr = req.container_registry
@@ -241,6 +244,27 @@ def validate_request(
         platform_changes=platform_changes,
         resolved=resolved,
     )
+
+
+HOSTNAME = re.compile(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)+$")
+
+
+def _resolve_endpoint_host(
+    req: ValidationRequest, base_domain: str, resolved: dict[str, str], c: _Collector
+) -> None:
+    """Default the endpoint host to <app>.<base_domain>; a custom host must be a valid DNS name."""
+    host = (req.endpoint_host or f"{req.application_name}.{base_domain}").lower()
+    if not HOSTNAME.fullmatch(host) or len(host) > 253:
+        c.error("endpoint_host", "invalid_host", f"'{host}' is not a valid host name.")
+        return
+    if not host.endswith(f".{base_domain}"):
+        c.warn(
+            "endpoint_host",
+            "outside_gateway_domain",
+            f"'{host}' is outside the gateway domain {base_domain}; "
+            "add its DNS record and certificate yourself.",
+        )
+    resolved["endpoint_host"] = host
 
 
 def _validate_availability(

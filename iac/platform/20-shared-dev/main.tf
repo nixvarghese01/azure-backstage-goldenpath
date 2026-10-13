@@ -72,9 +72,14 @@ variable "postgres_allowed_ips" {
 }
 
 variable "dns_zone_name" {
-  description = "Optional DNS zone for application endpoints, e.g. dev.sportify.example. null = none."
+  description = "Optional public DNS zone for application endpoints. null = none (the demo uses dev.xycorp.local through hosts entries or private DNS)."
   type        = string
   default     = null
+  validation {
+    # .local is reserved for multicast DNS (RFC 6762) and can't be served from a public zone.
+    condition     = var.dns_zone_name == null || !endswith(coalesce(var.dns_zone_name, "x"), ".local")
+    error_message = "A public DNS zone can't serve .local names; use an Azure Private DNS zone or hosts entries instead."
+  }
 }
 
 variable "shared_storage_name" {

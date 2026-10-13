@@ -25,7 +25,7 @@ config:
   backstageScope: ""      # api://sportify-backstage/.default
   approverGroup: group:default/platform-approvers
 hooks:
-  host: platform-hooks.dev.sportify.example
+  host: platform-hooks.dev.xycorp.local
   gateway: { name: sportify-gateway, namespace: sportify-gateway }
 resources:
   requests: { cpu: 50m, memory: 128Mi }

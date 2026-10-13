@@ -7,10 +7,10 @@ workloadIdentity:
 keyVault:
   name: kv-sportify-plat-dev
   tenantId: ""
-host: backstage.dev.sportify.example
+host: backstage.dev.xycorp.local
 gateway: { name: sportify-gateway, namespace: sportify-gateway }
 env:
-  BACKSTAGE_BASE_URL: http://backstage.dev.sportify.example
+  BACKSTAGE_BASE_URL: http://backstage.dev.xycorp.local
   POSTGRES_HOST: ""
   POSTGRES_USER: id-sportify-backstage-dev
   AZURE_TENANT_ID: ""

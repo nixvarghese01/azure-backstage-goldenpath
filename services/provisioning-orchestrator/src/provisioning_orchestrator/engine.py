@@ -68,6 +68,7 @@ def _validation_body(req: Request) -> dict[str, Any]:
         "runtime_capability": s.get("runtime_capability", {"type": "none", "mode": "existing"}),
         "availability": s.get("availability", {"tier": "standard"}),
         "stack": req.stack,
+        "endpoint_host": s.get("endpoint_host", ""),
     }
 
 
@@ -123,6 +124,10 @@ def h_validate(ctx: Context, s: Session, step: Step, req: Request) -> None:
             details={"errors": result.get("errors", [])},
         )
         return
+    # Persist the derived default (<app>.<gateway domain>) when the form left the host empty.
+    host = result.get("resolved", {}).get("endpoint_host")
+    if host and not req.spec.get("endpoint_host"):
+        req.spec = {**req.spec, "endpoint_host": host}
     changes = result.get("platform_changes") or []
     if changes:
         req.platform = {**req.platform, "changes": changes}

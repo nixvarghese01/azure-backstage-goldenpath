@@ -50,6 +50,8 @@ class AksCluster(BaseModel):
 class AksClusterOut(AksCluster):
     zones: int
     ha_eligible: bool
+    # Gateway base domain from the allowlist; applications default to <name>.<base_domain>.
+    base_domain: str | None = None
 
 
 class ContainerRegistry(BaseModel):
@@ -117,6 +119,8 @@ class ValidationRequest(BaseModel):
     runtime_capability: RuntimeCapability = Field(default_factory=RuntimeCapability)
     availability: Availability = Field(default_factory=Availability)
     stack: str = "nestjs"
+    # Empty = <application_name>.<gateway base_domain> of the selected cluster.
+    endpoint_host: str = ""
 
 
 class Finding(BaseModel):

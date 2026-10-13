@@ -28,7 +28,7 @@ The examples in this guide use the following request.
 | Container registry | Select existing: `acrsportifydev` |
 | Namespace | Create new: `orders-api` |
 | Runtime capability | Storage, select existing: `stsportifyshareddev` (blob read and write) |
-| Endpoint host | `orders-api.dev.sportify.example` |
+| Endpoint host | `orders-api.dev.xycorp.local` |
 | High availability | **No** (the `dev` default, so no justification is needed) |
 | Repository visibility | Public |
 
@@ -111,14 +111,26 @@ High availability   ( ) Yes   (•) No          ← default for dev
 
 ## Step 1: Submit everything in Backstage
 
-The template **Create → "Secure NestJS REST API"** is a single form with four pages, followed by a review page.
+The template **Create → "Application starter"** asks for as little as possible: two pages, then a review page.
+A developer who accepts the defaults types only the application name and picks a team.
 
 | Page | Fields | Source of options |
 |---|---|---|
-| 1. Application | Name, description, owner | Owner from the Backstage catalog (the user's groups) |
-| 2. Stack | Stack, sample endpoint, OpenAPI docs, runtime capability | A stack registry: NestJS is enabled, other stacks are listed as *coming soon* and disabled |
-| 3. Infrastructure | **Create new / Select existing** for the subscription, resource group, AKS cluster, container registry, namespace and Storage or Key Vault. Options the subscription can't support are disabled with the reason | `azure-discovery` (including `/capabilities`), called through the Backstage bridge; each picker is filtered by the selection above it |
-| 4. Deployment | Environment, deploy target, endpoint host, **high availability (Yes/No) with reason, justification and SLO target**, repository visibility | Platform policy (`policies/`); cluster zone data from discovery |
+| 1. Your application | **Name** and **owning team** (required); description (optional) | Owner from the Backstage catalog |
+| 2. Platform settings | Every field is a **dropdown preselected with the platform default**. Choosing **Custom…** or **Create new…** reveals a text box for your own value | See below |
+
+| Setting | Default | Custom option |
+|---|---|---|
+| Stack | NestJS; stacks awaiting validation are listed as *coming soon* | Any enabled stack |
+| Environment | `dev` | — (only `dev` is enabled) |
+| Subscription, resource group, AKS cluster, container registry, Storage or Key Vault | The first approved resource from `azure-discovery`, filtered by the selection above it | **Create new…** with a suggested name; disabled with the reason when the subscription can't support it |
+| Kubernetes namespace | The application name | **Custom…** |
+| Endpoint host | `<name>.<gateway domain>` of the selected cluster, e.g. `orders-api.dev.xycorp.local` | **Custom…**; outside the gateway domain you own DNS and TLS |
+| Availability | Standard: one pod with the stack's minimum resources ([sizing](technology-stacks.md#runtime-sizing)) | High availability, which asks for a reason, justification and SLO target |
+| Repository visibility | Public | Private |
+
+The server applies the same defaults if a field arrives empty: discovery derives the endpoint host from
+the cluster's `gateway.base_domain` in `policies/allowlist.yaml`.
 
 When the developer clicks **Create**:
 
@@ -225,14 +237,14 @@ The URLs are shown on the Backstage entity page (`orders-api` → *Overview* and
 
 | What | URL |
 |---|---|
-| Application endpoint | `https://orders-api.dev.sportify.example` |
-| API docs (Swagger) | `https://orders-api.dev.sportify.example/docs` |
-| Health | `https://orders-api.dev.sportify.example/health/ready` |
+| Application endpoint | `https://orders-api.dev.xycorp.local` |
+| API docs (Swagger) | `https://orders-api.dev.xycorp.local/docs` |
+| Health | `https://orders-api.dev.xycorp.local/health/ready` |
 | Repository | `https://github.com/sportify-org/orders-api` |
 | Workflow runs | `https://github.com/sportify-org/orders-api/actions` |
 | Container image | `acrsportifydev.azurecr.io/orders-api:<git-sha>` |
 | Azure resource group | Azure portal link to `rg-sportify-apps-dev` |
-| Backstage entity | `https://backstage.sportify.example/catalog/default/component/orders-api` |
+| Backstage entity | `https://backstage.xycorp.local/catalog/default/component/orders-api` |
 
 Each stage is reported as its own outcome:
 
@@ -280,7 +292,7 @@ Expected duration: about 10–15 minutes of automated work, plus the time taken 
 
 These are set up once by the platform team:
 
-- the shared AKS cluster with the OIDC issuer and Workload Identity enabled, the **App Routing Gateway API** with a shared `Gateway` ([ADR-0003](../adr/0003-ingress-gateway-api.md)), and a **DNS zone** for `*.dev.sportify.example`
+- the shared AKS cluster with the OIDC issuer and Workload Identity enabled, the **App Routing Gateway API** with a shared `Gateway` ([ADR-0003](../adr/0003-ingress-gateway-api.md)), and a **DNS zone** for `*.dev.xycorp.local`
 - the shared container registry, the Terraform state storage account, the platform Key Vault (with the AKS Key Vault secrets provider add-on) and PostgreSQL
 - for the first demo, a **free Azure subscription** prepared as described in [demo-environment.md](../operations/demo-environment.md)
 - the discovery, provisioning and deployment identities with their federated credentials

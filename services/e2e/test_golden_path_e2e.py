@@ -34,7 +34,7 @@ def submission(**overrides):
         "namespace": {"mode": "new", "name": "orders-api"},
         "runtime_capability": {"type": "storage", "mode": "existing", "name": "stsportifyshareddev"},
         "availability": {"tier": "standard"},
-        "endpoint_host": "orders-api.dev.sportify.example",
+        "endpoint_host": "orders-api.dev.xycorp.local",
     }
     body.update(overrides)
     return body
@@ -192,7 +192,7 @@ def test_golden_path_end_to_end(system, discovery, stack, entrypoint) -> None:
     values = files["deploy/helm/application/values-dev.yaml"]
     assert "11111111-2222-3333-4444-555555555555" in values
     assert "acrsportifydev.azurecr.io/orders-api" in values
-    assert "host: orders-api.dev.sportify.example" in values
+    assert "host: orders-api.dev.xycorp.local" in values
     assert "[[" not in "".join(files.values()), "unrendered template expression"
 
     webhook(
@@ -214,7 +214,7 @@ def test_golden_path_end_to_end(system, discovery, stack, entrypoint) -> None:
     drain(worker)
     callback(api, rid, "ci", "success", 4, {"image": "acrsportifydev.azurecr.io/orders-api:abc"})
     callback(api, rid, "deploy", "started", 5)
-    callback(api, rid, "deploy", "success", 5, {"endpoint": "orders-api.dev.sportify.example", "pods": "1/1"})
+    callback(api, rid, "deploy", "success", 5, {"endpoint": "orders-api.dev.xycorp.local", "pods": "1/1"})
     drain(worker)
 
     final = get(api, rid)
@@ -226,7 +226,7 @@ def test_golden_path_end_to_end(system, discovery, stack, entrypoint) -> None:
         "Application built": "succeeded",
         "Deployed": "succeeded",
     }
-    assert final["urls"]["application"] == "https://orders-api.dev.sportify.example"
+    assert final["urls"]["application"] == "https://orders-api.dev.xycorp.local"
     assert final["urls"]["azure_resource_group"].startswith(
         "https://portal.azure.com/#resource/subscriptions/"
     )

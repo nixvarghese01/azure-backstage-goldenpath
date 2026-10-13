@@ -1,7 +1,8 @@
-import type { FieldValidation } from '@backstage/plugin-scaffolder-react';
+import type { FieldValidation } from '@rjsf/utils';
 import type { InfrastructureSelection } from '@internal/plugin-sportify-platform-common';
 import { validateAvailability } from './AvailabilityPicker';
 import { validateInfrastructure } from './AzureResourcePicker';
+import { defaultEndpointHost, validateEndpointHost } from './EndpointHostPicker';
 
 function collector() {
   const errors: string[] = [];
@@ -68,5 +69,24 @@ describe('validateAvailability', () => {
       ctx,
     );
     expect(errors).toEqual([]);
+  });
+});
+
+describe('endpoint host', () => {
+  it('defaults to <name>.<gateway domain of the selected cluster>', () => {
+    expect(defaultEndpointHost({ name: 'orders-api', infrastructure: { baseDomain: 'dev.xycorp.local' } }))
+      .toBe('orders-api.dev.xycorp.local');
+    expect(defaultEndpointHost({ name: 'orders-api' })).toBe('');
+  });
+
+  it('accepts empty (server default) and valid hosts, rejects malformed ones', () => {
+    for (const ok of ['', 'orders-api.dev.xycorp.local', 'api.example.com']) {
+      const { validation, errors } = collector();
+      validateEndpointHost(ok, validation);
+      expect(errors).toEqual([]);
+    }
+    const { validation, errors } = collector();
+    validateEndpointHost('Not A Host', validation);
+    expect(errors).toHaveLength(1);
   });
 });

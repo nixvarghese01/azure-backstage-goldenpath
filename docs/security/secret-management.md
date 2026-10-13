@@ -40,7 +40,7 @@ Only these secrets exist in the platform:
 | S3 | Backstage **auth session secret** | `backstage` | `…/backstage-session-secret` | CSI file | 180 days | Platform team |
 | S4 | GitHub App #2 (orchestrator) **private key** | `provisioning-orchestrator` | `…/gh-app-orchestrator-key` | CSI file | 90 days | Platform team |
 | S5 | GitHub App #2 **webhook secret** | `orchestrator-api` | `…/gh-app-orchestrator-webhook-secret` | CSI file | 90 days | Platform team |
-| S6 | Gateway **TLS certificate** for `*.dev.sportify.example` | Shared Gateway | Key Vault **certificate** | App Routing Key Vault certificate integration | Auto-renewed by Key Vault (issuer-managed) | Platform team |
+| S6 | Gateway **TLS certificate** for `*.dev.xycorp.local` | Shared Gateway | Key Vault **certificate** | App Routing Key Vault certificate integration | Auto-renewed by Key Vault (issuer-managed) | Platform team |
 | S7 | Backstage **PostgreSQL password**, *only if* Entra authentication is not usable from the Backstage database client | `backstage` | `…/backstage-db-password` | CSI file | 90 days | Platform team |
 
 Notes:

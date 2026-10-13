@@ -34,6 +34,10 @@ provisioned and nothing was published.
 | ci-security | actionlint 1.7.12 with shellcheck 0.11.0 | Pass |
 | ci-security | zizmor 1.30.1, medium and above (offline audits) | No findings |
 | ci-security | Trivy 0.75.0: lockfile vulnerabilities and secrets; Dockerfile and manifest misconfiguration (HIGH, CRITICAL) | None |
+| ci-portal | `yarn install --immutable` (Node 24.21.0, Yarn 4.13.0, Backstage 1.55.3, lockfile committed) | Pass |
+| ci-portal | `yarn tsc`, `yarn lint:all` | Pass |
+| ci-portal | `yarn test:all` | 10 passed |
+| ci-portal | `yarn build:backend --config ../../app-config.container.yaml` | Pass |
 | — | Every action SHA pin matches its release tag | 11 / 11 |
 
 Checkov on a plan JSON was verified with a constructed plan: enrichment applies the module
@@ -72,11 +76,23 @@ checksum verification or from PyPI through uv.
   Each stack now has a single runtime profile used by both Kubernetes and Compose
   ([technology-stacks.md](../developer-guide/technology-stacks.md#runtime-sizing)), plus a startup probe.
 
+- **The portal had never been installed or compiled.** Fixes:
+  - Added the Backstage Yarn plugin and committed `yarn.lock`.
+  - Pinned `@yarnpkg/core` to 4.9.1, because 4.9.2 was published with an unresolvable `got` patch.
+  - Added the Jest, jsdom and type packages that Backstage CLI 0.36 expects the project to provide.
+  - Added ESLint configs to every package.
+  - Fixed 15 type errors from API drift: the sign-in page, entity card props, the permission policy
+    (now reads groups through the user-info service), and `FieldValidation` (now from `@rjsf/utils`).
+  - Built with the container config, because the default config `$include`s a credentials file that
+    isn't present at build time. The Dockerfile's relative `--config` path was also wrong.
+- **Portal dependency vulnerabilities.** Yarn resolutions force the patch fixes for `adm-zip` and `undici`.
+  Two HIGH findings that need breaking majors under upstream Backstage pins (`@graphql-tools/utils`,
+  `basic-ftp`) are accepted in `.trivyignore.yaml` with reasons until 2026-12-15.
+
 ## Not verified on this machine
 
 | Area | Blocker |
 |---|---|
-| Portal install, typecheck, lint, tests, build | Node.js / Yarn not installed. `portal/yarn.lock` is not committed, so `yarn install --immutable` in `ci-portal` fails until it is generated and committed |
 | Generated application builds and tests, Docker images, Compose | Node.js, Docker, Maven, Go not installed; Java is 17 (Spring targets 21) |
 | PostgreSQL integration tests (Testcontainers), kind install | Docker not installed |
 | zizmor online audits, CodeQL, SARIF upload, attestations | Run only on GitHub |
@@ -87,6 +103,7 @@ checksum verification or from PyPI through uv.
 - Create and protect the module release tags (`<module>/vX.Y.Z`) that generated repositories pin.
 - Register the `EncryptionAtHost` feature on the subscription
   ([demo-environment.md](demo-environment.md)).
-- Generate and commit `portal/yarn.lock`, then run
-  [validation-checklist.md](validation-checklist.md) with Node 24, Yarn 4.13 and Docker Desktop.
+- Run [validation-checklist.md](validation-checklist.md) with Docker Desktop for images, Compose,
+  the PostgreSQL integration tests and the kind install.
+- Revisit the `.trivyignore.yaml` acceptances before they expire on 2026-12-15.
 - Keep the seven additional starters disabled until their application builds pass.

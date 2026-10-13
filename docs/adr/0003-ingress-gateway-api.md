@@ -5,7 +5,7 @@
 
 ## Context
 
-The golden path exposes every application at a URL such as `https://orders-api.dev.sportify.example`, through a shared ingress on the AKS cluster.
+The golden path exposes every application at a URL such as `https://orders-api.dev.xycorp.local`, through a shared ingress on the AKS cluster.
 
 - Upstream **ingress-nginx** stopped maintenance in March 2026. It gets no more releases or security fixes.
 - Azure supports managed NGINX in the **AKS application routing add-on** only until **November 2026**. Microsoft states that users must migrate to the App Routing **Gateway API** implementation, or to another supported implementation, by then.

@@ -28,6 +28,8 @@ def test_aks_clusters_report_ha_eligibility(client) -> None:
     cluster = res.json()[0]
     assert cluster["name"] == "aks-sportify-shared-dev"
     assert cluster["ha_eligible"] is False
+    # Lets the form prefill the endpoint host as <name>.<base_domain>.
+    assert cluster["base_domain"] == "dev.xycorp.local"
 
 
 def test_storage_resources(client) -> None:

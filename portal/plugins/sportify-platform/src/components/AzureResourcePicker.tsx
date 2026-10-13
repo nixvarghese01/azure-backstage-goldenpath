@@ -1,27 +1,19 @@
 import { Progress } from '@backstage/core-components';
 import { useApi } from '@backstage/core-plugin-api';
-import type { FieldExtensionComponentProps, FieldValidation } from '@backstage/plugin-scaffolder-react';
+import type { FieldExtensionComponentProps } from '@backstage/plugin-scaffolder-react';
+import type { FieldValidation } from '@rjsf/utils';
 import type {
   Capabilities,
   InfrastructureSelection,
-  Mode,
   RuntimeCapability,
   Selection,
 } from '@internal/plugin-sportify-platform-common';
-import {
-  Box,
-  FormControlLabel,
-  FormHelperText,
-  MenuItem,
-  Radio,
-  RadioGroup,
-  TextField,
-  Typography,
-} from '@material-ui/core';
+import { Box, FormHelperText, MenuItem, TextField, Typography } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 import React, { useEffect, useMemo } from 'react';
 import useAsync from 'react-use/esm/useAsync';
 import { type NamedResource, sportifyApiRef } from '../api';
+import { CUSTOM, DefaultOrCustomSelect } from './DefaultOrCustomSelect';
 
 type Key = 'subscription' | 'resourceGroup' | 'aksCluster' | 'containerRegistry' | 'namespace' | 'runtimeCapability';
 const CAP_KEY: Record<Key, string> = {
@@ -45,66 +37,57 @@ function defaults(appName: string): InfrastructureSelection {
   };
 }
 
-interface RowProps {
+/** The first approved resource is the platform default for an empty "existing" selection. */
+function firstApproved(s: Selection, list?: NamedResource[]): Selection | undefined {
+  if (s.mode !== 'existing' || s.name || !list?.length) return undefined;
+  const r = list[0];
+  return { mode: 'existing', name: r.name, id: r.id, resourceGroup: r.resource_group };
+}
+
+interface ResourceProps {
   label: string;
   value: Selection;
   onChange: (s: Selection) => void;
   options?: NamedResource[];
   capability?: { available: boolean; reason?: string | null };
-  newPlaceholder: string;
+  suggestedName: string;
   newHelp?: string;
   describe?: (r: NamedResource) => string;
   existingDisabledReason?: string;
 }
 
-/** One resource: (•) Create new  ( ) Select existing, with the reason when an option is unavailable. */
-const ResourceRow = ({ label, value, onChange, options, capability, newPlaceholder, newHelp, describe,
-  existingDisabledReason }: RowProps) => {
-  const newDisabled = capability ? !capability.available : false;
-  const existingDisabled = !!existingDisabledReason || (options !== undefined && options.length === 0);
+/** One resource: a dropdown of approved resources (first = default) plus "Create new…". */
+const ResourceSelect = ({ label, value, onChange, options, capability, suggestedName, newHelp, describe,
+  existingDisabledReason }: ResourceProps) => {
+  const approved = existingDisabledReason ? [] : options ?? [];
+  const noneApproved = approved.length === 0 && value.mode !== 'new';
   return (
-    <Box mb={3}>
-      <Typography variant="subtitle2">{label}</Typography>
-      <RadioGroup row value={value.mode} onChange={e => onChange({ mode: e.target.value as Mode })}>
-        <FormControlLabel value="new" control={<Radio />} label="Create new" disabled={newDisabled} />
-        <FormControlLabel value="existing" control={<Radio />} label="Select existing" disabled={existingDisabled} />
-      </RadioGroup>
-      {newDisabled && capability?.reason && <FormHelperText>Create new unavailable: {capability.reason}</FormHelperText>}
-      {existingDisabled && (
-        <FormHelperText>
-          Select existing unavailable: {existingDisabledReason ?? 'nothing approved was found (check the allowlist and the discovery identity\'s Reader access).'}
-        </FormHelperText>
-      )}
-      {value.mode === 'new' ? (
-        <TextField
-          fullWidth
-          size="small"
-          label="Name"
-          placeholder={newPlaceholder}
-          helperText={newHelp}
-          value={value.name ?? ''}
-          onChange={e => onChange({ ...value, name: e.target.value.trim() })}
-        />
-      ) : (
-        <TextField
-          select
-          fullWidth
-          size="small"
-          label="Approved resource"
-          value={value.name ?? ''}
-          onChange={e => {
-            const r = options?.find(o => o.name === e.target.value);
-            onChange({ mode: 'existing', name: r?.name, id: r?.id, resourceGroup: r?.resource_group });
-          }}
-        >
-          {(options ?? []).map(o => (
-            <MenuItem key={o.id} value={o.name}>
-              {o.name}{describe ? ` - ${describe(o)}` : ''}
-            </MenuItem>
-          ))}
-        </TextField>
-      )}
-    </Box>
+    <DefaultOrCustomSelect
+      label={label}
+      options={approved.map((o, i) => ({
+        value: o.name,
+        label: `${o.name}${describe ? ` - ${describe(o)}` : ''}${i === 0 ? ' (default)' : ''}`,
+      }))}
+      selected={value.mode === 'new' ? CUSTOM : value.name ?? ''}
+      onSelect={v => {
+        if (v === CUSTOM) {
+          onChange({ mode: 'new', name: suggestedName });
+          return;
+        }
+        const r = approved.find(o => o.name === v);
+        onChange({ mode: 'existing', name: r?.name, id: r?.id, resourceGroup: r?.resource_group });
+      }}
+      customLabel="Create new…"
+      customDisabledReason={capability && !capability.available ? capability.reason ?? 'not offered' : undefined}
+      customValue={value.name}
+      onCustomChange={name => onChange({ mode: 'new', name })}
+      customFieldLabel="New name"
+      customPlaceholder={suggestedName}
+      customHelp={newHelp}
+      helperText={noneApproved ? existingDisabledReason ??
+        'Nothing approved was found; choose Create new… (or check the allowlist and the discovery identity\'s Reader access).'
+        : undefined}
+    />
   );
 };
 
@@ -136,9 +119,45 @@ export const AzureResourcePicker = (props: FieldExtensionComponentProps<Infrastr
     const rg = groups.value?.find(g => g.name === value.resourceGroup.name) ?? groups.value?.[0];
     return rg?.location ?? value.region ?? '';
   }, [groups.value, value.resourceGroup.name, value.region]);
+
+  // Prefill the platform defaults as the approved lists arrive; never overrides a user's choice.
   useEffect(() => {
-    if (region && region !== value.region) onChange({ ...value, region });
-  }, [region]); // eslint-disable-line react-hooks/exhaustive-deps
+    const next: InfrastructureSelection = { ...value };
+    let changed = false;
+    const apply = (key: 'subscription' | 'resourceGroup' | 'aksCluster' | 'containerRegistry', list?: NamedResource[]) => {
+      const picked = firstApproved(next[key], list);
+      if (picked) {
+        next[key] = picked;
+        changed = true;
+      }
+    };
+    apply('subscription', subs.value?.map(s => ({ id: s.id, name: s.name })));
+    apply('resourceGroup', groups.value);
+    apply('aksCluster', clusters.value);
+    apply('containerRegistry', registries.value);
+    if (next.runtimeCapability.type !== 'none') {
+      const picked = firstApproved(next.runtimeCapability, data.value);
+      if (picked) {
+        next.runtimeCapability = { ...picked, type: next.runtimeCapability.type };
+        changed = true;
+      }
+    }
+    if (next.namespace.mode === 'new' && !next.namespace.name && appName) {
+      next.namespace = { mode: 'new', name: appName };
+      changed = true;
+    }
+    if (region && region !== next.region) {
+      next.region = region;
+      changed = true;
+    }
+    const cluster = clusters.value?.find(k => k.name === next.aksCluster.name);
+    const baseDomain = (next.aksCluster.mode === 'existing' && cluster?.base_domain) || undefined;
+    if (baseDomain !== next.baseDomain) {
+      next.baseDomain = baseDomain;
+      changed = true;
+    }
+    if (changed) onChange(next);
+  }, [subs.value, groups.value, clusters.value, registries.value, data.value, appName, region, value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const caps = useAsync(async (): Promise<Capabilities | undefined> =>
     (subId && region ? api.capabilities(subId, region) : undefined), [api, subId, region]);
@@ -152,9 +171,12 @@ export const AzureResourcePicker = (props: FieldExtensionComponentProps<Infrastr
   return (
     <Box>
       <Typography variant="h6" gutterBottom>Azure resources</Typography>
+      <Typography variant="body2" gutterBottom>
+        Approved platform defaults are preselected. Change a dropdown only if this application needs something else.
+      </Typography>
       {rawErrors?.map(e => <Alert key={e} severity="error">{e}</Alert>)}
 
-      <ResourceRow
+      <ResourceSelect
         label="Subscription"
         value={value.subscription}
         onChange={s => onChange({
@@ -164,8 +186,8 @@ export const AzureResourcePicker = (props: FieldExtensionComponentProps<Infrastr
           ...(s.mode === 'new' ? { resourceGroup: { mode: 'new' }, aksCluster: { mode: 'new' }, containerRegistry: { mode: 'new' } } : {}),
         })}
         options={(subs.value ?? []).map(s => ({ id: s.id, name: s.name }))}
-        capability={caps.value ? cap('subscription') : { available: false, reason: 'Select an existing subscription first to check billing capabilities.' }}
-        newPlaceholder="sub-orders-dev"
+        capability={caps.value ? cap('subscription') : { available: false, reason: 'select an existing subscription first to check billing capabilities.' }}
+        suggestedName={`sub-${appName || 'app'}-${environment}`}
       />
       {value.subscription.mode === 'existing' && value.subscription.name && (
         <Box mb={2}>
@@ -173,42 +195,51 @@ export const AzureResourcePicker = (props: FieldExtensionComponentProps<Infrastr
         </Box>
       )}
 
-      <ResourceRow label="Resource group" value={value.resourceGroup} onChange={s => set('resourceGroup', s)}
-        options={groups.value} capability={cap('resourceGroup')} newPlaceholder={`rg-${appName || 'app'}-${environment}`}
+      <ResourceSelect label="Resource group" value={value.resourceGroup} onChange={s => set('resourceGroup', s)}
+        options={groups.value} capability={cap('resourceGroup')} suggestedName={`rg-${appName || 'app'}-${environment}`}
         newHelp="Must look like rg-<name>." describe={r => r.location ?? ''} existingDisabledReason={mustBeNew} />
 
-      <ResourceRow label="AKS cluster (shared)" value={value.aksCluster} onChange={s => set('aksCluster', s)}
-        options={clusters.value} capability={cap('aksCluster')} newPlaceholder={`aks-sportify-${environment}-2`}
+      <ResourceSelect label="AKS cluster (shared)" value={value.aksCluster} onChange={s => set('aksCluster', s)}
+        options={clusters.value} capability={cap('aksCluster')} suggestedName={`aks-sportify-${environment}-2`}
         newHelp="A new cluster is a shared platform resource: it is added through a platform pull request and approved by the platform team."
         describe={r => `${r.zones ?? 0} zone(s)${r.ha_eligible ? ', HA-eligible' : ''}`} existingDisabledReason={mustBeNew} />
 
-      <ResourceRow label="Container registry (shared)" value={value.containerRegistry} onChange={s => set('containerRegistry', s)}
-        options={registries.value} capability={cap('containerRegistry')} newPlaceholder={`acrsportify${environment}2`}
+      <ResourceSelect label="Container registry (shared)" value={value.containerRegistry} onChange={s => set('containerRegistry', s)}
+        options={registries.value} capability={cap('containerRegistry')} suggestedName={`acrsportify${environment}2`}
         newHelp="5-50 letters or digits. Added through a platform pull request." describe={r => r.sku ?? ''}
         existingDisabledReason={mustBeNew} />
 
-      <ResourceRow label="Kubernetes namespace" value={value.namespace} onChange={s => set('namespace', s)}
-        capability={cap('namespace')} newPlaceholder={appName || 'my-app'}
-        newHelp="Defaults to the application name." existingDisabledReason="Existing namespaces are entered by name and their ownership is checked at plan time."
+      <DefaultOrCustomSelect
+        label="Kubernetes namespace"
+        options={appName ? [{ value: appName, label: `${appName} (default: application name)` }] : []}
+        selected={value.namespace.name && value.namespace.name === appName ? appName : CUSTOM}
+        onSelect={v => set('namespace', { mode: 'new', name: v === CUSTOM ? value.namespace.name : appName })}
+        customLabel="Custom…"
+        customDisabledReason={cap('namespace') && !cap('namespace')?.available ? cap('namespace')?.reason ?? 'not offered' : undefined}
+        customValue={value.namespace.name}
+        onCustomChange={name => set('namespace', { mode: 'new', name })}
+        customFieldLabel="Namespace"
+        customPlaceholder={appName || 'my-app'}
+        customHelp="A DNS label; existing namespaces have their ownership checked at plan time."
       />
 
-      <Box mb={1}>
-        <TextField select size="small" label="Runtime capability" value={value.runtimeCapability.type}
+      <Box mb={2}>
+        <TextField select fullWidth size="small" label="Runtime capability" value={value.runtimeCapability.type}
           onChange={e => set('runtimeCapability', { type: e.target.value as RuntimeCapability['type'], mode: 'existing' })}>
-          <MenuItem value="storage" disabled={demoOnly}>Azure Storage (blob read/write)</MenuItem>
+          <MenuItem value="storage" disabled={demoOnly}>Azure Storage (blob read/write){demoOnly ? '' : ' (default)'}</MenuItem>
           <MenuItem value="keyvault" disabled={demoOnly}>Key Vault (read secrets)</MenuItem>
-          <MenuItem value="none">None</MenuItem>
+          <MenuItem value="none">None{demoOnly ? ' (default)' : ''}</MenuItem>
         </TextField>
         {demoOnly && <FormHelperText>This demo starter supports None; Azure data integrations are not implemented.</FormHelperText>}
       </Box>
       {value.runtimeCapability.type !== 'none' && (
-        <ResourceRow
+        <ResourceSelect
           label={value.runtimeCapability.type === 'storage' ? 'Storage account' : 'Key Vault'}
           value={value.runtimeCapability}
           onChange={s => set('runtimeCapability', { ...s, type: value.runtimeCapability.type })}
           options={data.value}
           capability={caps.value?.create_new[value.runtimeCapability.type === 'storage' ? 'storage_account' : 'key_vault']}
-          newPlaceholder={value.runtimeCapability.type === 'storage' ? `st${appName.replace(/-/g, '')}${environment}` : `kv-${appName}-${environment}`}
+          suggestedName={value.runtimeCapability.type === 'storage' ? `st${appName.replace(/-/g, '')}${environment}` : `kv-${appName}-${environment}`}
           describe={r => r.sku ?? ''}
           existingDisabledReason={mustBeNew}
         />

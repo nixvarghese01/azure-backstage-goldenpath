@@ -39,7 +39,7 @@ def test_description_is_serialized_in_generated_sources(description: str) -> Non
             "repo": "orders-api",
             "owner": "group:default/team-orders",
             "environment": "dev",
-            "endpoint_host": "orders-api.dev.sportify.example",
+            "endpoint_host": "orders-api.dev.xycorp.local",
             "availability": {"tier": "standard"},
             "request_id": "00000000-0000-4000-8000-000000000001",
             "outputs": {},

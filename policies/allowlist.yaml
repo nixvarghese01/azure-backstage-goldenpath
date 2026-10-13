@@ -40,7 +40,7 @@ aks_clusters:
     gateway:
       name: sportify-gateway
       namespace: sportify-gateway
-      base_domain: dev.sportify.example
+      base_domain: dev.xycorp.local
 
 container_registries:
   - name: acrsportifydev

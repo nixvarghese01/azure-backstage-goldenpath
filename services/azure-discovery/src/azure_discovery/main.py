@@ -124,13 +124,19 @@ def create_app(
     def aks_clusters(_: Auth, sub_id: str, environment: str | None = None) -> list[AksClusterOut]:
         _allowed_sub(sub_id, environment)
         clusters = cache.get_or_load(f"aks:{sub_id}", lambda: inventory.list_aks_clusters(sub_id))
-        return [
-            AksClusterOut(
-                **k.model_dump(), zones=k.zones_spanned, ha_eligible=k.zones_spanned >= policy.ha.min_zones
-            )
-            for k in clusters
-            if policy.aks_cluster(sub_id, k.name, environment)
-        ]
+        out: list[AksClusterOut] = []
+        for k in clusters:
+            entry = policy.aks_cluster(sub_id, k.name, environment)
+            if entry:
+                out.append(
+                    AksClusterOut(
+                        **k.model_dump(),
+                        zones=k.zones_spanned,
+                        ha_eligible=k.zones_spanned >= policy.ha.min_zones,
+                        base_domain=entry.gateway.base_domain if entry.gateway else None,
+                    )
+                )
+        return out
 
     @app.get("/v1/subscriptions/{sub_id}/container-registries", response_model=list[ContainerRegistry])
     def registries(_: Auth, sub_id: str, environment: str | None = None) -> list[ContainerRegistry]:

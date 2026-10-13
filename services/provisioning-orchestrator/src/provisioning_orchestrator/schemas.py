@@ -84,6 +84,7 @@ class RequestOut(BaseModel):
     stack: str
     requested_by: str
     ready_for_repository: bool
+    endpoint_host: str = ""
     validation: dict[str, Any]
     repository: dict[str, Any]
     platform: dict[str, Any]

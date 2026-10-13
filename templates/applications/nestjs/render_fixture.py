@@ -25,7 +25,7 @@ FIXTURE = {
     "requestId": "00000000-0000-4000-8000-000000000001",
     "org": "sportify-org",
     "availabilityTier": "standard",
-    "endpointHost": "orders-api.dev.sportify.example",
+    "endpointHost": "orders-api.dev.xycorp.local",
     "infrastructure.region": "uksouth",
     "infrastructure.subscription.id": "00000000-0000-0000-0000-000000000000",
     "infrastructure.resourceGroup.mode": "existing",

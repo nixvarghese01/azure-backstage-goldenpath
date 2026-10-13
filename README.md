@@ -63,9 +63,13 @@ The full step-by-step flow, with a sequence diagram, is in **[docs/developer-gui
 
 The form collects:
 
+Only the **name** and **owning team** are required. Everything else is a dropdown preselected with the
+platform default; choose **Custom…** or **Create new…** only when an application needs something different
+([form details](docs/developer-guide/golden-path.md#step-1-submit-everything-in-backstage)).
+
 | Input | Notes |
 |---|---|
-| Application name and description | Validated against naming rules and checked for duplicates |
+| Application name and description | Validated against naming rules and checked for duplicates. Description is optional |
 | Owner / owning team | Resolved from the Backstage catalog |
 | Stack | Chosen from the available stacks. NestJS (TypeScript) is enabled; other stacks are listed as *coming soon* and added later as templates |
 | Environment | `dev` initially |
@@ -75,11 +79,11 @@ The form collects:
 | Container registry | **Create new** or **Select existing** |
 | Kubernetes namespace | **Create new** or **Select existing** namespace owned by the same team |
 | Runtime capability | Azure Storage or Key Vault: **Create new** or **Select existing**, accessed through Workload Identity |
-| Endpoint host | For example `orders-api.dev.sportify.example`; served by the cluster's shared Gateway (App Routing Gateway API) |
+| Endpoint host | Defaults to `<name>.<gateway domain>`, e.g. `orders-api.dev.xycorp.local`; served by the cluster's shared Gateway (App Routing Gateway API). No DNS of your own is needed: see [Reaching an application without your own domain](docs/operations/demo-environment.md#reaching-an-application-without-your-own-domain) |
 | **High availability** | **Do you need HA?** Yes / No. The default is No in `dev` (Yes in a future `prod`). Choosing the non-default option requires a **reason and justification**, which is shown to the approver. See [High-availability option](#high-availability-option) |
 | Repository visibility and deployment options | Limited to permitted values. **Public** is the default (see [Repository visibility](#repository-visibility)) |
 
-Sensible defaults let a developer complete the path without filling in every optional field.
+Accepting every default completes the path with a single required text field.
 
 ### Create new or select existing
 

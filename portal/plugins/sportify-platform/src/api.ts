@@ -11,6 +11,8 @@ export interface NamedResource {
   zones?: number;
   ha_eligible?: boolean;
   login_server?: string;
+  /** AKS clusters only: gateway domain from the allowlist. */
+  base_domain?: string | null;
 }
 
 export interface Stack {

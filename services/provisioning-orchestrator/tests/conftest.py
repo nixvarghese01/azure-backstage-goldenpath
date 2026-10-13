@@ -137,7 +137,7 @@ def submission(**overrides: Any) -> dict[str, Any]:
         "namespace": {"mode": "new", "name": "orders-api"},
         "runtime_capability": {"type": "storage", "mode": "existing", "name": "stsportifyshareddev"},
         "availability": {"tier": "standard"},
-        "endpoint_host": "orders-api.dev.sportify.example",
+        "endpoint_host": "orders-api.dev.xycorp.local",
     }
     body.update(overrides)
     return body
