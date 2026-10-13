@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in the IDP doesn't work as the README describes
+labels: [bug]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Portal (Backstage, scaffolder form)
+        - Platform services (discovery, orchestrator)
+        - Application starters / generated repositories
+        - Infrastructure (Terraform, Helm, AKS)
+        - Pipelines (GitHub Actions)
+        - Local platform (WSL, make)
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. .\scripts\local\platform.ps1 up
+        2. Open http://localhost:7007/create and choose ...
+  - type: textarea
+    id: checks
+    attributes:
+      label: Output of the checks
+      description: "`make status` and, if you can, `make e2e` (or the failing workflow run link)"
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Commit or release
+      placeholder: e.g. v1.0.0 or 50250e4
