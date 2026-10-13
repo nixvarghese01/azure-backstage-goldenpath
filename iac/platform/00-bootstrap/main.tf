@@ -52,11 +52,15 @@ resource "azurerm_resource_group" "state" {
 }
 
 resource "azurerm_storage_account" "state" {
+  #checkov:skip=CKV2_AZURE_1:Microsoft-managed keys; customer-managed keys are out of scope.
+  #checkov:skip=CKV2_AZURE_33:Private endpoints need private networking for runners and pods; shared keys are disabled (Entra only).
+  #checkov:skip=CKV_AZURE_59:Public network access with Entra-only data access; private endpoints in production.
+  #checkov:skip=CKV_AZURE_33:No queues are used; blob only.
   name                            = "stsportifytfstate${var.environment}${var.name_suffix}"
   resource_group_name             = azurerm_resource_group.state.name
   location                        = azurerm_resource_group.state.location
   account_tier                    = "Standard"
-  account_replication_type        = "LRS"
+  account_replication_type        = "GZRS" # state must survive a zone or region outage
   min_tls_version                 = "TLS1_2"
   https_traffic_only_enabled      = true
   shared_access_key_enabled       = false
@@ -76,6 +80,7 @@ resource "azurerm_storage_account" "state" {
 }
 
 resource "azurerm_storage_container" "state" {
+  #checkov:skip=CKV2_AZURE_21:Blob read logging needs a diagnostic setting and Log Analytics workspace; versioning and a delete lock protect state.
   for_each              = toset(["platform", "apps"])
   name                  = each.value
   storage_account_id    = azurerm_storage_account.state.id

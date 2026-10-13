@@ -59,6 +59,8 @@ variable "tags" {
 }
 
 resource "azurerm_postgresql_flexible_server" "this" {
+  #checkov:skip=CKV2_AZURE_57:Private access is configurable (public_network_access_enabled); demo uses a firewall allowlist with Entra-only auth.
+  #checkov:skip=CKV_AZURE_136:Geo-redundant backups cost extra and are not needed for the demo; 7-day local backups are kept.
   name                          = var.name
   resource_group_name           = var.resource_group_name
   location                      = var.location

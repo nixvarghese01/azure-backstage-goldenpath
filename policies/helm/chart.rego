@@ -8,6 +8,9 @@ secret_like := `(?i)(_KEY|_SECRET|_PASSWORD|_TOKEN|CONNECTION_?STRING|SAS)$`
 
 workload_kinds := {"Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob"}
 
+# Readiness gates Service traffic, so it only applies to long-running workloads, not Jobs.
+long_running_kinds := {"Deployment", "StatefulSet", "DaemonSet"}
+
 pod_spec(obj) := obj.spec.template.spec if obj.kind in {"Deployment", "StatefulSet", "DaemonSet", "Job"}
 
 pod_spec(obj) := obj.spec.jobTemplate.spec.template.spec if obj.kind == "CronJob"
@@ -54,7 +57,7 @@ deny contains msg if {
 }
 
 deny contains msg if {
-	input.kind in workload_kinds
+	input.kind in long_running_kinds
 	some c in pod_spec(input).containers
 	not c.readinessProbe
 	msg := sprintf("%s/%s: container %s needs a readiness probe", [input.kind, input.metadata.name, c.name])

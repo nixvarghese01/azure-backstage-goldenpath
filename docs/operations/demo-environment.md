@@ -52,7 +52,7 @@ Options the subscription can't support are **disabled in the form, with the reas
 ## 5. Preparation checklist
 
 1. Create the free account and subscription. **Set a budget with alerts** at low thresholds (*Cost Management → Budgets*).
-2. Register the resource providers: `Microsoft.ContainerService`, `Microsoft.ContainerRegistry`, `Microsoft.KeyVault`, `Microsoft.DBforPostgreSQL`, `Microsoft.Network`, `Microsoft.Storage`, `Microsoft.ManagedIdentity`.
+2. Register the resource providers: `Microsoft.ContainerService`, `Microsoft.ContainerRegistry`, `Microsoft.KeyVault`, `Microsoft.DBforPostgreSQL`, `Microsoft.Network`, `Microsoft.Storage`, `Microsoft.ManagedIdentity`. Also register the `EncryptionAtHost` feature, which AKS node pools use for host encryption: `az feature register --namespace Microsoft.Compute --name EncryptionAtHost`, wait until `az feature show` reports `Registered`, then run `az provider register -n Microsoft.Compute`.
 3. Check the quota in the chosen region:
    ```bash
    az vm list-usage --location uksouth -o table | grep -i -E "total regional vcpus|standard.*family"

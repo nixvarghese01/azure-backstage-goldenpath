@@ -42,6 +42,11 @@ variable "tags" {
 }
 
 resource "azurerm_storage_account" "this" {
+  #checkov:skip=CKV2_AZURE_1:Microsoft-managed keys; customer-managed keys are out of scope.
+  #checkov:skip=CKV2_AZURE_33:Private endpoints need private networking for runners and pods; shared keys are disabled (Entra only).
+  #checkov:skip=CKV_AZURE_59:Public network access with Entra-only data access; private endpoints in production.
+  #checkov:skip=CKV_AZURE_33:No queues are used; blob only.
+  #checkov:skip=CKV_AZURE_206:Replication follows the availability tier (ADR-0004): LRS for standard, ZRS for ha.
   name                            = var.name
   resource_group_name             = var.resource_group_name
   location                        = var.location
@@ -68,6 +73,7 @@ resource "azurerm_storage_account" "this" {
 }
 
 resource "azurerm_storage_container" "this" {
+  #checkov:skip=CKV2_AZURE_21:Blob read logging needs a diagnostic setting and Log Analytics workspace; not enabled in the demo.
   for_each              = toset(var.containers)
   name                  = each.value
   storage_account_id    = azurerm_storage_account.this.id

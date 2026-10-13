@@ -57,6 +57,12 @@ variable "user_pool" {
   default = null
 }
 
+variable "api_server_authorized_ip_ranges" {
+  description = "CIDRs allowed to reach the API server. Empty = public API (GitHub-hosted runners)."
+  type        = list(string)
+  default     = []
+}
+
 variable "enable_gateway_api" {
   type    = bool
   default = true
@@ -67,6 +73,12 @@ variable "tags" {
 }
 
 resource "azurerm_kubernetes_cluster" "this" {
+  #checkov:skip=CKV_AZURE_115:Public API server so GitHub-hosted runners can deploy; access needs Entra auth (local accounts disabled).
+  #checkov:skip=CKV_AZURE_6:Authorized IP ranges are opt-in (api_server_authorized_ip_ranges); GitHub-hosted runner IPs are not stable.
+  #checkov:skip=CKV_AZURE_170:sku_tier is configurable; the demo uses Free (no uptime SLA), production sets Standard.
+  #checkov:skip=CKV_AZURE_117:Platform-managed disk encryption; a customer-managed disk encryption set is out of scope.
+  #checkov:skip=CKV_AZURE_226:Ephemeral OS disks need a VM size with a local cache disk; Standard_D2s_v5 has none.
+  #checkov:skip=CKV_AZURE_4:Container Insights needs a Log Analytics workspace (ingestion cost); not enabled in the demo.
   name                      = var.name
   location                  = var.location
   resource_group_name       = var.resource_group_name
@@ -78,7 +90,15 @@ resource "azurerm_kubernetes_cluster" "this" {
   local_account_disabled    = true
   automatic_upgrade_channel = "patch"
   node_os_upgrade_channel   = "NodeImage"
+  azure_policy_enabled      = true
   tags                      = var.tags
+
+  dynamic "api_server_access_profile" {
+    for_each = length(var.api_server_authorized_ip_ranges) > 0 ? [1] : []
+    content {
+      authorized_ip_ranges = var.api_server_authorized_ip_ranges
+    }
+  }
 
   default_node_pool {
     name                         = "system"
@@ -86,6 +106,8 @@ resource "azurerm_kubernetes_cluster" "this" {
     node_count                   = var.system_pool.node_count
     zones                        = var.system_pool.zones
     only_critical_addons_enabled = var.user_pool != null
+    max_pods                     = 110
+    host_encryption_enabled      = true # needs the Microsoft.Compute/EncryptionAtHost feature
     upgrade_settings {
       max_surge = "10%"
     }
@@ -125,14 +147,16 @@ resource "azurerm_kubernetes_cluster" "this" {
 }
 
 resource "azurerm_kubernetes_cluster_node_pool" "user" {
-  count                 = var.user_pool == null ? 0 : 1
-  name                  = "user"
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
-  vm_size               = var.user_pool.vm_size
-  node_count            = var.user_pool.node_count
-  zones                 = var.user_pool.zones
-  mode                  = "User"
-  tags                  = var.tags
+  count                   = var.user_pool == null ? 0 : 1
+  name                    = "user"
+  kubernetes_cluster_id   = azurerm_kubernetes_cluster.this.id
+  vm_size                 = var.user_pool.vm_size
+  node_count              = var.user_pool.node_count
+  zones                   = var.user_pool.zones
+  mode                    = "User"
+  max_pods                = 110
+  host_encryption_enabled = true
+  tags                    = var.tags
 }
 
 # Managed Gateway API CRDs + App Routing Istio implementation (not yet exposed natively by azurerm).

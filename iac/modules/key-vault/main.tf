@@ -40,6 +40,9 @@ variable "tags" {
 }
 
 resource "azurerm_key_vault" "this" {
+  #checkov:skip=CKV2_AZURE_32:Private endpoints need private networking for runners; access is Entra RBAC only.
+  #checkov:skip=CKV_AZURE_109:AKS reaches the vault from dynamic egress IPs; set public_network_access_enabled=false with a private endpoint in production.
+  #checkov:skip=CKV_AZURE_189:Public network access is configurable (public_network_access_enabled); demo default is on with RBAC.
   name                          = var.name
   resource_group_name           = var.resource_group_name
   location                      = var.location

@@ -28,6 +28,15 @@ variable "tags" {
 }
 
 resource "azurerm_container_registry" "this" {
+  # Basic SKU for the demo. The features below need Premium or Defender for Containers.
+  #checkov:skip=CKV_AZURE_139:Public endpoint with Entra auth (admin user off); private access needs Premium.
+  #checkov:skip=CKV_AZURE_163:Images are scanned with Trivy in CI before push; Defender for Containers is a paid add-on.
+  #checkov:skip=CKV_AZURE_164:Docker Content Trust is deprecated; images carry GitHub build provenance attestations instead.
+  #checkov:skip=CKV_AZURE_165:Geo-replication needs Premium; single-region platform.
+  #checkov:skip=CKV_AZURE_166:Quarantine needs Premium; CI blocks images with critical vulnerabilities before push.
+  #checkov:skip=CKV_AZURE_167:Retention policies need Premium; untagged manifests are cleaned up manually.
+  #checkov:skip=CKV_AZURE_233:Zone redundancy needs Premium.
+  #checkov:skip=CKV_AZURE_237:Dedicated data endpoints need Premium.
   name                   = var.name
   resource_group_name    = var.resource_group_name
   location               = var.location

@@ -73,7 +73,7 @@ create_new:
   key_vault: true
 
 skus:
-  storage_account: [Standard_LRS, Standard_ZRS]
+  storage_account: [Standard_LRS, Standard_ZRS, Standard_GZRS] # GZRS: Terraform state account only
   key_vault: [standard]
   container_registry: [Basic, Standard]
   aks_node_vm: [Standard_D2s_v5, Standard_D2as_v5, Standard_B2s]
