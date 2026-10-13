@@ -4657,7 +4657,7 @@ __metadata:
     "@material-ui/core": "npm:^4.12.4"
     "@material-ui/icons": "npm:^4.11.3"
     "@material-ui/lab": "npm:^4.0.0-alpha.61"
-    "@rjsf/utils": "npm:5.24.13"
+    "@rjsf/utils": "npm:6.11.0"
     "@testing-library/react": "npm:^16.0.0"
     react-use: "npm:^17.5.0"
   peerDependencies:
@@ -4963,7 +4963,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jest/react-is-18@npm:react-is@^18.3.1, react-is@npm:^18.0.0, react-is@npm:^18.2.0":
+"@jest/react-is-18@npm:react-is@^18.3.1, react-is@npm:^18.0.0, react-is@npm:^18.2.0, react-is@npm:^18.3.1":
   version: 18.3.1
   resolution: "react-is@npm:18.3.1"
   checksum: 10c0/f2f1e60010c683479e74c63f96b09fb41603527cd131a9959e2aee1e5a8b0caf270b365e5ca77d4a6b18aae659b60a86150bb3979073528877029b35aecd2072
@@ -7835,6 +7835,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@rjsf/utils@npm:6.11.0":
+  version: 6.11.0
+  resolution: "@rjsf/utils@npm:6.11.0"
+  dependencies:
+    "@x0k/json-schema-merge": "npm:^1.0.6"
+    fast-equals: "npm:^6.0.0"
+    fast-uri: "npm:^4.1.4"
+    jsonpointer: "npm:^5.0.1"
+    react-is: "npm:^18.3.1"
+  peerDependencies:
+    react: ">=18"
+  checksum: 10c0/4f663f0226f770658a9709bceb4b4f5fe016956b053e5cd6cf1198bded00b2010ed9919bdc0273d9bf0b4afc16bb3d8114104687200f4d81adcc8e209e664eea
+  languageName: node
+  linkType: hard
+
 "@rjsf/validator-ajv8@npm:5.24.13":
   version: 5.24.13
   resolution: "@rjsf/validator-ajv8@npm:5.24.13"
@@ -10677,6 +10692,15 @@ __metadata:
   version: 1.0.2
   resolution: "@wmhilton/crypto-hash@npm:1.0.2"
   checksum: 10c0/8484f90a61615ade87ffd7fc9079b0350ea9a574a9b0414542b1ce0342c47c2b2a5d711a6f95ef883ea2958985ef619957cb350cd4ff314a444910c08aeb233c
+  languageName: node
+  linkType: hard
+
+"@x0k/json-schema-merge@npm:^1.0.6":
+  version: 1.1.0
+  resolution: "@x0k/json-schema-merge@npm:1.1.0"
+  dependencies:
+    "@types/json-schema": "npm:^7.0.15"
+  checksum: 10c0/cbefa0d0d4d9155fcbc89cba4121c4a96cb57caa2784c511e1f79f6769929411fd97f443cea1e1098e1f4411544ff45c55b6d0afeedcb8eb82f1fb4626cab9ac
   languageName: node
   linkType: hard
 
@@ -16381,6 +16405,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"fast-equals@npm:^6.0.0":
+  version: 6.1.0
+  resolution: "fast-equals@npm:6.1.0"
+  checksum: 10c0/88a0916227fe806dc8760e43f5d5a8e9ecef4210452ecf06325f9edc6eb24e63e7c54af7b802c8be2cc51f0dac719ce254672b7dcf0960a4b3bdde41dcf1dee3
+  languageName: node
+  linkType: hard
+
 "fast-fifo@npm:^1.3.2":
   version: 1.3.2
   resolution: "fast-fifo@npm:1.3.2"
@@ -16468,6 +16499,13 @@ __metadata:
   version: 3.1.8
   resolution: "fast-uri@npm:3.1.8"
   checksum: 10c0/c9c47860a7f9110176d94bb30a02942182f0bfc8d6780e9702f320336dc2dadb83b1d9879cceaf8d4b439642d1ec6d78c317cb808ab155455551bd5d9d7c22d8
+  languageName: node
+  linkType: hard
+
+"fast-uri@npm:^4.1.4":
+  version: 4.2.1
+  resolution: "fast-uri@npm:4.2.1"
+  checksum: 10c0/a6ecc2d8a2ed340e3e8895e8d201a54454bf29141539c784cbc2a9aa6be274e74eb032ab2f09c7136f096cacd5b7af601ef0c5fd86f2492faebb9b64502d9410
   languageName: node
   linkType: hard
 
