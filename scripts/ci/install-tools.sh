@@ -15,6 +15,7 @@ CONFTEST_VERSION="0.71.1"
 TRIVY_VERSION="0.75.0"
 GITLEAKS_VERSION="8.30.1"
 KUBELOGIN_VERSION="0.2.21"
+KIND_VERSION="0.33.0"
 
 fetch_verified() { # url checksums_url filename
   local url="$1" sums_url="$2" file="$3"
@@ -51,6 +52,11 @@ for tool in "$@"; do
       fetch_verified "https://github.com/Azure/kubelogin/releases/download/v${KUBELOGIN_VERSION}/${f}" \
         "https://github.com/Azure/kubelogin/releases/download/v${KUBELOGIN_VERSION}/${f}.sha256" "${f}"
       unzip -o -q "${WORK}/${f}" -d "${WORK}/kl" && install -m 0755 "${WORK}/kl/bin/linux_amd64/kubelogin" "${BIN}/kubelogin" ;;
+    kind)
+      f="kind-linux-amd64"
+      fetch_verified "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/${f}" \
+        "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/${f}.sha256sum" "${f}"
+      install -m 0755 "${WORK}/${f}" "${BIN}/kind" ;;
     *) echo "unknown tool: ${tool}" >&2; exit 2 ;;
   esac
   echo "installed ${tool}"

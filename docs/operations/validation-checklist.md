@@ -13,6 +13,9 @@ uv run pytest libs/sportify-common/tests
 (cd azure-discovery && uv run pytest)
 (cd provisioning-orchestrator && uv run pytest -m "not integration")
 (cd provisioning-orchestrator && uv run pytest -m integration)   # needs Docker
+uv run pytest e2e                     # cross-service golden path, renders the real NestJS template
+# opt-in, read-only, real Azure:
+RUN_LIVE_AZURE_TESTS=1 LIVE_SUBSCRIPTION_ID=<id> uv run pytest azure-discovery -m live_azure
 ```
 
 Things most likely to need adjustment:

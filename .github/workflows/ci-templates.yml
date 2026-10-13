@@ -60,3 +60,26 @@ jobs:
           npm test
           npm run build
           docker build -t orders-api:ci .
+      - name: Install into kind (restricted Pod Security, read-only root, non-root)
+        working-directory: ${{ runner.temp }}/orders-api
+        env:
+          HELM_DRIVER: configmap
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/install-tools.sh" kind
+          kind create cluster --name golden-path --wait 120s
+          kind load docker-image orders-api:ci --name golden-path
+          kubectl create namespace orders-api
+          kubectl label namespace orders-api pod-security.kubernetes.io/enforce=restricted
+          # No Azure in kind: in-memory store, no Gateway route, no Workload Identity client ID.
+          helm install orders-api deploy/helm/application -n orders-api \
+            -f deploy/helm/application/values.yaml -f deploy/helm/application/values-dev.yaml \
+            --set image.repository=orders-api --set image.tag=ci --set image.pullPolicy=Never \
+            --set route.enabled=false --set azure.storageAccountName="" \
+            --set serviceAccount.workloadIdentityClientId="" \
+            --wait --timeout 3m
+          kubectl -n orders-api rollout status deployment/orders-api --timeout 2m
+          kubectl -n orders-api port-forward svc/orders-api 8080:80 & sleep 3
+          curl -fsS http://localhost:8080/health/ready
+          curl -fsS -X POST http://localhost:8080/v1/orders -H 'Content-Type: application/json' \
+            -d '{"customerId":"cust-001","currency":"GBP","items":[{"sku":"SKU-1","quantity":1,"unitPrice":5}]}'
+          test "$(kubectl -n orders-api get secrets -o name | wc -l)" -eq 0   # no Secret objects (HELM_DRIVER=configmap)
