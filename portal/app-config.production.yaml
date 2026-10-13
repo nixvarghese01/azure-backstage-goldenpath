@@ -85,3 +85,13 @@ sportify:
     mode: entra
     discoveryScope: ${DISCOVERY_ENTRA_SCOPE}
     orchestratorScope: ${ORCHESTRATOR_ENTRA_SCOPE}
+
+techdocs:
+  builder: local
+  generator:
+    runIn: local
+  publisher:
+    type: local
+    local:
+      # The root filesystem is read-only; generated docs go to the writable /tmp volume.
+      publishDirectory: /tmp/techdocs

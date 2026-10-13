@@ -1,0 +1,123 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backstage
+  annotations:
+    azure.workload.identity/client-id: {{ required "workloadIdentity.clientId" .Values.workloadIdentity.clientId | quote }}
+---
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: backstage
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    clientID: {{ .Values.workloadIdentity.clientId | quote }}
+    keyvaultName: {{ .Values.keyVault.name | quote }}
+    tenantId: {{ .Values.keyVault.tenantId | quote }}
+    objects: |
+      array:
+        - |
+          objectName: gh-app-backstage-key
+          objectType: secret
+        - |
+          objectName: gh-app-backstage-client-secret
+          objectType: secret
+        - |
+          objectName: backstage-session-secret
+          objectType: secret
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backstage
+  labels: { app.kubernetes.io/name: backstage }
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels: { app.kubernetes.io/name: backstage }
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backstage
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: backstage
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: backstage
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports: [{ name: http, containerPort: 7007 }]
+          env:
+            {{- range $k, $v := .Values.env }}
+            - { name: {{ $k }}, value: {{ $v | quote }} }
+            {{- end }}
+          volumeMounts:
+            - { name: secrets, mountPath: /mnt/secrets, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+          livenessProbe: { httpGet: { path: /.backstage/health/v1/liveness, port: http }, initialDelaySeconds: 30, periodSeconds: 10 }
+          readinessProbe: { httpGet: { path: /.backstage/health/v1/readiness, port: http }, initialDelaySeconds: 15, periodSeconds: 10 }
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+      volumes:
+        - name: secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes: { secretProviderClass: backstage }
+        - { name: tmp, emptyDir: { sizeLimit: 512Mi } }   # TechDocs local builds and scaffolder workspaces
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backstage
+spec:
+  selector: { app.kubernetes.io/name: backstage }
+  ports: [{ name: http, port: 7007, targetPort: http }]
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: backstage
+spec:
+  parentRefs:
+    - { name: {{ .Values.gateway.name }}, namespace: {{ .Values.gateway.namespace }} }
+  hostnames: [{{ .Values.host | quote }}]
+  rules:
+    - backendRefs:
+        - { name: backstage, port: 7007 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backstage
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: backstage }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backstage
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: backstage }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ .Values.gateway.namespace }} } }
+        - podSelector: { matchLabels: { app.kubernetes.io/name: provisioning-orchestrator-worker } }
+      ports: [{ port: 7007 }]
+  egress:
+    - to: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } } }]
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+    - to: [{ podSelector: { matchLabels: { app.kubernetes.io/name: azure-discovery } } }]
+      ports: [{ port: 8001 }]
+    - to: [{ podSelector: { matchLabels: { app.kubernetes.io/name: provisioning-orchestrator-api } } }]
+      ports: [{ port: 8002 }]
+    - ports: [{ port: 443, protocol: TCP }, { port: 5432, protocol: TCP }]

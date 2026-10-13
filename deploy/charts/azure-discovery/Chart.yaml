@@ -1,0 +1,6 @@
+apiVersion: v2
+name: azure-discovery
+description: Read-only Azure discovery service (Sportify platform)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

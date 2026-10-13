@@ -1,0 +1,32 @@
+image:
+  repository: acrsportifydev.azurecr.io/sportify/provisioning-orchestrator
+  tag: latest
+api:
+  replicas: 2
+worker:
+  replicas: 2
+workloadIdentity:
+  clientId: ""            # id-sportify-orchestrator-<env> (no Azure resource access)
+keyVault:
+  name: kv-sportify-plat-dev
+  tenantId: ""
+database:
+  url: ""                 # postgresql+psycopg://id-sportify-orchestrator-dev@<server>.postgres.database.azure.com:5432/orchestrator?sslmode=require
+auth:
+  tenantId: ""
+  audience: ""            # app ID URI of this service
+  allowedCallers: ""      # backstage object ID
+config:
+  githubOrg: sportify-org
+  githubAppId: ""
+  githubInstallationId: ""
+  platformRepo: sportify-azure-backstage
+  discoveryScope: ""      # api://sportify-discovery/.default
+  backstageScope: ""      # api://sportify-backstage/.default
+  approverGroup: group:default/platform-approvers
+hooks:
+  host: platform-hooks.dev.sportify.example
+  gateway: { name: sportify-gateway, namespace: sportify-gateway }
+resources:
+  requests: { cpu: 50m, memory: 128Mi }
+  limits: { cpu: 500m, memory: 384Mi }

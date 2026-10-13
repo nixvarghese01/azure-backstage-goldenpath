@@ -1,0 +1,26 @@
+image:
+  repository: acrsportifydev.azurecr.io/sportify/backstage
+  tag: latest
+replicas: 2
+workloadIdentity:
+  clientId: ""             # id-sportify-backstage-<env>
+keyVault:
+  name: kv-sportify-plat-dev
+  tenantId: ""
+host: backstage.dev.sportify.example
+gateway: { name: sportify-gateway, namespace: sportify-gateway }
+env:
+  BACKSTAGE_BASE_URL: http://backstage.dev.sportify.example
+  POSTGRES_HOST: ""
+  POSTGRES_USER: id-sportify-backstage-dev
+  AZURE_TENANT_ID: ""
+  GITHUB_ORG: sportify-org
+  GITHUB_APP_BACKSTAGE_ID: ""
+  GITHUB_APP_BACKSTAGE_CLIENT_ID: ""
+  GITHUB_APP_ORCHESTRATOR_ID: ""
+  DISCOVERY_ENTRA_SCOPE: ""
+  ORCHESTRATOR_ENTRA_SCOPE: ""
+  BACKSTAGE_ENTRA_AUDIENCE: ""
+resources:
+  requests: { cpu: 200m, memory: 512Mi }
+  limits: { cpu: "1", memory: 1Gi }

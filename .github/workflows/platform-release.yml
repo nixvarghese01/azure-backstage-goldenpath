@@ -86,17 +86,22 @@ jobs:
             docker tag "sportify/${name}:${{ github.sha }}" "$target" && docker push "$target"
           done
       - name: Deploy charts
+        env:
+          # {"<chart>": "<values YAML with environment IDs>"}; identifiers only, no secrets.
+          PLATFORM_CHART_VALUES_JSON: ${{ vars.PLATFORM_CHART_VALUES_JSON }}
         run: |
           az aks get-credentials -g "${{ vars.AKS_RESOURCE_GROUP }}" -n "${{ vars.AKS_NAME }}" --overwrite-existing
           kubelogin convert-kubeconfig -l azurecli
-          deploy() { # <chart> <workload identity client id>
-            helm upgrade --install "$1" "deploy/charts/$1" -n sportify-platform \
-              -f "deploy/charts/$1/values.yaml" \
-              --set image.repository="${{ vars.ACR_NAME }}.azurecr.io/sportify/$1" \
+          deploy() { # <chart> <workload identity client id> [extra helm args...]
+            local chart="$1" client_id="$2"; shift 2
+            jq -er --arg c "$chart" '.[$c] // ""' <<< "$PLATFORM_CHART_VALUES_JSON" > "$RUNNER_TEMP/$chart.yaml"
+            helm upgrade --install "$chart" "deploy/charts/$chart" -n sportify-platform \
+              -f "deploy/charts/$chart/values.yaml" -f "$RUNNER_TEMP/$chart.yaml" "$@" \
+              --set image.repository="${{ vars.ACR_NAME }}.azurecr.io/sportify/$chart" \
               --set image.tag="${{ github.sha }}" \
-              --set-string workloadIdentity.clientId="$2" \
+              --set-string workloadIdentity.clientId="$client_id" \
               --atomic --wait --timeout 10m
           }
-          deploy azure-discovery "${{ vars.DISCOVERY_CLIENT_ID }}"
+          deploy azure-discovery "${{ vars.DISCOVERY_CLIENT_ID }}" --set-file allowlist=policies/allowlist.yaml
           deploy provisioning-orchestrator "${{ vars.ORCHESTRATOR_CLIENT_ID }}"
           deploy backstage "${{ vars.BACKSTAGE_CLIENT_ID }}"

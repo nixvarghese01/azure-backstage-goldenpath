@@ -1,0 +1,213 @@
+{{- define "orch.env" -}}
+- { name: ORCHESTRATOR_DATABASE_URL, value: {{ required "database.url" .Values.database.url | quote }} }
+- { name: ORCHESTRATOR_DATABASE_ENTRA_AUTH, value: "true" }
+- { name: DISCOVERY_BASE_URL, value: "http://azure-discovery:8001" }
+- { name: DISCOVERY_ENTRA_SCOPE, value: {{ .Values.config.discoveryScope | quote }} }
+- { name: ORCHESTRATOR_BACKSTAGE_BASE_URL, value: "http://backstage:7007" }
+- { name: BACKSTAGE_ENTRA_SCOPE, value: {{ .Values.config.backstageScope | quote }} }
+- { name: ORCHESTRATOR_GITHUB_MODE, value: app }
+- { name: ORCHESTRATOR_GITHUB_ORG, value: {{ .Values.config.githubOrg | quote }} }
+- { name: ORCHESTRATOR_GITHUB_APP_ID, value: {{ .Values.config.githubAppId | quote }} }
+- { name: ORCHESTRATOR_GITHUB_APP_INSTALLATION_ID, value: {{ .Values.config.githubInstallationId | quote }} }
+- { name: ORCHESTRATOR_PLATFORM_REPO, value: {{ .Values.config.platformRepo | quote }} }
+- { name: ORCHESTRATOR_APPROVER_GROUP, value: {{ .Values.config.approverGroup | quote }} }
+# Paths to CSI-mounted secret files (values never in env): secret-management.md §5
+- { name: ORCHESTRATOR_GITHUB_APP_PRIVATE_KEY_FILE, value: /mnt/secrets/gh-app-orchestrator-key }
+- { name: ORCHESTRATOR_GITHUB_WEBHOOK_SECRET_FILE, value: /mnt/secrets/gh-app-orchestrator-webhook-secret }
+- { name: SPORTIFY_AUTH_MODE, value: entra }
+- { name: SPORTIFY_ENTRA_TENANT_ID, value: {{ .Values.auth.tenantId | quote }} }
+- { name: SPORTIFY_ENTRA_AUDIENCE, value: {{ .Values.auth.audience | quote }} }
+- { name: SPORTIFY_ALLOWED_CALLERS, value: {{ .Values.auth.allowedCallers | quote }} }
+{{- end -}}
+
+{{- define "orch.pod" -}}
+serviceAccountName: provisioning-orchestrator
+securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+volumes:
+  - name: secrets
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes: { secretProviderClass: provisioning-orchestrator }
+  - { name: tmp, emptyDir: { sizeLimit: 32Mi } }
+{{- end -}}
+
+{{- define "orch.container" -}}
+image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+env: {{- include "orch.env" . | nindent 2 }}
+volumeMounts:
+  - { name: secrets, mountPath: /mnt/secrets, readOnly: true }
+  - { name: tmp, mountPath: /tmp }
+resources: {{- toYaml .Values.resources | nindent 2 }}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: [ALL] }
+{{- end -}}
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: provisioning-orchestrator
+  annotations:
+    azure.workload.identity/client-id: {{ required "workloadIdentity.clientId" .Values.workloadIdentity.clientId | quote }}
+---
+# Only this workload's own secrets (per-secret RBAC in Key Vault); no secretObjects -> no K8s Secrets.
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: provisioning-orchestrator
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    clientID: {{ .Values.workloadIdentity.clientId | quote }}
+    keyvaultName: {{ .Values.keyVault.name | quote }}
+    tenantId: {{ .Values.keyVault.tenantId | quote }}
+    objects: |
+      array:
+        - |
+          objectName: gh-app-orchestrator-key
+          objectType: secret
+        - |
+          objectName: gh-app-orchestrator-webhook-secret
+          objectType: secret
+---
+# Schema migrations before the new version starts.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: provisioning-orchestrator-migrate-{{ .Release.Revision }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: provisioning-orchestrator-migrate
+        azure.workload.identity/use: "true"
+    spec:
+      restartPolicy: Never
+      {{- include "orch.pod" . | nindent 6 }}
+      containers:
+        - name: migrate
+          command: ["alembic", "upgrade", "head"]
+          {{- include "orch.container" . | nindent 10 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provisioning-orchestrator-api
+  labels: { app.kubernetes.io/name: provisioning-orchestrator-api }
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels: { app.kubernetes.io/name: provisioning-orchestrator-api }
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: provisioning-orchestrator-api
+        azure.workload.identity/use: "true"
+    spec:
+      {{- include "orch.pod" . | nindent 6 }}
+      containers:
+        - name: api
+          ports: [{ name: http, containerPort: 8002 }]
+          livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10 }
+          readinessProbe: { httpGet: { path: /readyz, port: http }, periodSeconds: 10 }
+          {{- include "orch.container" . | nindent 10 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provisioning-orchestrator-worker
+  labels: { app.kubernetes.io/name: provisioning-orchestrator-worker }
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels: { app.kubernetes.io/name: provisioning-orchestrator-worker }
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: provisioning-orchestrator-worker
+        azure.workload.identity/use: "true"
+    spec:
+      terminationGracePeriodSeconds: 60   # finish or release the current step lease
+      {{- include "orch.pod" . | nindent 6 }}
+      containers:
+        - name: worker
+          command: ["orchestrator-worker"]
+          livenessProbe:
+            exec: { command: ["python", "-c", "import provisioning_orchestrator"] }
+            periodSeconds: 30
+          readinessProbe:
+            exec: { command: ["python", "-c", "import provisioning_orchestrator"] }
+            periodSeconds: 30
+          {{- include "orch.container" . | nindent 10 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: provisioning-orchestrator-api
+spec:
+  selector: { app.kubernetes.io/name: provisioning-orchestrator-api }
+  ports: [{ name: http, port: 8002, targetPort: http }]
+---
+# Only the two GitHub-facing paths are public, on a separate host.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: provisioning-orchestrator-hooks
+spec:
+  parentRefs:
+    - { name: {{ .Values.hooks.gateway.name }}, namespace: {{ .Values.hooks.gateway.namespace }} }
+  hostnames: [{{ .Values.hooks.host | quote }}]
+  rules:
+    - matches:
+        - path: { type: Exact, value: /v1/webhooks/github }
+        - path: { type: Exact, value: /v1/callbacks/actions }
+      backendRefs:
+        - { name: provisioning-orchestrator-api, port: 8002 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: provisioning-orchestrator-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: provisioning-orchestrator-api }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: provisioning-orchestrator-worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: provisioning-orchestrator-worker }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: provisioning-orchestrator
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app.kubernetes.io/name, operator: In, values: [provisioning-orchestrator-api, provisioning-orchestrator-worker, provisioning-orchestrator-migrate] }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: backstage } }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: {{ .Values.hooks.gateway.namespace }} } }
+      ports: [{ port: 8002 }]
+  egress:
+    - to: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } } }]
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+    - to: [{ podSelector: { matchLabels: { app.kubernetes.io/name: azure-discovery } } }]
+      ports: [{ port: 8001 }]
+    - to: [{ podSelector: { matchLabels: { app.kubernetes.io/name: backstage } } }]
+      ports: [{ port: 7007 }]
+    - ports: [{ port: 443, protocol: TCP }, { port: 5432, protocol: TCP }]
