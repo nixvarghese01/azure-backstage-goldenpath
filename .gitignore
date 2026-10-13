@@ -25,6 +25,8 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 *.tfvars.json
+# Reusable modules leave provider selection to their callers; root stacks commit their lock files.
+iac/modules/**/.terraform.lock.hcl
 # Rendered environment tfvars hold no secrets and are committed in generated repos.
 
 # --- Node / Backstage ---
@@ -47,6 +49,13 @@ __pycache__/
 .ruff_cache/
 htmlcov/
 .coverage
+
+# --- .NET build output ---
+bin/
+obj/
+
+# Workspace-local validation tools and download caches
+.tools/
 
 # --- OS / editors ---
 .DS_Store

@@ -8,6 +8,7 @@ description = "Documented placeholders and dev-only values"
 regexes = [
   '''dev-only-not-a-secret''',
   '''dev-only-change-me''',
+  '''^idempotency_key=$''', # generic-api-key misreads test keyword arguments
 ]
 paths = [
   '''deploy/local/\.env\.example$''',
