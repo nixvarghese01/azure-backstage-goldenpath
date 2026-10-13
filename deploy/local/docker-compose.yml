@@ -1,12 +1,21 @@
 # Local microservice stack: mock Azure/GitHub, no cloud provisioning or publication.
 name: sportify-platform
 
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "2"
+
 x-orchestrator: &orchestrator
   image: sportify/provisioning-orchestrator:local
   build:
     context: ../..
     dockerfile: services/provisioning-orchestrator/Dockerfile
   init: true
+  cpus: ${ORCHESTRATOR_CPUS:-0.5}
+  mem_limit: ${ORCHESTRATOR_MEMORY:-256m}
+  logging: *logging
   read_only: true
   tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
   cap_drop: [ALL]
@@ -23,12 +32,18 @@ x-orchestrator: &orchestrator
     ORCHESTRATOR_BACKSTAGE_BASE_URL: http://backstage:7007
     ORCHESTRATOR_GITHUB_WEBHOOK_SECRET_FILE: /run/secrets/webhook-secret
     DISCOVERY_BASE_URL: http://azure-discovery:8001
+    ORCHESTRATOR_WORKER_POLL_SECONDS: "5"
+    ORCHESTRATOR_RECONCILE_SECONDS: "120"
   secrets: [webhook-secret]
 
 services:
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
+    cpus: ${POSTGRES_CPUS:-0.5}
+    mem_limit: ${POSTGRES_MEMORY:-256m}
+    logging: *logging
+    command: [postgres, -c, shared_buffers=32MB, -c, work_mem=2MB, -c, maintenance_work_mem=16MB]
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev-only-not-a-secret}
@@ -51,6 +66,9 @@ services:
       dockerfile: services/azure-discovery/Dockerfile
     restart: unless-stopped
     init: true
+    cpus: ${DISCOVERY_CPUS:-0.5}
+    mem_limit: ${DISCOVERY_MEMORY:-256m}
+    logging: *logging
     read_only: true
     tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
     cap_drop: [ALL]
@@ -104,9 +122,13 @@ services:
     build:
       context: ../..
       dockerfile: portal/Dockerfile
+      target: runtime-lite
     command: [node, packages/backend, --config, app-config.container.yaml, --config, app-config.docker.yaml]
     restart: unless-stopped
     init: true
+    cpus: ${BACKSTAGE_CPUS:-1.0}
+    mem_limit: ${BACKSTAGE_MEMORY:-768m}
+    logging: *logging
     read_only: true
     tmpfs: ["/tmp:rw,nosuid,size=512m,uid=1000,gid=1000,mode=1777"]
     cap_drop: [ALL]
@@ -115,6 +137,7 @@ services:
       SPORTIFY_LOCAL_GUEST_AUTH: "true"
       SPORTIFY_DEV_SERVICE_TOKEN: ${SPORTIFY_DEV_SERVICE_TOKEN:-dev-only-change-me}
       ORCHESTRATOR_GITHUB_ORG: ${ORCHESTRATOR_GITHUB_ORG:-sportify-org}
+      NODE_OPTIONS: ${BACKSTAGE_NODE_OPTIONS:---no-node-snapshot --max-old-space-size=512}
     ports:
       - "127.0.0.1:7007:7007"
     networks: [platform]

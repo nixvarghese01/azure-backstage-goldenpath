@@ -20,7 +20,7 @@ COPY templates/applications/nestjs/application /app/stack-templates/nestjs
 ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 ORCHESTRATOR_STACK_TEMPLATES_DIR=/app/stack-templates
 USER 10001
 EXPOSE 8002
-HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/readyz', timeout=3)"
 # API by default; the worker Deployment overrides the command with: orchestrator-worker
 CMD ["uvicorn", "provisioning_orchestrator.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8002"]

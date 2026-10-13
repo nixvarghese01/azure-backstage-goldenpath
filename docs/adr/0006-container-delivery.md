@@ -35,6 +35,18 @@ and dropped capabilities. Startup depends on readiness and successful database m
 and migration containers disable the image's HTTP health check. Worker heartbeat instrumentation
 is deferred.
 
+Local Compose defaults to the `runtime-lite` Backstage target, with external/prebuilt TechDocs and
+no Python/MkDocs runtime tooling. A matching Compose override selects the full target and on-demand
+generation. The release image still defaults to the full target. Runtime dependencies are focused
+on the backend workspace, and only the portal's infrastructure scaffold is copied into its base
+image; application rendering remains the worker's responsibility.
+
+Local CPU/memory ceilings and rotated logs bound resource growth. PostgreSQL memory settings and
+worker polling intervals are reduced for the development workload. Python HTTP services depend on
+base FastAPI/Uvicorn packages rather than their optional standard extras; trace exporter imports
+are deferred until tracing is enabled. These choices are starting points, not measured savings or
+production sizing. They require later build, startup and load validation.
+
 ## Consequences
 
 Developers can build and start the service topology without preparing Node or Python dependencies
@@ -46,4 +58,6 @@ No builds, startup commands, tests, pushes or deployments were executed for this
 
 - [Backstage Docker image guidance](https://backstage.io/docs/deployment/docker/)
 - [Backstage guest authentication provider](https://backstage.io/docs/next/auth/guest/provider/)
+- [Backstage external TechDocs builder](https://backstage.io/docs/features/techdocs/getting-started/)
+- [Docker Compose service resource settings](https://docs.docker.com/reference/compose-file/services/)
 - [Local setup and deferred execution](../../deploy/local/README.md)

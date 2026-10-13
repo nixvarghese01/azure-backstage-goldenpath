@@ -1,0 +1,3 @@
+# Pair with runtime-lite when using the image outside the local Compose stack.
+techdocs:
+  builder: external

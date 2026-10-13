@@ -491,6 +491,8 @@ These are the planned prerequisites. Versions were checked on 2026-10-10; the fu
 The full container setup is in [deploy/local/README.md](deploy/local/README.md). It includes Backstage,
 Azure discovery, the orchestrator API and worker, schema migrations and PostgreSQL. The local profile
 uses guest sign-in and mock integrations. Builds and runtime verification are deferred.
+Local defaults use the lightweight Backstage image and configurable resource limits; on-demand
+TechDocs generation is available through the documented optional Compose override.
 
 ```bash
 docker compose -f deploy/local/docker-compose.yml up --build -d

@@ -13,7 +13,8 @@ Everything else is built-in: catalog, scaffolder (`fetch:template`, `publish:git
 ## Container deployment
 
 [`Dockerfile`](Dockerfile) builds the frontend/backend bundle in a Node build stage and assembles
-a non-root runtime with production dependencies and TechDocs tooling. Build it from the repository
+a non-root runtime with production dependencies. The default `runtime` includes TechDocs tooling;
+the local `runtime-lite` target omits Python and MkDocs. Build it from the repository
 root, which supplies the catalog, local templates and documentation:
 
 ```bash
@@ -22,8 +23,9 @@ docker build -f portal/Dockerfile -t sportify/backstage:local .
 
 The default command loads `app-config.container.yaml` followed by `app-config.production.yaml`.
 The [local Compose stack](../deploy/local/README.md) selects `app-config.docker.yaml` instead,
-serves the UI and backend together at `http://localhost:7007`, and enables guest sign-in for
-the demo developer. Python services communicate through container DNS names; the browser uses
+uses `runtime-lite` with prebuilt TechDocs and applies adjustable resource ceilings. It serves
+the UI and backend together at `http://localhost:7007` and enables guest sign-in for the demo
+developer. Python services communicate through container DNS names; the browser uses
 only Backstage. GitHub and Azure actions require their own integration configuration.
 
 The older `packages/backend/Dockerfile` remains available for a prepared host-built bundle.

@@ -17,6 +17,6 @@ COPY policies/allowlist.yaml /etc/sportify/allowlist.yaml
 ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 DISCOVERY_POLICY_FILE=/etc/sportify/allowlist.yaml
 USER 10001
 EXPOSE 8001
-HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/readyz', timeout=3)"
 CMD ["uvicorn", "azure_discovery.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8001"]

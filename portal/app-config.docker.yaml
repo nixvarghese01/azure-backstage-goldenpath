@@ -21,6 +21,9 @@ backend:
             permission: catalog.entity.read
           - plugin: catalog
             permission: catalog.entity.delete
+techdocs:
+  # Lightweight image serves prebuilt docs; the optional full override enables generation.
+  builder: external
 auth:
   environment: local-docker
   providers:

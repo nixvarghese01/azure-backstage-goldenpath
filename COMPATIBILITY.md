@@ -6,6 +6,12 @@ The component versions chosen for Sportify Azure Backstage milestone 1, why each
 - **Rule:** use the newest release that every dependent component supports, not simply the newest release. Where the newest release is not adopted, the reason is given.
 - **Pinning:** exact versions go in lock files (`yarn.lock`, `uv.lock`, `.terraform.lock.hcl`, Helm `Chart.lock`). Manifests use the ranges shown here, and GitHub Actions are pinned to commit SHAs.
 
+Container footprint update (2026-10-13): the Python HTTP services now request base FastAPI and Uvicorn
+packages, without optional `standard` extras. Package version ranges are unchanged. Local Backstage
+uses the optional `runtime-lite` image with prebuilt TechDocs; the full image retains Python/MkDocs
+for on-demand generation. These dependency and image changes have not been built or tested. See
+[ADR-0006](docs/adr/0006-container-delivery.md) and [local defaults](deploy/local/README.md).
+
 > Re-verify this page before each phase starts and whenever Dependabot or Renovate proposes a major upgrade. Update the *Verified on* date when you do.
 
 ---

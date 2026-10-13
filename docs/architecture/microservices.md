@@ -254,6 +254,12 @@ The local stack is not a complete simulation of Actions, Terraform or AKS.
 
 See [deploy/local/README.md](../../deploy/local/README.md) for build/start commands and pending checks.
 
+The local footprint is bounded by configurable CPU/memory limits and rotated logs. Backstage's
+`runtime-lite` image omits Python/MkDocs, and its local TechDocs builder reads prebuilt content.
+On-demand generation uses the optional full-image Compose override. The worker's longer local
+idle poll and reconcile intervals reduce background database and GitHub activity. Production replica
+counts are unchanged; local ceilings are provisional until startup and load measurements are available.
+
 ## 10. Why three services, and when to split further
 
 The services follow **responsibility and identity boundaries**, not technical layers:

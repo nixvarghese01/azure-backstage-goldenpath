@@ -5,9 +5,9 @@ description = "Durable request orchestrator for the Sportify golden path"
 requires-python = ">=3.14,<3.15"
 dependencies = [
   "sportify-common",
-  "fastapi[standard]~=0.143.0",
+  "fastapi~=0.143.0",
   "pydantic~=2.14",
-  "uvicorn[standard]~=0.54.0",
+  "uvicorn~=0.54.0",
   "sqlalchemy~=2.1.0",
   "alembic~=1.20",
   "psycopg[binary]~=3.3",
