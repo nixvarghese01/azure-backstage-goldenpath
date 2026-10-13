@@ -1,6 +1,8 @@
 node_modules
 dist
 coverage
+test
+docker-compose*.yml
 .git
 .github
 infra

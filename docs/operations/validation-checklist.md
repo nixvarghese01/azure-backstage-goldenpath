@@ -56,6 +56,11 @@ Most likely to need adjustment: attribute names that changed between azurerm 4.x
 
 ```bash
 cd /tmp/orders-api && npm install && npm run lint && npm test && npm run test:e2e && npm run build && docker build -t orders-api .
+docker compose config --quiet
+# Optional local developer smoke check (in-memory data; no Azure):
+docker compose up --build -d
+curl -fsS http://localhost:3000/health/ready
+docker compose down
 ```
 
 Then commit the generated `package-lock.json` to the template, and switch CI back to `npm ci` with caching.

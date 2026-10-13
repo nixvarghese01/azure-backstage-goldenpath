@@ -35,6 +35,9 @@ jobs:
         run: |
           cd services && uv sync --package provisioning-orchestrator
           uv run python ../templates/applications/nestjs/render_fixture.py "$RUNNER_TEMP/orders-api"
+      - name: Generated developer checkout configuration
+        working-directory: ${{ runner.temp }}/orders-api
+        run: docker compose config --quiet
       - name: Terraform (generated repo)
         working-directory: ${{ runner.temp }}/orders-api/infra/terraform
         run: |

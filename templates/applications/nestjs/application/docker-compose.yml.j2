@@ -1,0 +1,28 @@
+# Generated checkout experience for [[ values.app ]]. No Azure or GitHub credentials required.
+name: [[ values.app ]]
+services:
+  application:
+    image: [[ values.app ]]:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: ${APP_CPUS:-0.5}
+    mem_limit: ${APP_MEMORY:-384m}
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=256
+      PORT: "3000"
+      # Explicitly select the in-memory demo repository for local development.
+      AZURE_STORAGE_ACCOUNT: ""
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

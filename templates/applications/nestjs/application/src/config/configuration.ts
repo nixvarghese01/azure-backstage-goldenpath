@@ -1,4 +1,4 @@
-import { plainToInstance } from 'class-transformer';
+import { plainToInstance, Transform } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, Min, validateSync } from 'class-validator';
 
 /**
@@ -17,6 +17,7 @@ export class AppConfig {
   NODE_ENV = 'production';
 
   /** Storage account name; when unset the service uses an in-memory store (local dev and tests). */
+  @Transform(({ value }: { value: unknown }) => (value === '' ? undefined : value))
   @IsOptional()
   @Matches(/^[a-z0-9]{3,24}$/)
   AZURE_STORAGE_ACCOUNT?: string;

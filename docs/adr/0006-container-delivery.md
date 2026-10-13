@@ -47,6 +47,13 @@ base FastAPI/Uvicorn packages rather than their optional standard extras; trace 
 are deferred until tracing is enabled. These choices are starting points, not measured savings or
 production sizing. They require later build, startup and load validation.
 
+Generated applications also receive a technology-specific rendered Dockerfile, loopback-only local
+Compose configuration and checkout README from their stack template. For NestJS, the dummy orders
+application uses its in-memory repository locally and approved Azure configuration when deployed.
+The existing infrastructure-first ordering remains: application assets arrive through the orchestrator's
+post-provisioning pull request, not in the initial infrastructure-only repository. The fixture and
+cross-service tests cover asset rendering, with execution deferred.
+
 ## Consequences
 
 Developers can build and start the service topology without preparing Node or Python dependencies

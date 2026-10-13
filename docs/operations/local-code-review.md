@@ -21,6 +21,14 @@ triggered, and no Azure resources were provisioned during this review.
 
 ## Verification status
 
+Subsequent source review covered the container topology, lightweight image targets and generated
+developer starter. The renderer's inputs supply the Dockerfile, Compose and README templates;
+generated output names match the existing CI and application pull-request path. An empty
+`AZURE_STORAGE_ACCOUNT` from Compose previously failed the starter's name validation. The config now
+normalizes that empty value to an unset capability, preserving the local in-memory mode and validation
+of malformed nonempty names. Regression cases are written for later execution. The platform README
+now distinguishes the initial infrastructure-only repository from the final Docker-ready starter.
+
 Before testing was deferred, the four existing Helm charts passed basic lint with their defaults.
 The platform charts emitted missing-value warnings; this does not establish deployment readiness.
 The cross-service pytest attempt stopped during collection because SQLAlchemy was unavailable.

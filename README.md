@@ -7,7 +7,7 @@ Sportify Azure Backstage lets developers request a production-shaped service thr
 > **This is a model project.** It is a reference design that shows how an enterprise-grade IDP on Backstage and Azure can be structured, secured and operated. The implementation is deliberately scoped to one golden path, to demonstrate the design end to end. It is not intended for wide production rollout as-is. Where a production platform would make a different trade-off, the [ADRs](docs/adr/) say so.
 
 > **Project status: milestone 1 code written; end-to-end validation pending.**
-> This README describes the target design and the first golden path. The [Implementation status](#implementation-status) table distinguishes code written from verified behaviour. See the [local code review](docs/operations/local-code-review.md) for the latest changes and deferred checks.
+> This README describes the target design and the first golden path. The [Implementation status](#implementation-status) table distinguishes code written from verified behaviour. The current review covers source and configuration consistency only: builds, tests, startup, provisioning and publishing are deferred to another system. See the [local code review](docs/operations/local-code-review.md) for findings and pending checks.
 
 ---
 
@@ -50,7 +50,7 @@ The goal is one complete, enterprise-quality vertical slice rather than many unf
 The developer **submits everything in one Backstage form** first. Then the platform:
 
 1. provisions the infrastructure, after **approval in the Backstage UI**
-2. generates the application for the **chosen stack**, with a basic Dockerfile and CI/CD
+2. generates a dummy starter for the **chosen stack**, with a rendered Dockerfile, local Compose configuration and CI/CD
 3. deploys it to the selected AKS cluster
 4. **shares the URLs** on the Backstage entity page
 
@@ -196,7 +196,7 @@ flowchart LR
 2. **Validate.** `sportify:request:submit` sends the request to the orchestrator, using the scaffolder task ID as the idempotency key. The orchestrator re-validates every selection through the discovery service and the policies. It then returns a request ID, or rejects the request before any repository exists. If the request asks for a new subscription, AKS cluster or registry, the orchestrator first raises the platform pull request and waits for it to be applied (`PLATFORM_PROVISIONING`).
 3. **Repository.** The built-in `publish:github` creates the repository with **infrastructure code only**, and `catalog:register` registers it. `sportify:request:repository-created` reports it to the orchestrator, and the scaffolder task finishes.
 4. **Infrastructure.** The orchestrator dispatches the validate and plan workflows. The apply job is held until a reviewer **approves in the Backstage UI** (see [Approval in Backstage](#approval-in-backstage)). It then applies the saved plan.
-5. **Application.** Once the infrastructure is ready, the orchestrator opens a pull request that adds the application for the chosen stack: source, tests, Dockerfile and CI/CD. It merges the pull request when the checks pass.
+5. **Application.** Once the infrastructure is ready, the orchestrator opens a pull request that adds the starter for the chosen stack: source, tests, a rendered Dockerfile, local Compose configuration, checkout instructions and CI/CD. Developers can run the dummy API without Azure credentials after the pull request merges.
 6. **Deploy.** CI builds, scans and pushes the image. The deploy workflow installs the Helm chart on AKS, then smoke-tests the endpoint.
 7. **Report.** The orchestrator follows every step through `workflow_run`, `deployment_status`, `deployment_protection_rule` and `pull_request` webhooks, plus Actions callbacks,, with periodic polling to catch lost events. The application, repository, workflow, registry, Azure and Backstage URLs appear on the entity page and in a Backstage notification.
 
@@ -426,7 +426,9 @@ Generated application repositories are always separate from this platform reposi
 
 ## Generated application repository
 
-Each request produces one self-contained repository that the application team owns:
+Each request produces one self-contained repository that the application team owns. The tree below
+shows the final layout after the application pull request merges; the initial repository contains
+infrastructure only. NestJS is the currently enabled technology.
 
 ```
 <application-name>/
@@ -434,7 +436,7 @@ Each request produces one self-contained repository that the application team ow
 ├── test/                    # unit + integration test structure
 ├── infra/terraform/         # one root module, see ADR-0002
 │   ├── main.tf  variables.tf  outputs.tf  providers.tf  versions.tf
-│   ├── .terraform.lock.hcl
+│   ├── .terraform.lock.hcl    # pending generation and validation
 │   └── environments/dev/
 │       ├── backend.hcl      # state location only
 │       └── terraform.tfvars # rendered from the Backstage form
@@ -448,12 +450,24 @@ Each request produces one self-contained repository that the application team ow
 │   ├── application-ci.yml
 │   └── application-deploy.yml
 ├── Dockerfile
+├── docker-compose.yml        # local dummy API; no Azure credentials
+├── .gitignore  .dockerignore
 ├── catalog-info.yaml
 ├── docs/
 └── README.md
 ```
 
 Application code and infrastructure live in the same repository. The infrastructure definitions and workflows are generated before any provisioning runs.
+
+The orchestrator renders the selected stack's application source, tests, Dockerfile, Compose file,
+README and workflow callers from `templates/applications/<stack>/application/`. It supplies validated
+request metadata and non-sensitive infrastructure outputs. NestJS's local configuration explicitly
+uses an in-memory store, with temporary data, loopback-only access and adjustable resource limits.
+Deployed Helm values select the approved Azure capability separately. A successful local dummy API
+does not establish successful provisioning or deployment.
+
+Python, portal and generated application dependency lockfiles are not committed yet. Image sizes,
+memory use and the developer checkout experience require validation on the target system.
 
 The Terraform `.tf` files are the same in every generated repository. The scaffolder renders only `terraform.tfvars`, and the modules come from this repository's `iac/modules/`, pinned to a version tag. Existing resources are read through `data` sources and never modified or destroyed. See [ADR-0002](docs/adr/0002-terraform-structure.md).
 
@@ -463,6 +477,9 @@ These are the planned prerequisites. Versions were checked on 2026-10-10; the fu
 
 **Local development**
 
+- The container path needs Docker Engine/Desktop with Linux containers and Compose v2; Node.js and
+  Python are installed inside the build stages. The host-development and validation paths use the
+  tools below. None of these environments has been started for the current changes.
 - **WSL2 (Ubuntu) or a dev container on Windows.** Backstage needs a Unix-like OS.
 - Node.js **24 LTS** and Yarn **4.13** (as pinned by Backstage 1.55)
 - Python **3.14** and [uv](https://docs.astral.sh/uv/) **0.13** for the platform services
@@ -556,6 +573,13 @@ Mock adapters are only for local development and isolated tests. Live integratio
 | 5 | Real Azure provisioning, approvals, state management, failure recovery, cleanup | 🟡 Terraform and workflows written; not applied |
 | 6 | Full automated testing, security checks, documentation, reproducible demo | ⚪ Tests written but not run; validation pending ([checklist](docs/operations/validation-checklist.md)) |
 
+Recent implementation work includes the complete local microservice Compose definition, a lightweight
+Backstage image target with optional documentation generation, bounded local resources, and the rendered
+NestJS developer starter. Source review checked the template inputs against the orchestrator and fixture
+renderer, the generated asset names against CI expectations, and the local storage setting against startup
+validation. Empty local storage settings now select the in-memory repository while malformed nonempty
+settings remain invalid. Regression coverage is written, but these changes have not been executed.
+
 ### Definition of done for milestone 1
 
 The first milestone is complete when a developer can:
@@ -581,7 +605,7 @@ Installing a Helm chart successfully does not make it production-ready. Remainin
 
 ## Documentation
 
-Planned documentation, published through TechDocs:
+Repository documentation (TechDocs publication is unverified):
 
 - [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md): proposed workflow, CI/CD workflow design and the detailed phased plan
 - [`COMPATIBILITY.md`](COMPATIBILITY.md): component version compatibility plan
@@ -589,13 +613,15 @@ Planned documentation, published through TechDocs:
 - [`docs/security/secret-management.md`](docs/security/secret-management.md): secret inventory, Key Vault, delivery, rotation and incident response
 - `docs/adr/`: Architecture Decision Records: [0001 Python platform services](docs/adr/0001-python-platform-services.md), [0002 Terraform structure](docs/adr/0002-terraform-structure.md), [0003 Ingress through the Gateway API](docs/adr/0003-ingress-gateway-api.md), [0004 High-availability option](docs/adr/0004-availability-tier-option.md), [0005 Reusable workflows and CI identity](docs/adr/0005-reusable-workflows-and-ci-identity.md)
 - [`docs/operations/validation-checklist.md`](docs/operations/validation-checklist.md): how to validate the code, step by step
+- [`deploy/local/README.md`](deploy/local/README.md): local microservice topology, lightweight defaults and optional full TechDocs image
+- [`docs/adr/0006-container-delivery.md`](docs/adr/0006-container-delivery.md): container delivery and generated developer starter design
 - [`docs/developer-guide/golden-path.md`](docs/developer-guide/golden-path.md): the end-to-end golden path, approval in Backstage and the shared URLs
 - [`docs/operations/cleanup.md`](docs/operations/cleanup.md): cleanup and teardown; troubleshooting and recovery procedures will follow
 - [`docs/operations/demo-environment.md`](docs/operations/demo-environment.md): running the first demo on a free Azure subscription
 
 ## Contributing and security
 
-- Contribution guidelines will be in `CONTRIBUTING.md`.
+- Contribution guidelines are in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Please report vulnerabilities privately as described in `SECURITY.md`. Do not open public issues for security problems.
 
 ## License

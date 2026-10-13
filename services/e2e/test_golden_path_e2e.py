@@ -98,9 +98,12 @@ def test_golden_path_end_to_end(system) -> None:
 
     # The application PR is rendered from the real stack template with the real outputs.
     files = github.files[f"sportify/app-{rid}"]
-    for expected in ("src/main.ts", "Dockerfile", "package.json", "deploy/helm/application/values-dev.yaml",
+    for expected in ("src/main.ts", "Dockerfile", "docker-compose.yml", "README.md", ".gitignore",
+                     "package.json", "deploy/helm/application/values-dev.yaml",
                      ".github/workflows/application-ci.yml", ".github/workflows/application-deploy.yml"):
         assert expected in files, expected
+    assert "image: orders-api:local" in files["docker-compose.yml"]
+    assert 'org.opencontainers.image.title="orders-api"' in files["Dockerfile"]
     values = files["deploy/helm/application/values-dev.yaml"]
     assert "11111111-2222-3333-4444-555555555555" in values
     assert "acrsportifydev.azurecr.io/orders-api" in values

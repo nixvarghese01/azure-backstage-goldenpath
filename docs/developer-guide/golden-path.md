@@ -8,7 +8,7 @@ This guide describes the planned happy path, from submitting a request in Backst
 
 1. **Submit everything in Backstage.** One form collects the application, stack, infrastructure and deployment choices. Nothing runs until the developer clicks **Create**.
 2. **Provision infrastructure.** The platform creates the repository with infrastructure code, validates and plans it, waits for **approval in Backstage**, then applies the plan.
-3. **Generate the application.** It is generated for the chosen stack, with a basic Dockerfile and CI/CD, as a pull request into the same repository.
+3. **Generate the application.** It is generated for the chosen stack, with a rendered Dockerfile, local Compose configuration, checkout instructions and CI/CD, as a pull request into the same repository.
 4. **Deploy** to the selected AKS cluster and namespace, then verify the deployment.
 5. **Share the URLs** on the Backstage entity page and in a notification.
 
@@ -243,6 +243,28 @@ Each stage is reported as its own outcome:
 ✅ Application built            tests passed · 0 critical vulnerabilities
 ✅ Deployed                     healthy · 1/1 pods ready (Standard tier)
 ```
+
+## Developer checkout
+
+The repository initially contains infrastructure only. After the application's generated pull
+request merges, a developer can check out the selected stack's dummy application and run it locally:
+
+```bash
+git clone https://github.com/sportify-org/orders-api.git
+cd orders-api
+docker compose up --build -d
+```
+
+The NestJS starter exposes Swagger at `http://localhost:3000/docs`, readiness at `/health/ready`
+and the sample `/v1/orders` API. Local Compose deliberately uses an in-memory repository with no
+Azure credentials; data is lost on restart. The same Dockerfile builds the CI/deployment image,
+while deployed Helm values provide the approved Azure runtime configuration. Local startup and
+cloud deployment remain separate outcomes.
+
+The orchestrator selects the allowlisted stack and renders its Dockerfile, source, Compose file,
+README, tests and workflows into one application pull request. New technologies need their own
+stack template, tests and compatible reusable build/deploy workflow before being enabled. The
+current implementation enables NestJS only. Runtime and generated-template validation are pending.
 
 ## State timeline
 
