@@ -19,6 +19,15 @@ def render_stack(templates_dir: Path, stack: str, values: dict[str, Any]) -> dic
     root = templates_dir / stack
     if not root.is_dir():
         raise FileNotFoundError(f"stack template '{stack}' not found")
+    files: dict[str, str] = {}
+    shared = templates_dir / "_shared"
+    if shared.is_dir():
+        files.update(_render_directory(shared, values))
+    files.update(_render_directory(root, values))
+    return files
+
+
+def _render_directory(root: Path, values: dict[str, Any]) -> dict[str, str]:
     env = Environment(  # noqa: S701 - output is source code, not HTML
         loader=FileSystemLoader(str(root)),
         undefined=StrictUndefined,

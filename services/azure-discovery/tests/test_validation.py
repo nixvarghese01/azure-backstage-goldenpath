@@ -18,6 +18,14 @@ def test_golden_path_request_is_valid(client) -> None:
     assert "aks_cluster_id" in body["resolved"]
 
 
+def test_demo_stack_rejects_unsupported_azure_capability(client, policy) -> None:
+    stack = next(item for item in policy.stacks if item.id == "fastapi")
+    stack.enabled = True
+    assert "stack_capability_not_supported" in _codes(_validate(client, stack="fastapi"))
+    body = _validate(client, stack="fastapi", runtime_capability={"type": "none", "mode": "existing"})
+    assert body["valid"] is True, body["errors"]
+
+
 def test_tampered_resource_group_is_rejected(client) -> None:
     body = _validate(client, resource_group={"mode": "existing", "name": "rg-other"})
     assert "not_allowlisted" in _codes(body)

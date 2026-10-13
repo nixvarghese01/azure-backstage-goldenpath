@@ -58,6 +58,9 @@ def validate_request(req: ValidationRequest, inventory: AzureInventory, policy: 
     stack = next((s for s in policy.stacks if s.id == req.stack), None)
     if not stack or not stack.enabled:
         c.error("stack", "stack_not_available", f"Stack '{req.stack}' is not available yet.")
+    if stack and req.runtime_capability.type not in stack.runtime_capabilities:
+        c.error("runtime_capability", "stack_capability_not_supported",
+                f"Stack '{req.stack}' supports runtime capabilities: {', '.join(stack.runtime_capabilities)}.")
 
     # ---- subscription ----
     sub_id = req.subscription.id or ""

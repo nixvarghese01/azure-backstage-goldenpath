@@ -49,4 +49,9 @@ sportify:
   stacks:
     - { id: nestjs, name: NestJS (TypeScript), enabled: true }
     - { id: fastapi, name: Python FastAPI, enabled: false }
-    - { id: dotnet, name: .NET, enabled: false }
+    - { id: go, name: Go HTTP API, enabled: false }
+    - { id: dotnet, name: ASP.NET Core, enabled: false }
+    - { id: springboot, name: Java Spring Boot, enabled: false }
+    - { id: nextjs, name: Next.js (React), enabled: false }
+    - { id: react, name: React + Vite, enabled: false }
+    - { id: vue, name: Vue + Vite, enabled: false }

@@ -78,7 +78,10 @@ def discovery(inventory: MockInventory) -> TestClient:
 @pytest.fixture
 def stacks(tmp_path: Path) -> Path:
     root = tmp_path / "stacks"
-    shutil.copytree(REPO / "templates" / "applications" / "nestjs" / "application", root / "nestjs")
+    applications = REPO / "templates" / "applications"
+    shutil.copytree(applications / "_shared", root / "_shared")
+    for stack in ("nestjs", "fastapi", "go", "dotnet", "springboot", "nextjs", "react", "vue"):
+        shutil.copytree(applications / stack / "application", root / stack)
     return root
 
 

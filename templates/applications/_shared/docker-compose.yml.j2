@@ -1,0 +1,26 @@
+# Generated local demo; no Azure credentials or shared platform services.
+name: [[ values.app ]]
+services:
+  application:
+    image: [[ values.app ]]:local
+    build: .
+    init: true
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: ${APP_CPUS:-0.5}
+    mem_limit: ${APP_MEMORY:-[[ {"springboot": "512m", "fastapi": "256m", "go": "128m", "react": "128m", "vue": "128m"}.get(values.stack | default("nestjs"), "384m") ]]}
+    environment:
+      PORT: "3000"
+[% if values.stack | default("nestjs") in ["nestjs", "nextjs"] %]
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=256
+[% endif %]
+[% if values.stack | default("nestjs") == "springboot" %]
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=65"
+[% endif %]
+    ports: ["127.0.0.1:${APP_PORT:-3000}:3000"]
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }

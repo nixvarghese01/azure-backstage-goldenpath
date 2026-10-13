@@ -36,7 +36,7 @@ marking the change verified. Do not push or create a pull request without author
 
 ## Adding a new stack
 
-1. Add `templates/applications/<stack>/application/` (rendered by the orchestrator with `[[ ]]` delimiters).
+1. Add `templates/applications/<stack>/application/` (rendered by the orchestrator with `[[ ]]` delimiters). Common assets come from `templates/applications/_shared/`; stack files override them.
 2. Add the stack to `policies/allowlist.yaml` and to `sportify.stacks` in `portal/app-config.yaml`, initially with `enabled: false`.
-3. Provide a reusable CI workflow if the build differs from Node.js.
+3. Use the existing reusable CI runtime input (`node`, `python`, `go`, `dotnet`, `java`). Non-Node templates must provide a `verify` Docker target, keeping OIDC trust on the existing workflow.
 4. Extend `ci-templates.yml` to render and test it, then enable it.

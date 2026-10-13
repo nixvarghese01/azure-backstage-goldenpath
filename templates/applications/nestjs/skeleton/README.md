@@ -7,7 +7,7 @@ Created by **Sportify Azure Backstage** (request `${{ values.requestId }}`). Own
 ## How this repository is built
 
 1. **Infrastructure first.** This repository starts with Terraform (`infra/terraform`), the Helm chart (`deploy/helm/application`) and the infrastructure workflows. The platform validates, plans and, after **approval in Backstage**, applies the infrastructure.
-2. **Application second.** Once the infrastructure is ready, the platform opens a pull request adding the dummy NestJS application, tests, a rendered Dockerfile, local Compose configuration, checkout instructions and CI/CD. It merges when checks pass.
+2. **Application second.** Once the infrastructure is ready, the platform opens a pull request adding the `${{ values.stack }}` starter, tests, a rendered Dockerfile, local Compose configuration, checkout instructions and CI/CD. It merges when checks pass.
 3. **Deploy.** CI builds, scans and pushes the image; the deploy workflow installs the Helm chart on the shared AKS cluster and smoke-tests the endpoint.
 
 Status, URLs and history: see this component's **Provisioning** tab in Backstage.

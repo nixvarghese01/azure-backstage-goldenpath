@@ -9,6 +9,11 @@ Sportify Azure Backstage lets developers request a production-shaped service thr
 > **Project status: milestone 1 code written; end-to-end validation pending.**
 > This README describes the target design and the first golden path. The [Implementation status](#implementation-status) table distinguishes code written from verified behaviour. The current review covers source and configuration consistency only: builds, tests, startup, provisioning and publishing are deferred to another system. See the [local code review](docs/operations/local-code-review.md) for findings and pending checks.
 
+Application starters now cover **NestJS, FastAPI, Go, ASP.NET Core, Spring Boot, Next.js, React/Vite
+and Vue/Vite**. NestJS remains enabled; the seven new starters are disabled pending target-system
+validation. See the [technology inventory](docs/developer-guide/technology-stacks.md) for runtimes,
+container design, CI coverage and current capability limits.
+
 ---
 
 ## Contents
@@ -139,6 +144,10 @@ The form asks **"Do you need high availability?"** so the cost and complexity of
 - The decision is stored in the audit log and as catalog annotations.
 
 ## Architecture
+
+Animated overview of the proposed solution, including Azure Key Vault secret delivery:
+
+![Proposed Sportify Azure Backstage architecture](docs/assets/proposed-platform.gif)
 
 ```mermaid
 flowchart LR
@@ -428,7 +437,8 @@ Generated application repositories are always separate from this platform reposi
 
 Each request produces one self-contained repository that the application team owns. The tree below
 shows the final layout after the application pull request merges; the initial repository contains
-infrastructure only. NestJS is the currently enabled technology.
+infrastructure only. NestJS is the currently enabled technology; additional backend and frontend
+templates are implemented and await validation before enablement.
 
 ```
 <application-name>/
@@ -615,6 +625,7 @@ Repository documentation (TechDocs publication is unverified):
 - [`docs/operations/validation-checklist.md`](docs/operations/validation-checklist.md): how to validate the code, step by step
 - [`deploy/local/README.md`](deploy/local/README.md): local microservice topology, lightweight defaults and optional full TechDocs image
 - [`docs/adr/0006-container-delivery.md`](docs/adr/0006-container-delivery.md): container delivery and generated developer starter design
+- [`docs/developer-guide/technology-stacks.md`](docs/developer-guide/technology-stacks.md): backend/frontend starter inventory and shared contracts
 - [`docs/developer-guide/golden-path.md`](docs/developer-guide/golden-path.md): the end-to-end golden path, approval in Backstage and the shared URLs
 - [`docs/operations/cleanup.md`](docs/operations/cleanup.md): cleanup and teardown; troubleshooting and recovery procedures will follow
 - [`docs/operations/demo-environment.md`](docs/operations/demo-environment.md): running the first demo on a free Azure subscription

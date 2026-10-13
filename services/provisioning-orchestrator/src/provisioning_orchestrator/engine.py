@@ -165,6 +165,7 @@ def h_open_app_pr(ctx: Context, s: Session, step: Step, req: Request) -> None:
         return
     values = {
         "app": req.application_name,
+        "stack": req.stack,
         "description": req.spec.get("description", ""),
         "owner": req.owner,
         "environment": req.environment,

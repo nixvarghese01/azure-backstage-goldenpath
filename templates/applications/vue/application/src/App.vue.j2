@@ -1,0 +1,24 @@
+<script setup lang="ts">
+import { onMounted, ref } from 'vue';
+type Order = { id: string; customerId: string; currency: string; total: number };
+const orders = ref<Order[]>([]);
+const failed = ref(false);
+const title = [[ values.app | tojson ]];
+onMounted(async () => {
+  try {
+    const response = await fetch('/orders.json');
+    if (!response.ok) throw new Error('Demo unavailable');
+    orders.value = await response.json();
+  } catch { failed.value = true; }
+});
+</script>
+<template>
+  <main><span class="badge">VUE + VITE STARTER</span><h1>{{ title }}</h1>
+    <p>Read-only demo data; no Azure credentials.</p>
+    <section><h2>Sample orders</h2><p v-if="failed" role="alert">Demo unavailable</p>
+      <ul v-else><li v-for="order in orders" :key="order.id">
+        {{ order.id }} / {{ order.customerId }} / {{ order.currency }} {{ order.total.toFixed(2) }}
+      </li></ul>
+    </section><a href="/docs">Endpoint documentation</a>
+  </main>
+</template>

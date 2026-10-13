@@ -17,6 +17,14 @@ COPY services/provisioning-orchestrator/alembic.ini /app/alembic.ini
 COPY services/provisioning-orchestrator/migrations /app/migrations
 # Stack templates rendered into the application pull request.
 COPY templates/applications/nestjs/application /app/stack-templates/nestjs
+COPY templates/applications/_shared /app/stack-templates/_shared
+COPY templates/applications/fastapi/application /app/stack-templates/fastapi
+COPY templates/applications/go/application /app/stack-templates/go
+COPY templates/applications/dotnet/application /app/stack-templates/dotnet
+COPY templates/applications/springboot/application /app/stack-templates/springboot
+COPY templates/applications/nextjs/application /app/stack-templates/nextjs
+COPY templates/applications/react/application /app/stack-templates/react
+COPY templates/applications/vue/application /app/stack-templates/vue
 ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 ORCHESTRATOR_STACK_TEMPLATES_DIR=/app/stack-templates
 USER 10001
 EXPOSE 8002

@@ -14,6 +14,11 @@ for on-demand generation. These dependency and image changes have not been built
 
 > Re-verify this page before each phase starts and whenever Dependabot or Renovate proposes a major upgrade. Update the *Verified on* date when you do.
 
+Additional application starter baselines (2026-10-13): Next.js 16/React 19 on Node 24, React/Vue
+with Vite 8, Go 1.26, ASP.NET Core/.NET 10, and Spring Boot 4.0.8 on Java 21. These do not change
+the Backstage workspace versions. Upstream design references are in the [technology inventory](docs/developer-guide/technology-stacks.md).
+Dependency resolution, runtime compatibility and security checks remain unverified; new stacks are disabled.
+
 ---
 
 ## 1. Summary

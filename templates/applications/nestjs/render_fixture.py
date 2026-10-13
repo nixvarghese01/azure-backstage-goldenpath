@@ -1,17 +1,17 @@
-"""Render the NestJS golden path (skeleton + application) with fixture values, for ci-templates.yml.
+"""Render the shared infrastructure skeleton plus a selected application stack for ci-templates.yml.
 
 The skeleton uses Backstage's ``${{ values.x }}`` syntax; this script substitutes the few expressions the
 skeleton uses so the result is a realistic generated repository. The application stack is rendered
 with the orchestrator's own renderer, exactly as in production.
-Usage: python render_fixture.py <output-dir>
+Usage: python render_fixture.py <output-dir> [--stack nestjs|fastapi|go|dotnet|springboot|nextjs|react|vue]
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import shutil
-import sys
 from pathlib import Path
 
 from provisioning_orchestrator.templating import render_stack
@@ -71,12 +71,26 @@ def render_skeleton(out: Path) -> None:
 
 
 def main() -> None:
-    out = Path(sys.argv[1])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("output", type=Path)
+    parser.add_argument(
+        "--stack",
+        choices=["nestjs", "fastapi", "go", "dotnet", "springboot", "nextjs", "react", "vue"],
+        default="nestjs",
+    )
+    args = parser.parse_args()
+    FIXTURE["stack"] = args.stack
+    out = args.output
+    if args.stack != "nestjs":
+        FIXTURE["infrastructure.runtimeCapability.type"] = "none"
+        FIXTURE["infrastructure.runtimeCapability.name"] = ""
+        FIXTURE["infrastructure.runtimeCapability.resourceGroup"] = ""
     if out.exists():
         shutil.rmtree(out)
     render_skeleton(out)
     values = {
         "app": "orders-api", "description": "Order management REST API", "owner": "group:default/team-orders",
+        "stack": args.stack,
         "environment": "dev", "request_id": FIXTURE["requestId"], "org": "sportify-org", "repo": "orders-api",
         "namespace": "orders-api", "endpoint_host": FIXTURE["endpointHost"],
         "availability": {"tier": "standard"}, "runtime_capability": {"type": "storage", "mode": "existing"},
@@ -84,7 +98,10 @@ def main() -> None:
                     "acr_login_server": "acrsportifydev.azurecr.io", "storage_account_name": "stsportifyshareddev"},
         "resolved": {},
     }
-    for rel, content in render_stack(HERE.parent, "nestjs/application", values).items():
+    if args.stack != "nestjs":
+        values["runtime_capability"] = {"type": "none", "mode": "existing"}
+        values["outputs"].pop("storage_account_name", None)
+    for rel, content in render_stack(HERE.parent, f"{args.stack}/application", values).items():
         target = out / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")

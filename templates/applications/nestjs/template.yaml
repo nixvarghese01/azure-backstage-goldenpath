@@ -2,12 +2,12 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: secure-nestjs-api
-  title: Secure NestJS REST API
+  title: Application starter (backend or frontend)
   description: >-
-    Request a secure NestJS REST API. The platform validates your choices, creates a repository with the
+    Request an application using an enabled technology stack. The platform validates your choices, creates a repository with the
     infrastructure, provisions or reuses approved Azure resources after approval, adds the application
     as a pull request, deploys it to AKS and shares the URLs.
-  tags: [nestjs, typescript, aks, golden-path, recommended]
+  tags: [backend, frontend, aks, golden-path, recommended]
   annotations:
     backstage.io/techdocs-ref: dir:../../../docs
 spec:
@@ -46,7 +46,7 @@ spec:
           type: string
           default: nestjs
           ui:field: SportifyStackPicker
-          ui:help: More stacks are coming soon; they appear here disabled until they are enabled.
+          ui:help: Stacks awaiting target-system validation remain disabled. New demo starters use runtime capability None.
         includeSampleEndpoint:
           title: Include the sample /v1/orders endpoint
           type: boolean
@@ -125,6 +125,7 @@ spec:
           - infra/terraform/*.tf
         values:
           name: ${{ parameters.name }}
+          stack: ${{ parameters.stack }}
           description: ${{ parameters.description }}
           owner: ${{ parameters.owner }}
           environment: ${{ parameters.environment }}

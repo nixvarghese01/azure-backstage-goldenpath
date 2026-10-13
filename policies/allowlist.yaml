@@ -96,9 +96,31 @@ stacks:
   - id: fastapi
     name: Python FastAPI
     enabled: false
-  - id: dotnet
-    name: .NET
+    runtime_capabilities: [none]
+  - id: go
+    name: Go HTTP API
     enabled: false
+    runtime_capabilities: [none]
+  - id: dotnet
+    name: ASP.NET Core
+    enabled: false
+    runtime_capabilities: [none]
+  - id: springboot
+    name: Java Spring Boot
+    enabled: false
+    runtime_capabilities: [none]
+  - id: nextjs
+    name: Next.js (React)
+    enabled: false
+    runtime_capabilities: [none]
+  - id: react
+    name: React + Vite
+    enabled: false
+    runtime_capabilities: [none]
+  - id: vue
+    name: Vue + Vite
+    enabled: false
+    runtime_capabilities: [none]
 
 ha:
   min_zones: 2

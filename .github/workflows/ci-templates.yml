@@ -15,6 +15,10 @@ permissions:
 jobs:
   render-and-check:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: [nestjs, fastapi, go, dotnet, springboot, nextjs, react, vue]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
@@ -34,7 +38,7 @@ jobs:
       - name: Render skeleton + application with fixture values
         run: |
           cd services && uv sync --package provisioning-orchestrator
-          uv run python ../templates/applications/nestjs/render_fixture.py "$RUNNER_TEMP/orders-api"
+          uv run python ../templates/applications/nestjs/render_fixture.py "$RUNNER_TEMP/orders-api" --stack "${{ matrix.stack }}"
       - name: Generated developer checkout configuration
         working-directory: ${{ runner.temp }}/orders-api
         run: docker compose config --quiet
@@ -56,13 +60,20 @@ jobs:
             -f deploy/helm/application/values-dev.yaml --set availability.tier=ha > rendered-ha.yaml
           conftest test rendered-ha.yaml -p "$GITHUB_WORKSPACE/policies/helm"
       - name: Application (generated repo)
+        if: contains(fromJSON('["nestjs", "nextjs", "react", "vue"]'), matrix.stack)
         working-directory: ${{ runner.temp }}/orders-api
         run: |
           npm install --no-audit --no-fund
           npm run lint
           npm test
-          npm run test:e2e
+          npm run test:e2e --if-present
           npm run build
+          docker build -t orders-api:ci .
+      - name: Non-Node application (generated repo)
+        if: contains(fromJSON('["fastapi", "go", "dotnet", "springboot"]'), matrix.stack)
+        working-directory: ${{ runner.temp }}/orders-api
+        run: |
+          docker build --target verify -t orders-api:verify .
           docker build -t orders-api:ci .
       - name: Install into kind (restricted Pod Security, read-only root, non-root)
         working-directory: ${{ runner.temp }}/orders-api
@@ -84,6 +95,9 @@ jobs:
           kubectl -n orders-api rollout status deployment/orders-api --timeout 2m
           kubectl -n orders-api port-forward svc/orders-api 8080:80 & sleep 3
           curl -fsS http://localhost:8080/health/ready
-          curl -fsS -X POST http://localhost:8080/v1/orders -H 'Content-Type: application/json' \
-            -d '{"customerId":"cust-001","currency":"GBP","items":[{"sku":"SKU-1","quantity":1,"unitPrice":5}]}'
+          curl -fsS http://localhost:8080/v1/orders
+          if [[ "${{ matrix.stack }}" == "nestjs" ]]; then
+            curl -fsS -X POST http://localhost:8080/v1/orders -H 'Content-Type: application/json' \
+              -d '{"customerId":"cust-001","currency":"GBP","items":[{"sku":"SKU-1","quantity":1,"unitPrice":5}]}'
+          fi
           test "$(kubectl -n orders-api get secrets -o name | wc -l)" -eq 0   # no Secret objects (HELM_DRIVER=configmap)

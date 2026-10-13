@@ -1,0 +1,16 @@
+{
+  "name": [[ values.app | tojson ]],
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "start": "next start --hostname 0.0.0.0",
+    "lint": "node --check next.config.mjs && node --check app/v1/orders/route.js",
+    "test": "node --test test/*.test.mjs",
+    "test:e2e": "node --test test/*.e2e.mjs",
+    "build": "next build"
+  },
+  "dependencies": { "next": "^16.3.7", "react": "^19.2.0", "react-dom": "^19.2.0" }
+}

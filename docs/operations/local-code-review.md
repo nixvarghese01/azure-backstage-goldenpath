@@ -21,6 +21,13 @@ triggered, and no Azure resources were provisioned during this review.
 
 ## Verification status
 
+The later multi-technology implementation adds FastAPI, Go, ASP.NET Core, Spring Boot, Next.js,
+React/Vite and Vue/Vite starters. Shared rendering, runtime selection in CI, the worker image,
+per-stack Azure capability policy and an eight-stack template CI matrix are written. New choices
+remain disabled pending validation. Source/whitespace review does not establish successful dependency
+resolution, builds, framework tests, container startup or deployment. See the
+[technology inventory](../developer-guide/technology-stacks.md) for the precise scope and limitations.
+
 Subsequent source review covered the container topology, lightweight image targets and generated
 developer starter. The renderer's inputs supply the Dockerfile, Compose and README templates;
 generated output names match the existing CI and application pull-request path. An empty

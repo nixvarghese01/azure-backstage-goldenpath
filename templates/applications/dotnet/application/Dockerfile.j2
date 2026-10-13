@@ -1,0 +1,16 @@
+# [[ values.app ]] / ASP.NET Core.
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY . .
+RUN dotnet publish Starter.csproj -c Release -o /out
+
+FROM build AS verify
+RUN dotnet run --project tests/Checks/Checks.csproj --configuration Release
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /out .
+ENV ASPNETCORE_URLS=http://+:3000
+USER 1654
+EXPOSE 3000
+CMD ["dotnet", "Starter.dll"]

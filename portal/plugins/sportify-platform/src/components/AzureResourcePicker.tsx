@@ -113,8 +113,12 @@ export const AzureResourcePicker = (props: FieldExtensionComponentProps<Infrastr
   const ctx = (formContext as any)?.formData ?? {};
   const environment: string = ctx.environment ?? 'dev';
   const appName: string = ctx.name ?? '';
+  const demoOnly = ['fastapi', 'go', 'dotnet', 'springboot', 'nextjs', 'react', 'vue'].includes(ctx.stack);
   const api = useApi(sportifyApiRef);
-  const value = useMemo(() => formData ?? defaults(appName), [formData, appName]);
+  const value = useMemo<InfrastructureSelection>(() => formData ?? {
+    ...defaults(appName),
+    ...(demoOnly ? { runtimeCapability: { type: 'none' as const, mode: 'existing' as const } } : {}),
+  }, [formData, appName, demoOnly]);
   const set = (key: Key, s: Selection | RuntimeCapability) => onChange({ ...value, [key]: s });
 
   const subs = useAsync(() => api.subscriptions(environment), [api, environment]);
@@ -191,10 +195,11 @@ export const AzureResourcePicker = (props: FieldExtensionComponentProps<Infrastr
       <Box mb={1}>
         <TextField select size="small" label="Runtime capability" value={value.runtimeCapability.type}
           onChange={e => set('runtimeCapability', { type: e.target.value as RuntimeCapability['type'], mode: 'existing' })}>
-          <MenuItem value="storage">Azure Storage (blob read/write)</MenuItem>
-          <MenuItem value="keyvault">Key Vault (read secrets)</MenuItem>
+          <MenuItem value="storage" disabled={demoOnly}>Azure Storage (blob read/write)</MenuItem>
+          <MenuItem value="keyvault" disabled={demoOnly}>Key Vault (read secrets)</MenuItem>
           <MenuItem value="none">None</MenuItem>
         </TextField>
+        {demoOnly && <FormHelperText>This demo starter supports None; Azure data integrations are not implemented.</FormHelperText>}
       </Box>
       {value.runtimeCapability.type !== 'none' && (
         <ResourceRow

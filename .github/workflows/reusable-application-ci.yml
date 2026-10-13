@@ -1,4 +1,4 @@
-# Reusable CI for generated Node.js (NestJS) applications: test, build, scan, push (main only).
+# Reusable CI: language checks, build, scan, push (main only). Azure OIDC trust stays on this workflow.
 # Pushing uses the deployment identity, whose credential trusts only this workflow in <env>-build.
 name: reusable-application-ci
 
@@ -11,6 +11,10 @@ on:
       image_name:
         type: string
         required: true
+      runtime:
+        description: node | python | go | dotnet | java
+        type: string
+        default: node
 
 permissions:
   contents: read
@@ -26,14 +30,28 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: inputs.runtime == 'node'
         with:
           node-version: 24
       - name: Install (lockfile if present; generated repos commit theirs after the first install)
+        if: inputs.runtime == 'node'
         run: if [[ -f package-lock.json ]]; then npm ci; else npm install --no-audit --no-fund; fi
       - run: npm run lint
+        if: inputs.runtime == 'node'
       - run: npm test
-      - run: npm run test:e2e
+        if: inputs.runtime == 'node'
+      - run: npm run test:e2e --if-present
+        if: inputs.runtime == 'node'
       - run: npm run build
+        if: inputs.runtime == 'node'
+      - name: Validate runtime selection
+        env:
+          RUNTIME: ${{ inputs.runtime }}
+        run: |
+          case "$RUNTIME" in node|python|go|dotnet|java) ;; *) echo 'Unsupported runtime'; exit 1 ;; esac
+      - name: Non-Node language checks inside the reviewed verify target
+        if: inputs.runtime != 'node'
+        run: docker build --target verify -t starter-verification .
 
   image:
     needs: test

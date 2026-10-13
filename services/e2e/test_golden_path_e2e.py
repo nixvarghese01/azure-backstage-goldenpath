@@ -4,6 +4,8 @@ the real NestJS template -> CI -> deploy -> SUCCEEDED with shared URLs."""
 
 from __future__ import annotations
 
+import pytest
+
 from e2e.conftest import AUTH
 
 SUB = "00000000-0000-0000-0000-000000000000"
@@ -67,10 +69,20 @@ def get(api, rid):
     return api.get(f"/v1/requests/{rid}", headers=AUTH).json()
 
 
-def test_golden_path_end_to_end(system) -> None:
+@pytest.mark.parametrize("stack, entrypoint", [
+    ("nestjs", "src/main.ts"), ("fastapi", "app/main.py"), ("go", "main.go"),
+    ("dotnet", "StarterApi.cs"), ("springboot", "src/main/java/com/sportify/starter/Starter.java"),
+    ("nextjs", "app/page.jsx"), ("react", "src/App.tsx"), ("vue", "src/App.vue"),
+])
+def test_golden_path_end_to_end(system, discovery, stack, entrypoint) -> None:
     api, worker, github = system["api"], system["worker"], system["github"]
 
-    rid = api.post("/v1/requests", json=submission(), headers=REQUESTER).json()["id"]
+    # Enabling an unvalidated stack here is confined to this in-process test policy.
+    next(item for item in discovery.app.state.policy.stacks if item.id == stack).enabled = True
+    body = submission(stack=stack)
+    if stack != "nestjs":
+        body["runtime_capability"] = {"type": "none", "mode": "existing"}
+    rid = api.post("/v1/requests", json=body, headers=REQUESTER).json()["id"]
     drain(worker)
     body = get(api, rid)
     assert body["ready_for_repository"] is True, body["validation"]
@@ -98,12 +110,14 @@ def test_golden_path_end_to_end(system) -> None:
 
     # The application PR is rendered from the real stack template with the real outputs.
     files = github.files[f"sportify/app-{rid}"]
-    for expected in ("src/main.ts", "Dockerfile", "docker-compose.yml", "README.md", ".gitignore",
-                     "package.json", "deploy/helm/application/values-dev.yaml",
+    for expected in (entrypoint, "Dockerfile", "docker-compose.yml", "README.md", ".gitignore",
+                     "deploy/helm/application/values-dev.yaml",
                      ".github/workflows/application-ci.yml", ".github/workflows/application-deploy.yml"):
         assert expected in files, expected
+    if stack in {"nestjs", "nextjs", "react", "vue"}:
+        assert "package.json" in files
     assert "image: orders-api:local" in files["docker-compose.yml"]
-    assert 'org.opencontainers.image.title="orders-api"' in files["Dockerfile"]
+    assert "orders-api" in files["Dockerfile"]
     values = files["deploy/helm/application/values-dev.yaml"]
     assert "11111111-2222-3333-4444-555555555555" in values
     assert "acrsportifydev.azurecr.io/orders-api" in values

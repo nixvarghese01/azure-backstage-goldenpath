@@ -72,6 +72,7 @@ class StackEntry(BaseModel):
     id: str
     name: str
     enabled: bool
+    runtime_capabilities: list[str] = Field(default_factory=lambda: ["storage", "keyvault", "none"])
 
 
 class Justification(BaseModel):
