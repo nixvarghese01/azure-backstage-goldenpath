@@ -58,7 +58,7 @@ def callback(api, rid, stage, status, run_id, data=None):
             "stage": stage,
             "status": status,
             "run_id": run_id,
-            "run_url": f"https://github.com/sportify-org/orders-api/actions/runs/{run_id}",
+            "run_url": f"https://github.com/nixvarghese01/orders-api/actions/runs/{run_id}",
             "data": data or {},
         },
     )
@@ -119,9 +119,9 @@ def test_golden_path_end_to_end(system, discovery, stack, entrypoint) -> None:
         f"/v1/requests/{rid}/repository",
         headers=AUTH,
         json={
-            "owner": "sportify-org",
+            "owner": "nixvarghese01",
             "name": "orders-api",
-            "url": "https://github.com/sportify-org/orders-api",
+            "url": "https://github.com/nixvarghese01/orders-api",
         },
     )
     drain(worker)
@@ -144,7 +144,7 @@ def test_golden_path_end_to_end(system, discovery, stack, entrypoint) -> None:
             "action": "requested",
             "environment": "dev-infra",
             "repository": {"name": "orders-api"},
-            "deployment_callback_url": "https://api.github.com/repos/sportify-org/orders-api/actions/runs/3/deployment_protection_rule",
+            "deployment_callback_url": "https://api.github.com/repos/nixvarghese01/orders-api/actions/runs/3/deployment_protection_rule",
         },
     )
     drain(worker)

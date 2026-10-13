@@ -14,7 +14,7 @@ env:
   POSTGRES_HOST: ""
   POSTGRES_USER: id-sportify-backstage-dev
   AZURE_TENANT_ID: ""
-  GITHUB_ORG: sportify-org
+  GITHUB_ORG: nixvarghese01
   GITHUB_APP_BACKSTAGE_ID: ""
   GITHUB_APP_BACKSTAGE_CLIENT_ID: ""
   GITHUB_APP_ORCHESTRATOR_ID: ""

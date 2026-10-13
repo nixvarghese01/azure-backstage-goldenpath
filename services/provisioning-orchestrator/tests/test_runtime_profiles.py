@@ -19,7 +19,7 @@ def _render(stack: str) -> dict[str, str]:
             "stack": stack,
             "description": "Orders",
             "namespace": "orders-api",
-            "org": "sportify-org",
+            "org": "nixvarghese01",
             "repo": "orders-api",
             "owner": "group:default/team-orders",
             "environment": "dev",

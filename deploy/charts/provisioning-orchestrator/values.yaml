@@ -17,7 +17,7 @@ auth:
   audience: ""            # app ID URI of this service
   allowedCallers: ""      # backstage object ID
 config:
-  githubOrg: sportify-org
+  githubOrg: nixvarghese01
   githubAppId: ""
   githubInstallationId: ""
   platformRepo: azure-backstage-goldenpath

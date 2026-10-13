@@ -142,7 +142,7 @@ When the developer clicks **Create**:
 
 | # | Action | Actor | State |
 |---|---|---|---|
-| 2.1 | `publish:github` creates `sportify-org/orders-api` containing **infrastructure only**: `infra/terraform`, the Helm chart, the `terraform-*` workflows, `catalog-info.yaml` and docs. Branch protection is applied. `catalog:register` adds it to the catalog | Backstage | `REPOSITORY_CREATED` |
+| 2.1 | `publish:github` creates `nixvarghese01/orders-api` containing **infrastructure only**: `infra/terraform`, the Helm chart, the `terraform-*` workflows, `catalog-info.yaml` and docs. Branch protection is applied. `catalog:register` adds it to the catalog | Backstage | `REPOSITORY_CREATED` |
 | 2.2 | `terraform-validate.yml`: `fmt -check`, `init`, `validate`, TFLint, security scan, policy checks, `helm lint` and `helm template` | GitHub Actions | `REPOSITORY_CREATED` |
 | 2.3 | `terraform-plan.yml` (environment `dev-infra-plan`, no approval): logs in with the provisioning identity through OIDC and saves the plan as an artifact. A summary and the plan hash are sent to the orchestrator | GitHub Actions | `INFRASTRUCTURE_PLANNED` |
 | 2.4 | `terraform-apply.yml` is dispatched and **held** by the custom deployment protection rule on the `dev-infra` environment | Orchestrator, GitHub | `AWAITING_APPROVAL` |
@@ -240,8 +240,8 @@ The URLs are shown on the Backstage entity page (`orders-api` → *Overview* and
 | Application endpoint | `https://orders-api.dev.xycorp.local` |
 | API docs (Swagger) | `https://orders-api.dev.xycorp.local/docs` |
 | Health | `https://orders-api.dev.xycorp.local/health/ready` |
-| Repository | `https://github.com/sportify-org/orders-api` |
-| Workflow runs | `https://github.com/sportify-org/orders-api/actions` |
+| Repository | `https://github.com/nixvarghese01/orders-api` |
+| Workflow runs | `https://github.com/nixvarghese01/orders-api/actions` |
 | Container image | `acrsportifydev.azurecr.io/orders-api:<git-sha>` |
 | Azure resource group | Azure portal link to `rg-sportify-apps-dev` |
 | Backstage entity | `https://backstage.xycorp.local/catalog/default/component/orders-api` |
@@ -262,7 +262,7 @@ The repository initially contains infrastructure only. After the application's g
 request merges, a developer can check out the selected stack's dummy application and run it locally:
 
 ```bash
-git clone https://github.com/sportify-org/orders-api.git
+git clone https://github.com/nixvarghese01/orders-api.git
 cd orders-api
 docker compose up --build -d
 ```

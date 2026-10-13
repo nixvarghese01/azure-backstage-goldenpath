@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   plan:
-    uses: sportify-org/azure-backstage-goldenpath/.github/workflows/reusable-terraform.yml@main
+    uses: nixvarghese01/azure-backstage-goldenpath/.github/workflows/reusable-terraform.yml@main
     permissions:
       contents: read
       id-token: write

@@ -39,7 +39,7 @@ The proposed workflow, CI/CD design and phased delivery plan for milestone 1 of 
 | # | Assumption |
 |---|---|
 | A1 | This is a **model project** that shows the design end to end. It is not a production rollout. |
-| A2 | Generated repositories are **public**, in a GitHub organisation you own (for example `sportify-org`). |
+| A2 | Generated repositories are **public**, in a GitHub organisation you own (for example `nixvarghese01`). |
 | A3 | One **free Azure subscription** is used for the first demo, and you can create role assignments and federated credentials in it. Its limits (30-day credit, vCPU quota, MOSP billing) are handled as described in [demo-environment.md](docs/operations/demo-environment.md). |
 | A4 | Development happens on Windows with **WSL2 (Ubuntu)** for Backstage. |
 | A5 | The versions are those in [COMPATIBILITY.md](COMPATIBILITY.md), checked on 2026-10-10. |
@@ -143,7 +143,7 @@ Platform infrastructure is approved through **GitHub environment reviewers**, no
 **Workflow security controls:**
 
 - The jobs that use Azure identities run only for `workflow_dispatch`, `push` to `main` or `workflow_run`, never for `pull_request` runs from forks.
-- Each federated credential's subject is tied to **repository + environment** (for example `repo:sportify-org/orders-api:environment:dev-infra`).
+- Each federated credential's subject is tied to **repository + environment** (for example `repo:nixvarghese01/orders-api:environment:dev-infra`).
 - Scanners run in jobs without Azure credentials ([COMPATIBILITY.md](COMPATIBILITY.md), risk 3).
 - `CODEOWNERS` covers `.github/workflows/` and `infra/`, so workflow changes need review by the platform team.
 - Logs never print tfvars, plan contents or Terraform outputs marked sensitive.
@@ -173,7 +173,7 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 
 **Tasks**
 
-- [ ] Create the GitHub organisation `sportify-org` (or chosen name), with the platform repository public.
+- [ ] Create the GitHub organisation `nixvarghese01` (or chosen name), with the platform repository public.
 - [ ] Register **GitHub App #1, Backstage**: repository creation and contents.
 - [ ] Register **GitHub App #2, orchestrator**: Actions, Deployments, Contents, Pull requests, webhooks, and **custom deployment protection rule** support.
 - [ ] Confirm the Azure subscription, region allowlist (for example `uksouth`) and that you can create role assignments.

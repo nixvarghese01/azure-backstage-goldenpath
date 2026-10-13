@@ -109,7 +109,7 @@ variable "storage" {
 
 module "storage" {
   count  = var.storage.mode == "new" ? 1 : 0
-  source = "git::https://github.com/sportify-org/azure-backstage-goldenpath.git//iac/modules/storage-account?ref=storage-account/v1.0.0"
+  source = "git::https://github.com/nixvarghese01/azure-backstage-goldenpath.git//iac/modules/storage-account?ref=storage-account/v1.0.0"
   # ...
 }
 
@@ -171,7 +171,7 @@ The `naming` module produces every name and the standard tags, and all modules t
 | `environment` | `dev` |
 | `request-id` | orchestrator request ID |
 | `lifecycle` | `application` or `platform` |
-| `repository` | `sportify-org/orders-api` |
+| `repository` | `nixvarghese01/orders-api` |
 | `availability-tier` | `standard` or `ha` ([ADR-0004](0004-availability-tier-option.md)) |
 
 Cleanup relies on `managed-by` and `request-id` to find only the resources the platform created.

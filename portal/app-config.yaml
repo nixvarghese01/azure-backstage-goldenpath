@@ -75,7 +75,7 @@ scaffolder:
 
 # --------------------------------------------------------------------- Sportify
 sportify:
-  githubOrg: sportify-org
+  githubOrg: nixvarghese01
   orchestratorGithubAppId: 0              # GitHub App #2 ID (set in app-config.local.yaml)
   approverGroup: group:default/platform-approvers
   submitTimeoutMinutes: 360
