@@ -15,5 +15,5 @@ echo "Organisation ${ORG} now issues subjects like:"
 echo "  repository_owner_id:<id>:environment:<env>:job_workflow_ref:<org>/<repo>/.github/workflows/<wf>@<ref>"
 echo
 echo "The platform repository keeps the default repo-based subject (its own workflows use it):"
-gh api --method PUT "repos/${ORG}/sportify-azure-backstage/actions/oidc/customization/sub" -F use_default=true
+gh api --method PUT "repos/${ORG}/azure-backstage-goldenpath/actions/oidc/customization/sub" -F use_default=true
 echo "Organisation ID (github_org_id in iac/platform/10-identities): $(gh api "orgs/${ORG}" --jq .id)"

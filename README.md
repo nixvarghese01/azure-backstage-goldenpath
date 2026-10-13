@@ -407,7 +407,7 @@ The secrets design is in [docs/security/secret-management.md](docs/security/secr
 The platform monorepo, grouped by area (only project-wide files at the root):
 
 ```
-sportify-azure-backstage/
+azure-backstage-goldenpath/
 ├── README.md  IMPLEMENTATION_PLAN.md  COMPATIBILITY.md
 ├── .github/
 │   ├── workflows/                   # platform CI/CD + reusable golden-path workflows (ADR-0005)

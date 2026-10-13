@@ -109,7 +109,7 @@ flowchart TB
 
 All workflows pin Actions to SHAs, declare least-privilege `permissions:` at the top, use OIDC for Azure, and never expose credentials to `pull_request` runs from forks.
 
-### 3.1 Platform repository (`sportify-azure-backstage`)
+### 3.1 Platform repository (`azure-backstage-goldenpath`)
 
 | Workflow | Trigger | Jobs | Permissions / identity | Environment |
 |---|---|---|---|---|

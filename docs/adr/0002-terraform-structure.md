@@ -109,7 +109,7 @@ variable "storage" {
 
 module "storage" {
   count  = var.storage.mode == "new" ? 1 : 0
-  source = "git::https://github.com/sportify-org/sportify-azure-backstage.git//iac/modules/storage-account?ref=storage-account/v1.0.0"
+  source = "git::https://github.com/sportify-org/azure-backstage-goldenpath.git//iac/modules/storage-account?ref=storage-account/v1.0.0"
   # ...
 }
 

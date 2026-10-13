@@ -75,7 +75,7 @@ catalog:
     - type: file
       target: ./catalog/platform.yaml
     - type: url
-      target: https://github.com/${GITHUB_ORG}/sportify-azure-backstage/blob/main/templates/applications/nestjs/template.yaml
+      target: https://github.com/${GITHUB_ORG}/azure-backstage-goldenpath/blob/main/templates/applications/nestjs/template.yaml
       rules:
         - allow: [Template]
 

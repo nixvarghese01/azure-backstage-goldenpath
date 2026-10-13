@@ -57,7 +57,7 @@ variable "github_org_id" {
 
 variable "platform_repo" {
   type    = string
-  default = "sportify-azure-backstage"
+  default = "azure-backstage-goldenpath"
 }
 
 variable "reusable_workflow_ref" {

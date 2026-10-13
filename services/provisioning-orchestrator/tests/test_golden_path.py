@@ -232,7 +232,7 @@ def test_platform_resources_go_through_platform_pr(client, worker, github, disco
         f"pr-{rid}",
         {
             "action": "closed",
-            "repository": {"name": "sportify-azure-backstage"},
+            "repository": {"name": "azure-backstage-goldenpath"},
             "pull_request": {"merged": True, "head": {"ref": f"sportify/platform-{rid}"}},
         },
     )

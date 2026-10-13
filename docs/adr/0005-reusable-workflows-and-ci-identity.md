@@ -24,7 +24,7 @@ Separately, Helm stores release state in Kubernetes `Secret` objects by default.
 `scripts/configure-github-oidc.sh` runs once and sets the organisation's subject template to include `repository_owner_id`, `environment` and `job_workflow_ref`. Each identity then has **one credential per environment**, and that credential trusts only the platform's reusable workflow:
 
 ```
-repository_owner_id:<org-id>:environment:dev-infra:job_workflow_ref:<org>/sportify-azure-backstage/.github/workflows/reusable-terraform.yml@refs/heads/main
+repository_owner_id:<org-id>:environment:dev-infra:job_workflow_ref:<org>/azure-backstage-goldenpath/.github/workflows/reusable-terraform.yml@refs/heads/main
 ```
 
 | Identity | Environment | Workflow trusted |
@@ -32,7 +32,7 @@ repository_owner_id:<org-id>:environment:dev-infra:job_workflow_ref:<org>/sporti
 | provisioning | `<env>-infra-plan`, `<env>-infra` | `reusable-terraform.yml` |
 | deployment | `<env>-build`, `<env>` | `reusable-application-ci.yml`, `reusable-application-deploy.yml` |
 
-The platform repository's own workflows keep repository-based subjects (`repo:<org>/sportify-azure-backstage:environment:platform…`). Organisation customisation applies to repositories that opt in; generated repositories inherit the organisation default.
+The platform repository's own workflows keep repository-based subjects (`repo:<org>/azure-backstage-goldenpath:environment:platform…`). Organisation customisation applies to repositories that opt in; generated repositories inherit the organisation default.
 
 **Effect:** a new repository works immediately with no new credentials. A changed caller workflow in a generated repository can't obtain Azure tokens, because its `job_workflow_ref` would differ. Only a reviewed change to the platform repository can change what runs with these identities.
 

@@ -24,7 +24,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
-    uses: [[ values.org ]]/sportify-azure-backstage/.github/workflows/reusable-application-deploy.yml@main
+    uses: [[ values.org ]]/azure-backstage-goldenpath/.github/workflows/reusable-application-deploy.yml@main
     permissions:
       contents: read
       id-token: write

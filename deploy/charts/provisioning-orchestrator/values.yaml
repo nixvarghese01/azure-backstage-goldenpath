@@ -20,7 +20,7 @@ config:
   githubOrg: sportify-org
   githubAppId: ""
   githubInstallationId: ""
-  platformRepo: sportify-azure-backstage
+  platformRepo: azure-backstage-goldenpath
   discoveryScope: ""      # api://sportify-discovery/.default
   backstageScope: ""      # api://sportify-backstage/.default
   approverGroup: group:default/platform-approvers

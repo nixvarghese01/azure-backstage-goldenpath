@@ -60,7 +60,7 @@ def test_actions_callback_binds_run_id_to_token(client, monkeypatch, run_id, exp
     rid = client.post("/v1/requests", json=submission(), headers=REQUESTER).json()["id"]
     monkeypatch.setenv("SPORTIFY_AUTH_MODE", "entra")
     claims = {
-        "repository": "sportify-org/sportify-azure-backstage",
+        "repository": "sportify-org/azure-backstage-goldenpath",
         "repository_owner": "sportify-org",
         "run_id": "42",
         "run_attempt": "1",

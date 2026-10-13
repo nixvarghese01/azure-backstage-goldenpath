@@ -45,7 +45,7 @@ class Settings:
             github_org=_env("ORCHESTRATOR_GITHUB_ORG", "sportify-org") or "sportify-org",
             github_app_id=_env("ORCHESTRATOR_GITHUB_APP_ID"),
             github_installation_id=_env("ORCHESTRATOR_GITHUB_APP_INSTALLATION_ID"),
-            platform_repo=_env("ORCHESTRATOR_PLATFORM_REPO", "sportify-azure-backstage") or "",
+            platform_repo=_env("ORCHESTRATOR_PLATFORM_REPO", "azure-backstage-goldenpath") or "",
             platform_repo_ref=_env("ORCHESTRATOR_PLATFORM_REPO_REF", "main") or "main",
             backstage_base_url=(
                 _env("ORCHESTRATOR_BACKSTAGE_BASE_URL", "http://backstage:7007") or ""

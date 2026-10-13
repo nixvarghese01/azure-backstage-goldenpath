@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   apply:
-    uses: sportify-org/sportify-azure-backstage/.github/workflows/reusable-terraform.yml@main
+    uses: sportify-org/azure-backstage-goldenpath/.github/workflows/reusable-terraform.yml@main
     permissions:
       contents: read
       id-token: write

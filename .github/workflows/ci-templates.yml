@@ -53,7 +53,7 @@ jobs:
         working-directory: ${{ runner.temp }}/orders-api/infra/terraform
         run: |
           # Point module sources at this checkout instead of the published tags.
-          sed -i -E "s#git::https://github.com/[^/]+/sportify-azure-backstage.git//(iac/modules/[a-z-]+)\?ref=[^\"]+#$GITHUB_WORKSPACE/\1#" ./*.tf
+          sed -i -E "s#git::https://github.com/[^/]+/azure-backstage-goldenpath.git//(iac/modules/[a-z-]+)\?ref=[^\"]+#$GITHUB_WORKSPACE/\1#" ./*.tf
           terraform fmt -check -recursive
           terraform init -backend=false
           terraform validate

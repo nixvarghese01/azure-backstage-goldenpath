@@ -6,7 +6,7 @@ The exact access each identity has, as implemented in `iac/platform/10-identitie
 
 | Identity | Used by | Azure RBAC | Kubernetes RBAC | Trusted credential |
 |---|---|---|---|---|
-| `id-sportify-platform-<env>` | `platform-apply.yml` (stacks 20, 30) | **Contributor** + **RBAC Administrator** on the subscription; Blob Data Contributor on the `platform` state container | Cluster admin through the AKS admin group (break-glass only) | `repo:<org>/sportify-azure-backstage:environment:platform` (required reviewers) |
+| `id-sportify-platform-<env>` | `platform-apply.yml` (stacks 20, 30) | **Contributor** + **RBAC Administrator** on the subscription; Blob Data Contributor on the `platform` state container | Cluster admin through the AKS admin group (break-glass only) | `repo:<org>/azure-backstage-goldenpath:environment:platform` (required reviewers) |
 | `id-sportify-platform-plan-<env>` | `platform-plan.yml` | **Reader** on the subscription; Blob Data Reader on the `platform` state container | — | `…:environment:platform-plan` |
 | `id-sportify-platform-deploy-<env>` | `platform-release.yml` | AcrPush on the registries; AKS Cluster User | `sportify-app-deployer` in `sportify-platform` only | `…:environment:platform-deploy` |
 | `id-sportify-vending-<env>` | `platform-apply.yml` (stack 05) | Subscription creator on the EA/MCA billing scope (granted by the billing admin); Blob Data Contributor on `platform` state | — | `…:environment:platform-vending` |

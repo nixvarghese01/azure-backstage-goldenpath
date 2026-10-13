@@ -1,4 +1,4 @@
-title = "sportify-azure-backstage gitleaks config"
+title = "azure-backstage-goldenpath gitleaks config"
 
 [extend]
 useDefault = true
