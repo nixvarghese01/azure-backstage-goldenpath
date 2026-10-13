@@ -122,7 +122,7 @@ resource "kubernetes_manifest" "gateway" {
           protocol = "HTTP"
           hostname = var.gateway_hostname
           allowedRoutes = { namespaces = { from = "Selector", selector = {
-            matchLabels = { "sportify.io/gateway-access" = "true" } } } }
+          matchLabels = { "sportify.io/gateway-access" = "true" } } } }
         }],
         var.gateway_tls_secret == null ? [] : [{
           name     = "https"
@@ -131,7 +131,7 @@ resource "kubernetes_manifest" "gateway" {
           hostname = var.gateway_hostname
           tls      = { mode = "Terminate", certificateRefs = [{ kind = "Secret", name = var.gateway_tls_secret }] }
           allowedRoutes = { namespaces = { from = "Selector", selector = {
-            matchLabels = { "sportify.io/gateway-access" = "true" } } } }
+          matchLabels = { "sportify.io/gateway-access" = "true" } } } }
         }],
       )
     }
@@ -224,13 +224,12 @@ resource "kubernetes_role_binding_v1" "platform_deployer" {
 
 # ------------------------------------------------------------------ Workload Identity for platform services
 resource "azurerm_federated_identity_credential" "service" {
-  for_each            = toset(["backstage", "discovery", "orchestrator"])
-  name                = "k8s-sportify-platform-${each.key}"
-  resource_group_name = var.identity_resource_group
-  parent_id           = data.azurerm_user_assigned_identity.id[each.key].id
-  issuer              = data.azurerm_kubernetes_cluster.this.oidc_issuer_url
-  subject             = "system:serviceaccount:sportify-platform:${each.key == "discovery" ? "azure-discovery" : each.key == "orchestrator" ? "provisioning-orchestrator" : each.key}"
-  audience            = ["api://AzureADTokenExchange"]
+  for_each                  = toset(["backstage", "discovery", "orchestrator"])
+  name                      = "k8s-sportify-platform-${each.key}"
+  user_assigned_identity_id = data.azurerm_user_assigned_identity.id[each.key].id
+  issuer                    = data.azurerm_kubernetes_cluster.this.oidc_issuer_url
+  subject                   = "system:serviceaccount:sportify-platform:${each.key == "discovery" ? "azure-discovery" : each.key == "orchestrator" ? "provisioning-orchestrator" : each.key}"
+  audience                  = ["api://AzureADTokenExchange"]
 }
 
 output "gateway" {

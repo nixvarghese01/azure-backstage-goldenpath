@@ -70,7 +70,7 @@ variable "namespace" {
 
 variable "runtime_capability" {
   type = object({
-    type           = string           # storage | keyvault | none
+    type           = string # storage | keyvault | none
     mode           = optional(string, "existing")
     name           = optional(string)
     resource_group = optional(string) # for existing resources outside the app's resource group

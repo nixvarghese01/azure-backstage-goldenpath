@@ -91,6 +91,11 @@ resource "azurerm_kubernetes_cluster" "this" {
     }
   }
 
+  # azurerm 5 requires this block; node pools are managed explicitly, not auto-provisioned.
+  node_provisioning_profile {
+    mode = "Manual"
+  }
+
   identity {
     type = "SystemAssigned"
   }

@@ -40,11 +40,11 @@ resource "kubernetes_namespace_v1" "this" {
   metadata {
     name = var.name
     labels = merge(var.labels, {
-      "sportify.io/owner"                   = var.owner
-      "sportify.io/gateway-access"          = "true"
-      "pod-security.kubernetes.io/enforce"  = "restricted"
-      "pod-security.kubernetes.io/audit"    = "restricted"
-      "app.kubernetes.io/managed-by"        = "sportify-platform"
+      "sportify.io/owner"                  = var.owner
+      "sportify.io/gateway-access"         = "true"
+      "pod-security.kubernetes.io/enforce" = "restricted"
+      "pod-security.kubernetes.io/audit"   = "restricted"
+      "app.kubernetes.io/managed-by"       = "sportify-platform"
     })
   }
 }

@@ -21,8 +21,9 @@ test_wrong_region_denied if {
 	contains(msg, "region")
 }
 
+# object.union merges nested objects, so the tags are removed before being replaced.
 test_missing_tags_denied if {
-	some msg in main.deny with input as storage(object.union(good_storage, {"tags": {"owner": "x"}})) with data.regions as allow_data.regions with data.skus as allow_data.skus
+	some msg in main.deny with input as storage(object.union(object.remove(good_storage, ["tags"]), {"tags": {"owner": "x"}})) with data.regions as allow_data.regions with data.skus as allow_data.skus
 	contains(msg, "missing required tags")
 }
 
