@@ -36,7 +36,7 @@ def test_repository_cannot_be_recorded_before_validation(client) -> None:
     res = client.post(
         f"/v1/requests/{rid}/repository",
         headers=SERVICE,
-        json={"owner": "sportify-org", "name": "orders-api", "url": "https://github.com/x"},
+        json={"owner": "nixvarghese01", "name": "orders-api", "url": "https://github.com/x"},
     )
     assert res.status_code == 409
 
@@ -60,8 +60,8 @@ def test_actions_callback_binds_run_id_to_token(client, monkeypatch, run_id, exp
     rid = client.post("/v1/requests", json=submission(), headers=REQUESTER).json()["id"]
     monkeypatch.setenv("SPORTIFY_AUTH_MODE", "entra")
     claims = {
-        "repository": "sportify-org/azure-backstage-goldenpath",
-        "repository_owner": "sportify-org",
+        "repository": "nixvarghese01/azure-backstage-goldenpath",
+        "repository_owner": "nixvarghese01",
         "run_id": "42",
         "run_attempt": "1",
     }

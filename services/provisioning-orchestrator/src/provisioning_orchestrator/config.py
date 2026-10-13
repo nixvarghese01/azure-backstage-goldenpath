@@ -42,7 +42,7 @@ class Settings:
             discovery_base_url=(_env("DISCOVERY_BASE_URL", "http://azure-discovery:8001") or "").rstrip("/"),
             discovery_scope=_env("DISCOVERY_ENTRA_SCOPE"),
             github_mode=(_env("ORCHESTRATOR_GITHUB_MODE", "app") or "app").lower(),
-            github_org=_env("ORCHESTRATOR_GITHUB_ORG", "sportify-org") or "sportify-org",
+            github_org=_env("ORCHESTRATOR_GITHUB_ORG", "nixvarghese01") or "nixvarghese01",
             github_app_id=_env("ORCHESTRATOR_GITHUB_APP_ID"),
             github_installation_id=_env("ORCHESTRATOR_GITHUB_APP_INSTALLATION_ID"),
             platform_repo=_env("ORCHESTRATOR_PLATFORM_REPO", "azure-backstage-goldenpath") or "",

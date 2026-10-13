@@ -3,7 +3,7 @@
 # with data sources and never modified or destroyed - the platform only adds role assignments.
 
 module "naming" {
-  source            = "git::https://github.com/sportify-org/azure-backstage-goldenpath.git//iac/modules/naming?ref=naming/v1.0.0"
+  source            = "git::https://github.com/nixvarghese01/azure-backstage-goldenpath.git//iac/modules/naming?ref=naming/v1.0.0"
   application       = var.application
   environment       = var.environment
   owner             = var.owner
@@ -15,7 +15,7 @@ module "naming" {
 # ------------------------------------------------------------------ resource group
 module "resource_group" {
   count    = var.resource_group.mode == "new" ? 1 : 0
-  source   = "git::https://github.com/sportify-org/azure-backstage-goldenpath.git//iac/modules/resource-group?ref=resource-group/v1.0.0"
+  source   = "git::https://github.com/nixvarghese01/azure-backstage-goldenpath.git//iac/modules/resource-group?ref=resource-group/v1.0.0"
   name     = var.resource_group.name
   location = var.region
   tags     = module.naming.tags
@@ -44,7 +44,7 @@ data "azurerm_user_assigned_identity" "deployer" {
 
 # ------------------------------------------------------------------ runtime identity (Workload Identity)
 module "runtime_identity" {
-  source              = "git::https://github.com/sportify-org/azure-backstage-goldenpath.git//iac/modules/app-identity?ref=app-identity/v1.0.0"
+  source              = "git::https://github.com/nixvarghese01/azure-backstage-goldenpath.git//iac/modules/app-identity?ref=app-identity/v1.0.0"
   name                = module.naming.names.runtime_identity
   resource_group_name = local.rg_name
   location            = local.rg_location
@@ -57,7 +57,7 @@ module "runtime_identity" {
 # ------------------------------------------------------------------ namespace
 module "namespace" {
   count                 = var.namespace.mode == "new" ? 1 : 0
-  source                = "git::https://github.com/sportify-org/azure-backstage-goldenpath.git//iac/modules/app-namespace?ref=app-namespace/v1.0.0"
+  source                = "git::https://github.com/nixvarghese01/azure-backstage-goldenpath.git//iac/modules/app-namespace?ref=app-namespace/v1.0.0"
   name                  = var.namespace.name
   owner                 = var.owner
   deployer_principal_id = data.azurerm_user_assigned_identity.deployer.principal_id
@@ -83,7 +83,7 @@ check "existing_namespace_owned_by_team" {
 # ------------------------------------------------------------------ runtime capability: Storage
 module "storage" {
   count               = var.runtime_capability.type == "storage" && var.runtime_capability.mode == "new" ? 1 : 0
-  source              = "git::https://github.com/sportify-org/azure-backstage-goldenpath.git//iac/modules/storage-account?ref=storage-account/v1.0.0"
+  source              = "git::https://github.com/nixvarghese01/azure-backstage-goldenpath.git//iac/modules/storage-account?ref=storage-account/v1.0.0"
   name                = var.runtime_capability.name
   resource_group_name = local.rg_name
   location            = local.rg_location
@@ -102,7 +102,7 @@ data "azurerm_client_config" "current" {}
 
 module "key_vault" {
   count               = var.runtime_capability.type == "keyvault" && var.runtime_capability.mode == "new" ? 1 : 0
-  source              = "git::https://github.com/sportify-org/azure-backstage-goldenpath.git//iac/modules/key-vault?ref=key-vault/v1.0.0"
+  source              = "git::https://github.com/nixvarghese01/azure-backstage-goldenpath.git//iac/modules/key-vault?ref=key-vault/v1.0.0"
   name                = var.runtime_capability.name
   resource_group_name = local.rg_name
   location            = local.rg_location
@@ -129,7 +129,7 @@ locals {
 # ------------------------------------------------------------------ least-privilege access for the app
 module "runtime_access" {
   count                = var.runtime_capability.type == "none" ? 0 : 1
-  source               = "git::https://github.com/sportify-org/azure-backstage-goldenpath.git//iac/modules/role-assignment?ref=role-assignment/v1.0.0"
+  source               = "git::https://github.com/nixvarghese01/azure-backstage-goldenpath.git//iac/modules/role-assignment?ref=role-assignment/v1.0.0"
   scope                = local.capability_scope
   role_definition_name = local.capability_role
   principal_id         = module.runtime_identity.principal_id

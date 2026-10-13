@@ -35,7 +35,7 @@ def test_description_is_serialized_in_generated_sources(description: str) -> Non
             "app": "orders-api",
             "description": description,
             "namespace": "orders-api",
-            "org": "sportify-org",
+            "org": "nixvarghese01",
             "repo": "orders-api",
             "owner": "group:default/team-orders",
             "environment": "dev",
@@ -53,5 +53,5 @@ def test_description_is_serialized_in_generated_sources(description: str) -> Non
     assert 'org.opencontainers.image.title="orders-api"' in files["Dockerfile"]
     assert "image: orders-api:local" in files["docker-compose.yml"]
     assert 'AZURE_STORAGE_ACCOUNT: ""' in files["docker-compose.yml"]
-    assert "git clone https://github.com/sportify-org/orders-api.git" in files["README.md"]
+    assert "git clone https://github.com/nixvarghese01/orders-api.git" in files["README.md"]
     assert "[[" not in "".join(files.values())

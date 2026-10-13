@@ -23,7 +23,7 @@ FIXTURE = {
     "owner": "group:default/team-orders",
     "environment": "dev",
     "requestId": "00000000-0000-4000-8000-000000000001",
-    "org": "sportify-org",
+    "org": "nixvarghese01",
     "availabilityTier": "standard",
     "endpointHost": "orders-api.dev.xycorp.local",
     "infrastructure.region": "uksouth",
@@ -91,7 +91,7 @@ def main() -> None:
     values = {
         "app": "orders-api", "description": "Order management REST API", "owner": "group:default/team-orders",
         "stack": args.stack,
-        "environment": "dev", "request_id": FIXTURE["requestId"], "org": "sportify-org", "repo": "orders-api",
+        "environment": "dev", "request_id": FIXTURE["requestId"], "org": "nixvarghese01", "repo": "orders-api",
         "namespace": "orders-api", "endpoint_host": FIXTURE["endpointHost"],
         "availability": {"tier": "standard"}, "runtime_capability": {"type": "storage", "mode": "existing"},
         "outputs": {"identity_client_id": "11111111-1111-1111-1111-111111111111",

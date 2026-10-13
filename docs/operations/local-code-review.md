@@ -51,7 +51,7 @@ PostgreSQL restart/concurrency and kind deployment checks require their own prep
 
 1. Commit dependency lockfiles after resolving and validating Python, portal and generated
    application dependencies. Replace first-install fallbacks with reproducible installs.
-2. Replace the scaffold's hardcoded `sportify-org` workflow references with the configured
+2. Replace the scaffold's hardcoded `nixvarghese01` workflow references with the configured
    organization while preserving GitHub expressions. Pin reusable workflow/module references
    to a tested release before using them outside the model project.
 3. Extend cross-service coverage to the new subscription/cluster/registry path: wait for all

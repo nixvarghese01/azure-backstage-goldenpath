@@ -65,9 +65,14 @@ jobs:
       - uses: ./.github/actions/terraform-static
         with:
           working-directory: iac/platform/${{ matrix.stack }}
+      - name: Note when Azure isn't configured yet
+        if: vars.PLATFORM_PLAN_CLIENT_ID == ''
+        run: echo "::warning::PLATFORM_PLAN_CLIENT_ID isn't set, so the Azure plan is skipped; static checks still ran. See IMPLEMENTATION_PLAN.md Phase 4."
 
   plan:
     needs: [detect, static]
+    # Planning needs the platform plan identity; until Azure is set up, only the static gate runs.
+    if: vars.PLATFORM_PLAN_CLIENT_ID != ''
     runs-on: ubuntu-24.04
     environment: platform-plan
     permissions:

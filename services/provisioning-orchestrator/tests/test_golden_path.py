@@ -19,9 +19,9 @@ def _to_awaiting_approval(client, worker, github) -> str:
         f"/v1/requests/{rid}/repository",
         headers=SERVICE,
         json={
-            "owner": "sportify-org",
+            "owner": "nixvarghese01",
             "name": "orders-api",
-            "url": "https://github.com/sportify-org/orders-api",
+            "url": "https://github.com/nixvarghese01/orders-api",
         },
     )
     assert res.json()["state"] == "REPOSITORY_CREATED"
