@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/nixvarghese01/azure-backstage-goldenpath/security/advisories/new
+    about: Please report vulnerabilities privately, not in a public issue (see SECURITY.md).
+  - name: Roadmap
+    url: https://github.com/users/nixvarghese01/projects/4
+    about: What's planned and in progress for the IDP.

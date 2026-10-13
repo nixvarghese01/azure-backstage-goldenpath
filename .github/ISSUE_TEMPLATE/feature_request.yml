@@ -1,0 +1,23 @@
+name: Feature request
+description: A new capability or an improvement to the IDP
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you want to do and why it isn't possible or easy today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How it could work, and which component (portal, discovery, orchestrator, starters, infrastructure, pipelines).
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: A checklist that shows it works (tests, `make e2e`, docs).
+      placeholder: |
+        - [ ] ...

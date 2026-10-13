@@ -1,13 +1,22 @@
-# Internal Developer Portal
+# Internal Developer Portal (IDP), powered by Backstage
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![ci-security](https://github.com/nixvarghese01/azure-backstage-goldenpath/actions/workflows/ci-security.yml/badge.svg?branch=develop)](https://github.com/nixvarghese01/azure-backstage-goldenpath/actions/workflows/ci-security.yml)
+[![codeql](https://github.com/nixvarghese01/azure-backstage-goldenpath/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/nixvarghese01/azure-backstage-goldenpath/actions/workflows/codeql.yml)
+[![Status: work in progress](https://img.shields.io/badge/status-work%20in%20progress-orange.svg)](https://github.com/users/nixvarghese01/projects/4)
 
 An Internal Developer Platform (IDP) built on [Backstage](https://backstage.io), Microsoft Azure, Azure Kubernetes Service (AKS), Terraform, Helm and GitHub Actions.
 
-Internal Developer Portal lets developers request a production-shaped service through a self-service portal. The platform then validates the request, creates a dedicated repository, provisions or reuses approved Azure infrastructure behind an approval gate, and deploys the application to a shared AKS cluster. Backstage reports the status of each stage.
+The IDP lets developers request a production-shaped service through a self-service portal. The platform then validates the request, creates a dedicated repository, provisions or reuses approved Azure infrastructure behind an approval gate, and deploys the application to a shared AKS cluster. Backstage reports the status of each stage.
 
 > **This is a model project.** It is a reference design that shows how an enterprise-grade IDP on Backstage and Azure can be structured, secured and operated. The implementation is deliberately scoped to one golden path, to demonstrate the design end to end. It is not intended for wide production rollout as-is. Where a production platform would make a different trade-off, the [ADRs](docs/adr/) say so.
 
-> **Project status: milestone 1 code written; end-to-end validation pending.**
-> This README describes the target design and the first golden path. The [Implementation status](#implementation-status) table distinguishes code written from verified behaviour. The current review covers source and configuration consistency only: builds, tests, startup, provisioning and publishing are deferred to another system. See the [local code review](docs/operations/local-code-review.md) for findings and pending checks.
+> **Work in progress.** The platform code, pipelines and local environment are built and tested:
+> CI runs on every pull request, and the full platform runs locally with `make up` and passes `make e2e`.
+> Still ahead: GitHub App integration, the Azure deployment and the first end-to-end golden path on AKS.
+> Progress is tracked on the [roadmap board](https://github.com/users/nixvarghese01/projects/4) and in the
+> [milestones](https://github.com/nixvarghese01/azure-backstage-goldenpath/milestones); the
+> [Implementation status](#implementation-status) table distinguishes code written from verified behaviour.
 
 Application starters now cover **NestJS, FastAPI, Go, ASP.NET Core, Spring Boot, Next.js, React/Vite
 and Vue/Vite**. NestJS remains enabled; the seven new starters are disabled pending target-system
