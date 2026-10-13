@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from alembic import context
-
 from provisioning_orchestrator.config import Settings
 from provisioning_orchestrator.db import make_engine
 from provisioning_orchestrator.models import Base

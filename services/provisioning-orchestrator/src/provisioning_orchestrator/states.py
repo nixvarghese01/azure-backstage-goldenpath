@@ -45,8 +45,16 @@ TRANSITIONS: dict[State, frozenset[State]] = {
 
 TERMINAL = frozenset({S.CLEANED_UP})
 ACTIVE = frozenset(set(State) - {S.SUCCEEDED, S.FAILED, S.CANCELLED, S.CLEANED_UP})
-CANCELLABLE = frozenset({S.REQUESTED, S.VALIDATING, S.PLATFORM_PROVISIONING, S.REPOSITORY_CREATED,
-                         S.INFRASTRUCTURE_PLANNED, S.AWAITING_APPROVAL})
+CANCELLABLE = frozenset(
+    {
+        S.REQUESTED,
+        S.VALIDATING,
+        S.PLATFORM_PROVISIONING,
+        S.REPOSITORY_CREATED,
+        S.INFRASTRUCTURE_PLANNED,
+        S.AWAITING_APPROVAL,
+    }
+)
 CLEANABLE = frozenset({S.SUCCEEDED, S.FAILED, S.CANCELLED})
 
 # The outcome groups reported separately in Backstage ("honest status").

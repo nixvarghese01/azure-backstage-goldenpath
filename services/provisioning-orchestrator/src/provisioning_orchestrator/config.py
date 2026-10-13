@@ -15,8 +15,8 @@ class Settings:
     database_url: str
     database_entra_auth: bool
     discovery_base_url: str
-    discovery_scope: str | None          # Entra scope for discovery (None in static/dev mode)
-    github_mode: str                     # "app" | "mock"
+    discovery_scope: str | None  # Entra scope for discovery (None in static/dev mode)
+    github_mode: str  # "app" | "mock"
     github_org: str
     github_app_id: str | None
     github_installation_id: str | None
@@ -27,7 +27,7 @@ class Settings:
     callback_audience: str
     approver_group: str
     stack_templates_dir: Path
-    infra_environment: str               # GitHub environment holding the custom protection rule
+    infra_environment: str  # GitHub environment holding the custom protection rule
     worker_poll_seconds: float
     worker_lease_seconds: int
     reconcile_interval_seconds: int
@@ -47,7 +47,9 @@ class Settings:
             github_installation_id=_env("ORCHESTRATOR_GITHUB_APP_INSTALLATION_ID"),
             platform_repo=_env("ORCHESTRATOR_PLATFORM_REPO", "sportify-azure-backstage") or "",
             platform_repo_ref=_env("ORCHESTRATOR_PLATFORM_REPO_REF", "main") or "main",
-            backstage_base_url=(_env("ORCHESTRATOR_BACKSTAGE_BASE_URL", "http://backstage:7007") or "").rstrip("/"),
+            backstage_base_url=(
+                _env("ORCHESTRATOR_BACKSTAGE_BASE_URL", "http://backstage:7007") or ""
+            ).rstrip("/"),
             backstage_scope=_env("BACKSTAGE_ENTRA_SCOPE"),
             callback_audience=_env("ORCHESTRATOR_CALLBACK_AUDIENCE", "sportify-orchestrator") or "",
             approver_group=_env("ORCHESTRATOR_APPROVER_GROUP", "group:default/platform-approvers") or "",

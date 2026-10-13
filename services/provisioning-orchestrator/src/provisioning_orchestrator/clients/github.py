@@ -23,7 +23,7 @@ class WorkflowRun:
     id: int
     name: str
     display_title: str
-    status: str            # queued | in_progress | completed | waiting
+    status: str  # queued | in_progress | completed | waiting
     conclusion: str | None  # success | failure | cancelled | ...
     html_url: str
     head_branch: str | None = None
@@ -44,8 +44,9 @@ class GitHubClient(Protocol):
 
     def list_runs(self, repo: str, workflow: str, per_page: int = 30) -> list[WorkflowRun]: ...
 
-    def commit_files_on_branch(self, repo: str, base: str, branch: str, files: dict[str, str],
-                               message: str) -> str: ...
+    def commit_files_on_branch(
+        self, repo: str, base: str, branch: str, files: dict[str, str], message: str
+    ) -> str: ...
 
     def open_pull_request(self, repo: str, head: str, base: str, title: str, body: str) -> PullRequest: ...
 
@@ -53,8 +54,9 @@ class GitHubClient(Protocol):
 
     def merge_pull_request(self, repo: str, number: int, sha: str) -> None: ...
 
-    def review_protection_rule(self, callback_url: str, environment: str, approve: bool,
-                               comment: str) -> None: ...
+    def review_protection_rule(
+        self, callback_url: str, environment: str, approve: bool, comment: str
+    ) -> None: ...
 
 
 class AppGitHubClient:
@@ -90,41 +92,61 @@ class AppGitHubClient:
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
-        res = httpx.request(method, url if url.startswith("http") else f"{API}{url}", headers=headers,
-                            timeout=15.0, **kwargs)
+        res = httpx.request(
+            method, url if url.startswith("http") else f"{API}{url}", headers=headers, timeout=15.0, **kwargs
+        )
         res.raise_for_status()
         return res
 
     # ---------------- workflows ----------------
     def dispatch_workflow(self, repo: str, workflow: str, ref: str, inputs: dict[str, str]) -> None:
-        self._req("POST", f"/repos/{self.org}/{repo}/actions/workflows/{workflow}/dispatches",
-                  json={"ref": ref, "inputs": inputs})
+        self._req(
+            "POST",
+            f"/repos/{self.org}/{repo}/actions/workflows/{workflow}/dispatches",
+            json={"ref": ref, "inputs": inputs},
+        )
 
     def list_runs(self, repo: str, workflow: str, per_page: int = 30) -> list[WorkflowRun]:
-        data = self._req("GET", f"/repos/{self.org}/{repo}/actions/workflows/{workflow}/runs",
-                         params={"per_page": per_page}).json()
+        data = self._req(
+            "GET",
+            f"/repos/{self.org}/{repo}/actions/workflows/{workflow}/runs",
+            params={"per_page": per_page},
+        ).json()
         return [
-            WorkflowRun(id=r["id"], name=r.get("name", ""), display_title=r.get("display_title", ""),
-                        status=r["status"], conclusion=r.get("conclusion"), html_url=r["html_url"],
-                        head_branch=r.get("head_branch"))
+            WorkflowRun(
+                id=r["id"],
+                name=r.get("name", ""),
+                display_title=r.get("display_title", ""),
+                status=r["status"],
+                conclusion=r.get("conclusion"),
+                html_url=r["html_url"],
+                head_branch=r.get("head_branch"),
+            )
             for r in data.get("workflow_runs", [])
         ]
 
     # ---------------- git data: one commit with many files ----------------
-    def commit_files_on_branch(self, repo: str, base: str, branch: str, files: dict[str, str],
-                               message: str) -> str:
+    def commit_files_on_branch(
+        self, repo: str, base: str, branch: str, files: dict[str, str], message: str
+    ) -> str:
         r = f"/repos/{self.org}/{repo}"
         base_sha = self._req("GET", f"{r}/git/ref/heads/{base}").json()["object"]["sha"]
         base_tree = self._req("GET", f"{r}/git/commits/{base_sha}").json()["tree"]["sha"]
         tree = []
         for path, content in sorted(files.items()):
-            blob = self._req("POST", f"{r}/git/blobs", json={
-                "content": base64.b64encode(content.encode()).decode(), "encoding": "base64"}).json()
+            blob = self._req(
+                "POST",
+                f"{r}/git/blobs",
+                json={"content": base64.b64encode(content.encode()).decode(), "encoding": "base64"},
+            ).json()
             mode = "100755" if path.endswith(".sh") else "100644"
             tree.append({"path": path, "mode": mode, "type": "blob", "sha": blob["sha"]})
         new_tree = self._req("POST", f"{r}/git/trees", json={"base_tree": base_tree, "tree": tree}).json()
-        commit = self._req("POST", f"{r}/git/commits", json={
-            "message": message, "tree": new_tree["sha"], "parents": [base_sha]}).json()
+        commit = self._req(
+            "POST",
+            f"{r}/git/commits",
+            json={"message": message, "tree": new_tree["sha"], "parents": [base_sha]},
+        ).json()
         try:
             self._req("POST", f"{r}/git/refs", json={"ref": f"refs/heads/{branch}", "sha": commit["sha"]})
         except httpx.HTTPStatusError as exc:
@@ -135,30 +157,52 @@ class AppGitHubClient:
 
     # ---------------- pull requests ----------------
     def _pr(self, d: dict[str, Any]) -> PullRequest:
-        return PullRequest(number=d["number"], url=d["html_url"], state=d["state"], merged=bool(d.get("merged")),
-                           mergeable_state=d.get("mergeable_state"), head_sha=d["head"]["sha"])
+        return PullRequest(
+            number=d["number"],
+            url=d["html_url"],
+            state=d["state"],
+            merged=bool(d.get("merged")),
+            mergeable_state=d.get("mergeable_state"),
+            head_sha=d["head"]["sha"],
+        )
 
     def open_pull_request(self, repo: str, head: str, base: str, title: str, body: str) -> PullRequest:
-        existing = self._req("GET", f"/repos/{self.org}/{repo}/pulls",
-                             params={"head": f"{self.org}:{head}", "state": "open"}).json()
+        existing = self._req(
+            "GET", f"/repos/{self.org}/{repo}/pulls", params={"head": f"{self.org}:{head}", "state": "open"}
+        ).json()
         if existing:
             return self._pr(existing[0])
-        return self._pr(self._req("POST", f"/repos/{self.org}/{repo}/pulls",
-                                  json={"head": head, "base": base, "title": title, "body": body}).json())
+        return self._pr(
+            self._req(
+                "POST",
+                f"/repos/{self.org}/{repo}/pulls",
+                json={"head": head, "base": base, "title": title, "body": body},
+            ).json()
+        )
 
     def get_pull_request(self, repo: str, number: int) -> PullRequest:
         return self._pr(self._req("GET", f"/repos/{self.org}/{repo}/pulls/{number}").json())
 
     def merge_pull_request(self, repo: str, number: int, sha: str) -> None:
-        self._req("PUT", f"/repos/{self.org}/{repo}/pulls/{number}/merge",
-                  json={"merge_method": "squash", "sha": sha})
+        self._req(
+            "PUT",
+            f"/repos/{self.org}/{repo}/pulls/{number}/merge",
+            json={"merge_method": "squash", "sha": sha},
+        )
 
     # ---------------- custom deployment protection rule ----------------
-    def review_protection_rule(self, callback_url: str, environment: str, approve: bool, comment: str) -> None:
-        self._req("POST", callback_url, json={
-            "environment_name": environment, "state": "approved" if approve else "rejected",
-            "comment": comment[:1000],
-        })
+    def review_protection_rule(
+        self, callback_url: str, environment: str, approve: bool, comment: str
+    ) -> None:
+        self._req(
+            "POST",
+            callback_url,
+            json={
+                "environment_name": environment,
+                "state": "approved" if approve else "rejected",
+                "comment": comment[:1000],
+            },
+        )
 
 
 @dataclass
@@ -176,8 +220,9 @@ class MockGitHubClient:
     def list_runs(self, repo: str, workflow: str, per_page: int = 30) -> list[WorkflowRun]:
         return list(self.runs.get((repo, workflow), []))
 
-    def commit_files_on_branch(self, repo: str, base: str, branch: str, files: dict[str, str],
-                               message: str) -> str:
+    def commit_files_on_branch(
+        self, repo: str, base: str, branch: str, files: dict[str, str], message: str
+    ) -> str:
         self.calls.append(("commit", {"repo": repo, "branch": branch, "files": sorted(files)}))
         return f"sha-{branch}"
 
@@ -185,8 +230,14 @@ class MockGitHubClient:
         for (r, _), pr in self.prs.items():
             if r == repo and pr.head_sha == f"sha-{head}" and pr.state == "open":
                 return pr
-        pr = PullRequest(number=self._next_pr, url=f"https://github.com/mock/{repo}/pull/{self._next_pr}",
-                         state="open", merged=False, mergeable_state="clean", head_sha=f"sha-{head}")
+        pr = PullRequest(
+            number=self._next_pr,
+            url=f"https://github.com/mock/{repo}/pull/{self._next_pr}",
+            state="open",
+            merged=False,
+            mergeable_state="clean",
+            head_sha=f"sha-{head}",
+        )
         self.prs[(repo, pr.number)] = pr
         self._next_pr += 1
         self.calls.append(("open_pr", {"repo": repo, "head": head, "title": title}))
@@ -200,5 +251,7 @@ class MockGitHubClient:
         pr.merged, pr.state = True, "closed"
         self.calls.append(("merge", {"repo": repo, "number": number}))
 
-    def review_protection_rule(self, callback_url: str, environment: str, approve: bool, comment: str) -> None:
+    def review_protection_rule(
+        self, callback_url: str, environment: str, approve: bool, comment: str
+    ) -> None:
         self.calls.append(("review", {"callback_url": callback_url, "approve": approve}))

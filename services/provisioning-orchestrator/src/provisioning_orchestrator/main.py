@@ -8,16 +8,17 @@ import os
 from collections.abc import Iterator
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request as HttpRequest, status
+from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Request as HttpRequest
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, text
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
 from sportify_common.auth import AuthSettings, Caller, authenticate, require_caller, require_user
 from sportify_common.jwt_verify import TokenVerificationError, github_actions_verifier
 from sportify_common.logging import configure_logging
 from sportify_common.secrets import read_secret_file
 from sportify_common.telemetry import configure_tracing
+from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, sessionmaker
 
 from provisioning_orchestrator.config import Settings
 from provisioning_orchestrator.db import make_engine, make_session_factory
@@ -61,7 +62,9 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
     configure_logging("provisioning-orchestrator", settings.log_level)
     configure_tracing("provisioning-orchestrator")
     if sessions is None:
-        sessions = make_session_factory(make_engine(settings.database_url, entra_auth=settings.database_entra_auth))
+        sessions = make_session_factory(
+            make_engine(settings.database_url, entra_auth=settings.database_entra_auth)
+        )
 
     app = FastAPI(title="provisioning-orchestrator", version="1.0.0")
 
@@ -95,7 +98,7 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
         try:
             s.execute(text("SELECT 1"))
             return JSONResponse({"status": "ready"})
-        except Exception:  # noqa: BLE001
+        except Exception:
             return JSONResponse({"status": "not_ready"}, status_code=503)
 
     # ---------------- requests ----------------
@@ -108,24 +111,41 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
             return out(existing)
         if not user.in_group(body.owner):
             raise _forbidden("not_owner_member", "You must be a member of the owning team.")
-        active = s.scalar(select(Request).where(
-            Request.application_name == body.application_name,
-            Request.environment == body.environment,
-            Request.state.in_([st.value for st in ACTIVE]),
-        ))
+        active = s.scalar(
+            select(Request).where(
+                Request.application_name == body.application_name,
+                Request.environment == body.environment,
+                Request.state.in_([st.value for st in ACTIVE]),
+            )
+        )
         if active:
-            raise _conflict("duplicate_application", f"An active request for '{body.application_name}' "
-                                                     f"in {body.environment} already exists ({active.id}).")
+            raise _conflict(
+                "duplicate_application",
+                f"An active request for '{body.application_name}' "
+                f"in {body.environment} already exists ({active.id}).",
+            )
         req = Request(
-            idempotency_key=body.idempotency_key, application_name=body.application_name,
-            environment=body.environment, owner=body.owner, stack=body.stack, requested_by=user.user_ref,
-            state=State.REQUESTED.value, spec=body.model_dump(exclude={"idempotency_key"}),
+            idempotency_key=body.idempotency_key,
+            application_name=body.application_name,
+            environment=body.environment,
+            owner=body.owner,
+            stack=body.stack,
+            requested_by=user.user_ref,
+            state=State.REQUESTED.value,
+            spec=body.model_dump(exclude={"idempotency_key"}),
         )
         try:
             s.add(req)
             s.flush()
-            audit(s, req.id, user.user_ref, "requested", application=req.application_name,
-                  environment=req.environment, availability=body.availability.model_dump())
+            audit(
+                s,
+                req.id,
+                user.user_ref,
+                "requested",
+                application=req.application_name,
+                environment=req.environment,
+                availability=body.availability.model_dump(),
+            )
             enqueue(s, "VALIDATE", request_id=req.id, dedup_key=f"validate:{req.id}")
             s.commit()
         except IntegrityError:
@@ -157,9 +177,17 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
         req.repository = body.model_dump()
         transition(s, req, State.REPOSITORY_CREATED, actor=caller.subject)
         audit(s, req.id, caller.subject, "repository_created", url=body.url)
-        enqueue(s, "DISPATCH", request_id=req.id, dedup_key=f"tf-validate:{req.id}", payload={
-            "repo": body.name, "workflow": "terraform-validate.yml",
-            "inputs": {"request_id": req.id}})
+        enqueue(
+            s,
+            "DISPATCH",
+            request_id=req.id,
+            dedup_key=f"tf-validate:{req.id}",
+            payload={
+                "repo": body.name,
+                "workflow": "terraform-validate.yml",
+                "inputs": {"request_id": req.id},
+            },
+        )
         s.commit()
         return out(req)
 
@@ -169,10 +197,16 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
         assert caller.user is not None
         if not caller.user.in_group(settings.approver_group):
             return []
-        rows = s.scalars(select(Request).where(Request.state.in_([State.AWAITING_APPROVAL.value,
-                                                                 State.CLEANUP_PENDING.value])))
-        return [out(r) for r in rows
-                if r.state == State.AWAITING_APPROVAL or r.cleanup.get("stage") == "awaiting_approval"]
+        rows = s.scalars(
+            select(Request).where(
+                Request.state.in_([State.AWAITING_APPROVAL.value, State.CLEANUP_PENDING.value])
+            )
+        )
+        return [
+            out(r)
+            for r in rows
+            if r.state == State.AWAITING_APPROVAL or r.cleanup.get("stage") == "awaiting_approval"
+        ]
 
     @app.post("/v1/requests/{request_id}/approval", response_model=RequestOut)
     def decide(request_id: str, body: ApprovalDecision, caller: User, s: DB) -> RequestOut:
@@ -191,14 +225,34 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
         if req.plan.get("hash") != body.plan_hash:
             raise _conflict("plan_changed", "The plan changed since you reviewed it; review the new plan.")
         approve = body.decision == "approve"
-        req.approval = {"decision": body.decision, "by": user.user_ref, "hash": body.plan_hash,
-                        "comment": body.comment, "mode": req.plan.get("mode", "apply")}
-        audit(s, req.id, user.user_ref, "approval_decided", decision=body.decision, plan_hash=body.plan_hash,
-              comment=body.comment, summary=req.plan.get("summary"))
-        enqueue(s, "RELEASE_PROTECTION_RULE", request_id=req.id,
-                dedup_key=f"release:{req.id}:{body.plan_hash}",
-                payload={"approve": approve, "plan_hash": body.plan_hash,
-                         "comment": f"{body.decision} by {user.user_ref} in Backstage. {body.comment}"})
+        req.approval = {
+            "decision": body.decision,
+            "by": user.user_ref,
+            "hash": body.plan_hash,
+            "comment": body.comment,
+            "mode": req.plan.get("mode", "apply"),
+        }
+        audit(
+            s,
+            req.id,
+            user.user_ref,
+            "approval_decided",
+            decision=body.decision,
+            plan_hash=body.plan_hash,
+            comment=body.comment,
+            summary=req.plan.get("summary"),
+        )
+        enqueue(
+            s,
+            "RELEASE_PROTECTION_RULE",
+            request_id=req.id,
+            dedup_key=f"release:{req.id}:{body.plan_hash}",
+            payload={
+                "approve": approve,
+                "plan_hash": body.plan_hash,
+                "comment": f"{body.decision} by {user.user_ref} in Backstage. {body.comment}",
+            },
+        )
         if destroy:
             req.cleanup = {**req.cleanup, "stage": "destroying" if approve else "rejected"}
         elif approve:
@@ -211,8 +265,12 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
     # ---------------- cancel / cleanup ----------------
     def _may_manage(user_groups: Caller, req: Request) -> bool:
         u = user_groups.user
-        return bool(u and (u.user_ref == req.requested_by or u.in_group(req.owner)
-                           or u.in_group(settings.approver_group)))
+        return bool(
+            u
+            and (
+                u.user_ref == req.requested_by or u.in_group(req.owner) or u.in_group(settings.approver_group)
+            )
+        )
 
     @app.post("/v1/requests/{request_id}/cancel", response_model=RequestOut)
     def cancel(request_id: str, caller: User, s: DB) -> RequestOut:
@@ -222,9 +280,13 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
         if req.state not in CANCELLABLE:
             raise _conflict("not_cancellable", f"Request is {req.state}; it can't be cancelled now.")
         if req.state == State.AWAITING_APPROVAL and req.plan.get("hash"):
-            enqueue(s, "RELEASE_PROTECTION_RULE", request_id=req.id,
-                    dedup_key=f"release:{req.id}:{req.plan['hash']}",
-                    payload={"approve": False, "plan_hash": req.plan["hash"], "comment": "Request cancelled."})
+            enqueue(
+                s,
+                "RELEASE_PROTECTION_RULE",
+                request_id=req.id,
+                dedup_key=f"release:{req.id}:{req.plan['hash']}",
+                payload={"approve": False, "plan_hash": req.plan["hash"], "comment": "Request cancelled."},
+            )
         transition(s, req, State.CANCELLED, actor=caller.user.user_ref if caller.user else caller.subject)
         s.commit()
         return out(req)
@@ -246,21 +308,38 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
             transition(s, req, State.CLEANED_UP, actor=actor)
         elif req.application.get("image") or req.deployment:
             req.cleanup = {"stage": "uninstalling"}
-            enqueue(s, "DISPATCH", request_id=req.id, dedup_key=f"uninstall:{req.id}", payload={
-                "repo": repo, "workflow": "application-deploy.yml",
-                "inputs": {"request_id": req.id, "action": "uninstall"}})
+            enqueue(
+                s,
+                "DISPATCH",
+                request_id=req.id,
+                dedup_key=f"uninstall:{req.id}",
+                payload={
+                    "repo": repo,
+                    "workflow": "application-deploy.yml",
+                    "inputs": {"request_id": req.id, "action": "uninstall"},
+                },
+            )
         else:
             req.cleanup = {"stage": "planning_destroy"}
-            enqueue(s, "DISPATCH", request_id=req.id, dedup_key=f"destroy-plan:{req.id}", payload={
-                "repo": repo, "workflow": "terraform-plan.yml",
-                "inputs": {"request_id": req.id, "mode": "destroy"}})
+            enqueue(
+                s,
+                "DISPATCH",
+                request_id=req.id,
+                dedup_key=f"destroy-plan:{req.id}",
+                payload={
+                    "repo": repo,
+                    "workflow": "terraform-plan.yml",
+                    "inputs": {"request_id": req.id, "mode": "destroy"},
+                },
+            )
         s.commit()
         return out(req)
 
     # ---------------- inbound from GitHub ----------------
     @app.post("/v1/webhooks/github", status_code=202)
     async def github_webhook(
-        request: HttpRequest, s: DB,
+        request: HttpRequest,
+        s: DB,
         x_github_event: Annotated[str, Header()],
         x_github_delivery: Annotated[str, Header()],
         x_hub_signature_256: Annotated[str | None, Header()] = None,
@@ -269,8 +348,14 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
         if not verify_github_signature(body, x_hub_signature_256):
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid signature")
         try:
-            s.add(InboxEvent(source="github_webhook", delivery_id=x_github_delivery,
-                             event_type=x_github_event, payload=await request.json()))
+            s.add(
+                InboxEvent(
+                    source="github_webhook",
+                    delivery_id=x_github_delivery,
+                    event_type=x_github_event,
+                    payload=await request.json(),
+                )
+            )
             s.commit()
         except IntegrityError:
             s.rollback()
@@ -278,8 +363,9 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
         return {"status": "accepted"}
 
     @app.post("/v1/callbacks/actions", status_code=202)
-    def actions_callback(body: CallbackBody, s: DB,
-                         authorization: Annotated[str | None, Header()] = None) -> dict[str, str]:
+    def actions_callback(
+        body: CallbackBody, s: DB, authorization: Annotated[str | None, Header()] = None
+    ) -> dict[str, str]:
         if not authorization or not authorization.lower().startswith("bearer "):
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="missing token")
         token = authorization.split(" ", 1)[1]
@@ -294,18 +380,27 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
                 raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token") from exc
         req = load(s, body.request_id)
         if auth.mode != "static":
-            expected_repo = (settings.platform_repo if body.stage == "platform_apply"
-                             else req.repository.get("name", ""))
+            expected_repo = (
+                settings.platform_repo if body.stage == "platform_apply" else req.repository.get("name", "")
+            )
             if claims.get("repository") != f"{settings.github_org}/{expected_repo}":
                 raise _forbidden("wrong_repository", "Callback is not from the request's repository.")
             if claims.get("repository_owner") != settings.github_org:
                 raise _forbidden("wrong_owner", "Callback is not from the platform organisation.")
             if body.run_id is None or str(body.run_id) != str(claims.get("run_id")):
-                raise _forbidden("wrong_run", "Callback run ID does not match the authenticated workflow run.")
+                raise _forbidden(
+                    "wrong_run", "Callback run ID does not match the authenticated workflow run."
+                )
         delivery = f"{req.id}:{claims.get('run_id')}:{claims.get('run_attempt')}:{body.stage}:{body.status}"
         try:
-            s.add(InboxEvent(source="actions_callback", delivery_id=delivery, event_type=body.stage,
-                             payload=body.model_dump()))
+            s.add(
+                InboxEvent(
+                    source="actions_callback",
+                    delivery_id=delivery,
+                    event_type=body.stage,
+                    payload=body.model_dump(),
+                )
+            )
             s.commit()
         except IntegrityError:
             s.rollback()

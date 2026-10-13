@@ -7,7 +7,7 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class Settings:
-    azure_mode: str          # "sdk" (real Azure) or "mock" (local development / tests)
+    azure_mode: str  # "sdk" (real Azure) or "mock" (local development / tests)
     policy_file: Path
     cache_ttl_seconds: int
     log_level: str

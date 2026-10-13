@@ -8,12 +8,17 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Literal, overload
 
 
 class SecretNotAvailableError(RuntimeError):
     """Raised when a required secret file is not configured or not readable."""
 
 
+@overload
+def read_secret_file(path_env_var: str, *, required: Literal[True] = ...) -> str: ...
+@overload
+def read_secret_file(path_env_var: str, *, required: bool) -> str | None: ...
 def read_secret_file(path_env_var: str, *, required: bool = True) -> str | None:
     """Return the contents of the file whose path is in ``path_env_var``.
 

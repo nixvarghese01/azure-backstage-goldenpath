@@ -117,7 +117,7 @@ class Allowlist(BaseModel):
         return region.lower() in {r.lower() for r in self.regions}
 
     @staticmethod
-    def _match(entries: list, sub_id: str, name: str, env: str | None = None) -> object | None:
+    def _match[E: ScopedEntry](entries: list[E], sub_id: str, name: str, env: str | None = None) -> E | None:
         for e in entries:
             if e.subscription.lower() == sub_id.lower() and e.name.lower() == name.lower():
                 if env is None or env in e.environments:
@@ -125,16 +125,16 @@ class Allowlist(BaseModel):
         return None
 
     def resource_group(self, sub_id: str, name: str, env: str | None = None) -> ScopedEntry | None:
-        return self._match(self.resource_groups, sub_id, name, env)  # type: ignore[return-value]
+        return self._match(self.resource_groups, sub_id, name, env)
 
     def aks_cluster(self, sub_id: str, name: str, env: str | None = None) -> AksEntry | None:
-        return self._match(self.aks_clusters, sub_id, name, env)  # type: ignore[return-value]
+        return self._match(self.aks_clusters, sub_id, name, env)
 
     def container_registry(self, sub_id: str, name: str, env: str | None = None) -> ScopedEntry | None:
-        return self._match(self.container_registries, sub_id, name, env)  # type: ignore[return-value]
+        return self._match(self.container_registries, sub_id, name, env)
 
     def data_resource(self, sub_id: str, name: str, env: str | None = None) -> DataResourceEntry | None:
-        return self._match(self.data_resources, sub_id, name, env)  # type: ignore[return-value]
+        return self._match(self.data_resources, sub_id, name, env)
 
 
 def load_allowlist(path: Path) -> Allowlist:

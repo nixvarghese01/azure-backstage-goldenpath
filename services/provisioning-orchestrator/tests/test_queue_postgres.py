@@ -3,11 +3,10 @@
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from sqlalchemy import create_engine, func, select
-
 from provisioning_orchestrator.db import make_session_factory, transaction
 from provisioning_orchestrator.models import Base, Step
 from provisioning_orchestrator.queue import claim_next
+from sqlalchemy import create_engine, func, select
 
 pytestmark = pytest.mark.integration
 

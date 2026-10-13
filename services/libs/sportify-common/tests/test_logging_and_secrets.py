@@ -1,5 +1,4 @@
 import pytest
-
 from sportify_common.logging import redact
 from sportify_common.secrets import SecretNotAvailableError, read_secret_file
 

@@ -1,12 +1,11 @@
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
-
 from azure_discovery.config import Settings
 from azure_discovery.inventory.mock import MockInventory
 from azure_discovery.main import create_app
 from azure_discovery.policy import load_allowlist
+from fastapi.testclient import TestClient
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 POLICY_FILE = REPO_ROOT / "policies" / "allowlist.yaml"

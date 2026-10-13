@@ -1,4 +1,5 @@
 from azure_discovery.inventory.base import AzurePermissionError, AzureThrottledError
+
 from tests.conftest import AUTH, SUB
 
 

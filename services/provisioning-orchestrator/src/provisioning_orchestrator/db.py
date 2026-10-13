@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
 
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
@@ -12,7 +13,7 @@ _PG_SCOPE = "https://ossrdbms-aad.database.windows.net/.default"
 
 
 def make_engine(url: str, *, entra_auth: bool = False) -> Engine:
-    kwargs: dict = {"pool_pre_ping": True}
+    kwargs: dict[str, Any] = {"pool_pre_ping": True}
     if url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
     engine = create_engine(url, **kwargs)

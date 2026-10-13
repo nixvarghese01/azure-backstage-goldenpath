@@ -67,10 +67,15 @@ def test_ha_rejects_placeholder_justification(client) -> None:
 
 
 def test_ha_rejected_on_non_zonal_cluster_with_lrs_warning(client) -> None:
-    body = _validate(client, availability={
-        "tier": "ha", "reason": "customer-facing", "slo_target": "99.9",
-        "justification": "Public checkout API used by the web shop; outages block orders.",
-    })
+    body = _validate(
+        client,
+        availability={
+            "tier": "ha",
+            "reason": "customer-facing",
+            "slo_target": "99.9",
+            "justification": "Public checkout API used by the web shop; outages block orders.",
+        },
+    )
     assert "cluster_not_zonal" in _codes(body)
     assert "ha_with_lrs" in {w["code"] for w in body["warnings"]}
 
@@ -78,10 +83,15 @@ def test_ha_rejected_on_non_zonal_cluster_with_lrs_warning(client) -> None:
 def test_ha_accepted_on_zonal_cluster(client, inventory) -> None:
     pool = inventory.clusters[0].node_pools[0]
     pool.count, pool.zones = 3, ["1", "2", "3"]
-    body = _validate(client, availability={
-        "tier": "ha", "reason": "customer-facing", "slo_target": "99.9",
-        "justification": "Public checkout API used by the web shop; outages block orders.",
-    })
+    body = _validate(
+        client,
+        availability={
+            "tier": "ha",
+            "reason": "customer-facing",
+            "slo_target": "99.9",
+            "justification": "Public checkout API used by the web shop; outages block orders.",
+        },
+    )
     assert "cluster_not_zonal" not in _codes(body)
 
 

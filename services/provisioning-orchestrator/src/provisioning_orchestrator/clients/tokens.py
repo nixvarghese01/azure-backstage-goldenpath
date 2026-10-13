@@ -15,7 +15,8 @@ def _credential():  # type: ignore[no-untyped-def]
 
 def bearer_for(scope: str | None) -> str:
     if scope:
-        return _credential().get_token(scope).token
+        access_token: str = _credential().get_token(scope).token
+        return access_token
     token = os.environ.get("SPORTIFY_DEV_SERVICE_TOKEN")
     if not token:
         raise RuntimeError("no Entra scope configured and SPORTIFY_DEV_SERVICE_TOKEN is not set")

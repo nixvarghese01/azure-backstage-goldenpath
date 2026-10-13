@@ -41,6 +41,9 @@ def _render_directory(root: Path, values: dict[str, Any]) -> dict[str, str]:
     )
     files: dict[str, str] = {}
     for path in sorted(root.rglob("*")):
+        # Local .NET builds leave binary caches alongside starter source files.
+        if any(part in {"bin", "obj"} for part in path.relative_to(root).parts[:-1]):
+            continue
         if not path.is_file():
             continue
         rel = path.relative_to(root).as_posix()

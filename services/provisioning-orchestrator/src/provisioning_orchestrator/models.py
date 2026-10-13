@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
@@ -22,7 +22,7 @@ def new_id() -> str:
 
 
 class Base(DeclarativeBase):
-    type_annotation_map = {dict[str, Any]: JsonType, list[Any]: JsonType}
+    type_annotation_map: ClassVar[dict[Any, Any]] = {dict[str, Any]: JsonType, list[Any]: JsonType}
 
 
 class Request(Base):
@@ -45,17 +45,17 @@ class Request(Base):
     spec: Mapped[dict[str, Any]] = mapped_column(default=dict)
     validation: Mapped[dict[str, Any]] = mapped_column(default=dict)
     ready_for_repository: Mapped[bool] = mapped_column(default=False)
-    repository: Mapped[dict[str, Any]] = mapped_column(default=dict)      # {owner, name, url}
-    platform: Mapped[dict[str, Any]] = mapped_column(default=dict)        # {pr_number, pr_url, apply_run}
-    plan: Mapped[dict[str, Any]] = mapped_column(default=dict)            # {hash, run_id, summary}
-    approval: Mapped[dict[str, Any]] = mapped_column(default=dict)        # {decision, by, at, comment, hash}
+    repository: Mapped[dict[str, Any]] = mapped_column(default=dict)  # {owner, name, url}
+    platform: Mapped[dict[str, Any]] = mapped_column(default=dict)  # {pr_number, pr_url, apply_run}
+    plan: Mapped[dict[str, Any]] = mapped_column(default=dict)  # {hash, run_id, summary}
+    approval: Mapped[dict[str, Any]] = mapped_column(default=dict)  # {decision, by, at, comment, hash}
     protection_rule: Mapped[dict[str, Any]] = mapped_column(default=dict)  # {callback_url, environment}
-    outputs: Mapped[dict[str, Any]] = mapped_column(default=dict)         # non-sensitive TF outputs
-    application: Mapped[dict[str, Any]] = mapped_column(default=dict)     # {pr_number, pr_url, image}
-    deployment: Mapped[dict[str, Any]] = mapped_column(default=dict)      # {endpoint, pods, run_url}
-    cleanup: Mapped[dict[str, Any]] = mapped_column(default=dict)         # {stage}
-    runs: Mapped[list[Any]] = mapped_column(default=list)                 # workflow run history
-    error: Mapped[dict[str, Any]] = mapped_column(default=dict)           # actionable diagnostics
+    outputs: Mapped[dict[str, Any]] = mapped_column(default=dict)  # non-sensitive TF outputs
+    application: Mapped[dict[str, Any]] = mapped_column(default=dict)  # {pr_number, pr_url, image}
+    deployment: Mapped[dict[str, Any]] = mapped_column(default=dict)  # {endpoint, pods, run_url}
+    cleanup: Mapped[dict[str, Any]] = mapped_column(default=dict)  # {stage}
+    runs: Mapped[list[Any]] = mapped_column(default=list)  # workflow run history
+    error: Mapped[dict[str, Any]] = mapped_column(default=dict)  # actionable diagnostics
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -104,7 +104,7 @@ class InboxEvent(Base):
     __table_args__ = (UniqueConstraint("delivery_id", name="uq_inbox_delivery_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    source: Mapped[str] = mapped_column(String(32))          # github_webhook | actions_callback
+    source: Mapped[str] = mapped_column(String(32))  # github_webhook | actions_callback
     delivery_id: Mapped[str] = mapped_column(String(200))
     event_type: Mapped[str] = mapped_column(String(64))
     payload: Mapped[dict[str, Any]] = mapped_column(default=dict)

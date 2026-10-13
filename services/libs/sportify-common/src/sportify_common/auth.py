@@ -34,7 +34,7 @@ class UserContext:
 
 @dataclass(frozen=True)
 class Caller:
-    subject: str            # caller workload (Entra oid/appid, or "dev")
+    subject: str  # caller workload (Entra oid/appid, or "dev")
     user: UserContext | None
 
 

@@ -84,6 +84,7 @@ class Capabilities(BaseModel):
 
 # ---------------- validation ----------------
 
+
 class Selection(BaseModel):
     mode: Mode
     id: str | None = None
@@ -130,7 +131,9 @@ class ValidationResult(BaseModel):
     warnings: list[Finding] = Field(default_factory=list)
     platform_changes: list[str] = Field(
         default_factory=list,
-        description="Platform-level resources to create first (subscription, aks_cluster, container_registry)",
+        description=(
+            "Platform-level resources to create first (subscription, aks_cluster, container_registry)"
+        ),
     )
     resolved: dict[str, str] = Field(default_factory=dict)
 

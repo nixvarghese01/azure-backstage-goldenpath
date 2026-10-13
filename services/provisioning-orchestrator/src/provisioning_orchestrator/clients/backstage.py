@@ -10,7 +10,9 @@ from provisioning_orchestrator.clients.tokens import bearer_for
 
 
 class BackstageClient(Protocol):
-    def notify(self, recipients: list[str], title: str, description: str, link: str, severity: str) -> None: ...
+    def notify(
+        self, recipients: list[str], title: str, description: str, link: str, severity: str
+    ) -> None: ...
 
     def unregister_component(self, name: str, namespace: str = "default") -> None: ...
 
@@ -23,8 +25,13 @@ class HttpBackstageClient:
     def notify(self, recipients: list[str], title: str, description: str, link: str, severity: str) -> None:
         body: dict[str, Any] = {
             "recipients": {"type": "entity", "entityRef": recipients},
-            "payload": {"title": title, "description": description, "link": link,
-                        "severity": severity, "topic": "sportify-provisioning"},
+            "payload": {
+                "title": title,
+                "description": description,
+                "link": link,
+                "severity": severity,
+                "topic": "sportify-provisioning",
+            },
         }
         res = httpx.post(
             f"{self.base_url}/api/notifications/notifications",
@@ -37,8 +44,11 @@ class HttpBackstageClient:
     def unregister_component(self, name: str, namespace: str = "default") -> None:
         """Remove a cleaned-up application's entity from the catalog (idempotent: 404 is fine)."""
         headers = {"Authorization": f"Bearer {bearer_for(self.scope)}"}
-        res = httpx.get(f"{self.base_url}/api/catalog/entities/by-name/component/{namespace}/{name}",
-                        headers=headers, timeout=5.0)
+        res = httpx.get(
+            f"{self.base_url}/api/catalog/entities/by-name/component/{namespace}/{name}",
+            headers=headers,
+            timeout=5.0,
+        )
         if res.status_code == 404:
             return
         res.raise_for_status()
@@ -55,8 +65,15 @@ class NullBackstageClient:
         self.sent: list[dict[str, Any]] = []
 
     def notify(self, recipients: list[str], title: str, description: str, link: str, severity: str) -> None:
-        self.sent.append({"recipients": recipients, "title": title, "description": description,
-                          "link": link, "severity": severity})
+        self.sent.append(
+            {
+                "recipients": recipients,
+                "title": title,
+                "description": description,
+                "link": link,
+                "severity": severity,
+            }
+        )
 
     def unregister_component(self, name: str, namespace: str = "default") -> None:
         self.sent.append({"unregistered": f"component:{namespace}/{name}"})

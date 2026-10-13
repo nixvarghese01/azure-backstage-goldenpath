@@ -18,10 +18,12 @@ def claim_next(session: Session, worker_id: str, lease_seconds: int) -> Step | N
     now = datetime.now(UTC)
     stmt = (
         select(Step)
-        .where(or_(
-            and_(Step.status == "pending", Step.run_after <= now),
-            and_(Step.status == "running", Step.locked_until < now),  # lease expired
-        ))
+        .where(
+            or_(
+                and_(Step.status == "pending", Step.run_after <= now),
+                and_(Step.status == "running", Step.locked_until < now),  # lease expired
+            )
+        )
         .order_by(Step.run_after, Step.id)
         .limit(1)
         .with_for_update(skip_locked=True)

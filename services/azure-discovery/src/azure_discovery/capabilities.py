@@ -25,7 +25,7 @@ def compute_capabilities(
         options["subscription"] = CapabilityOption(
             available=False,
             reason="Subscription vending needs an EA or MCA billing account "
-                   "(free and pay-as-you-go accounts can't create subscriptions).",
+            "(free and pay-as-you-go accounts can't create subscriptions).",
         )
     else:
         options["subscription"] = CapabilityOption(available=True)
@@ -46,7 +46,7 @@ def compute_capabilities(
             else CapabilityOption(
                 available=False,
                 reason=f"Regional vCPU quota too low: {free} free of {limit} in {region}, "
-                       f"a new cluster needs at least {NEW_AKS_MIN_VCPUS}.",
+                f"a new cluster needs at least {NEW_AKS_MIN_VCPUS}.",
             )
         )
 

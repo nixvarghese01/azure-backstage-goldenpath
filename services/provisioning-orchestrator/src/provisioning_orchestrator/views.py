@@ -7,9 +7,17 @@ from provisioning_orchestrator.schemas import Outcome, RequestOut
 from provisioning_orchestrator.states import State
 
 _ORDER = [
-    State.REQUESTED, State.VALIDATING, State.PLATFORM_PROVISIONING, State.REPOSITORY_CREATED,
-    State.INFRASTRUCTURE_PLANNED, State.AWAITING_APPROVAL, State.PROVISIONING, State.INFRASTRUCTURE_READY,
-    State.APPLICATION_BUILDING, State.DEPLOYING, State.SUCCEEDED,
+    State.REQUESTED,
+    State.VALIDATING,
+    State.PLATFORM_PROVISIONING,
+    State.REPOSITORY_CREATED,
+    State.INFRASTRUCTURE_PLANNED,
+    State.AWAITING_APPROVAL,
+    State.PROVISIONING,
+    State.INFRASTRUCTURE_READY,
+    State.APPLICATION_BUILDING,
+    State.DEPLOYING,
+    State.SUCCEEDED,
 ]
 _RANK = {s: i for i, s in enumerate(_ORDER)}
 
@@ -84,14 +92,27 @@ def urls(req: Request, backstage_base: str, org: str) -> dict[str, str]:
 def to_out(req: Request, backstage_base: str, org: str) -> RequestOut:
     validation = req.validation or {}
     return RequestOut(
-        id=req.id, state=req.state, application_name=req.application_name, environment=req.environment,
-        owner=req.owner, stack=req.stack, requested_by=req.requested_by,
+        id=req.id,
+        state=req.state,
+        application_name=req.application_name,
+        environment=req.environment,
+        owner=req.owner,
+        stack=req.stack,
+        requested_by=req.requested_by,
         ready_for_repository=req.ready_for_repository,
         validation={k: validation.get(k) for k in ("valid", "errors", "warnings", "platform_changes")},
-        repository=req.repository, platform=req.platform,
+        repository=req.repository,
+        platform=req.platform,
         plan={k: req.plan.get(k) for k in ("hash", "summary", "mode")},
-        approval=req.approval, application=req.application, deployment=req.deployment,
-        cleanup=req.cleanup, availability=req.spec.get("availability", {}), error=req.error,
-        runs=req.runs or [], outcomes=outcomes(req), urls=urls(req, backstage_base, org),
-        created_at=req.created_at, updated_at=req.updated_at,
+        approval=req.approval,
+        application=req.application,
+        deployment=req.deployment,
+        cleanup=req.cleanup,
+        availability=req.spec.get("availability", {}),
+        error=req.error,
+        runs=req.runs or [],
+        outcomes=outcomes(req),
+        urls=urls(req, backstage_base, org),
+        created_at=req.created_at,
+        updated_at=req.updated_at,
     )

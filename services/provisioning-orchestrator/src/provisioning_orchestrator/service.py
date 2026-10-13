@@ -28,7 +28,12 @@ def audit(session: Session, request_id: str | None, actor: str, action: str, **d
 
 
 def transition(
-    session: Session, req: Request, target: State, *, actor: str, reason: str | None = None,
+    session: Session,
+    req: Request,
+    target: State,
+    *,
+    actor: str,
+    reason: str | None = None,
     error: dict[str, Any] | None = None,
 ) -> None:
     current = State(req.state)
@@ -38,37 +43,57 @@ def transition(
     req.state = target.value
     if error is not None:
         req.error = error
-    audit(session, req.id, actor, "state_changed", **{"from": current.value, "to": target.value,
-                                                      "reason": reason})
+    audit(
+        session,
+        req.id,
+        actor,
+        "state_changed",
+        **{"from": current.value, "to": target.value, "reason": reason},
+    )
     if target == State.CLEANED_UP and req.repository.get("name"):
         session.add(OutboxMessage(kind="catalog_unregister", payload={"application": req.application_name}))
     if target in _NOTIFY:
         audience, title = _NOTIFY[target]
-        session.add(OutboxMessage(kind="notification", payload={
-            "request_id": req.id,
-            "application": req.application_name,
-            "audience": audience,
-            "owner": req.owner,
-            "requested_by": req.requested_by,
-            "title": f"{title}: {req.application_name} ({req.environment})",
-            "state": target.value,
-            "error": (error or {}).get("message"),
-        }))
+        session.add(
+            OutboxMessage(
+                kind="notification",
+                payload={
+                    "request_id": req.id,
+                    "application": req.application_name,
+                    "audience": audience,
+                    "owner": req.owner,
+                    "requested_by": req.requested_by,
+                    "title": f"{title}: {req.application_name} ({req.environment})",
+                    "state": target.value,
+                    "error": (error or {}).get("message"),
+                },
+            )
+        )
 
 
 def enqueue(
-    session: Session, kind: str, *, request_id: str | None, dedup_key: str,
-    payload: dict[str, Any] | None = None, delay_seconds: int = 0,
+    session: Session,
+    kind: str,
+    *,
+    request_id: str | None,
+    dedup_key: str,
+    payload: dict[str, Any] | None = None,
+    delay_seconds: int = 0,
 ) -> bool:
     """Add a step unless one with the same dedup key exists. Returns True if added."""
     if session.scalar(select(Step.id).where(Step.dedup_key == dedup_key)) is not None:
         return False
     try:
         with session.begin_nested():
-            session.add(Step(
-                request_id=request_id, kind=kind, dedup_key=dedup_key, payload=payload or {},
-                run_after=datetime.now(UTC) + timedelta(seconds=delay_seconds),
-            ))
+            session.add(
+                Step(
+                    request_id=request_id,
+                    kind=kind,
+                    dedup_key=dedup_key,
+                    payload=payload or {},
+                    run_after=datetime.now(UTC) + timedelta(seconds=delay_seconds),
+                )
+            )
         return True
     except IntegrityError:  # concurrent enqueue of the same step
         return False
@@ -76,12 +101,26 @@ def enqueue(
 
 def record_run(req: Request, *, stage: str, run_id: str | int | None, url: str | None, status: str) -> None:
     runs = list(req.runs or [])
-    runs.append({"stage": stage, "run_id": str(run_id) if run_id else None, "url": url, "status": status,
-                 "at": datetime.now(UTC).isoformat()})
+    runs.append(
+        {
+            "stage": stage,
+            "run_id": str(run_id) if run_id else None,
+            "url": url,
+            "status": status,
+            "at": datetime.now(UTC).isoformat(),
+        }
+    )
     req.runs = runs[-50:]
 
 
-def fail(session: Session, req: Request, *, actor: str, stage: str, message: str,
-         details: dict[str, Any] | None = None) -> None:
+def fail(
+    session: Session,
+    req: Request,
+    *,
+    actor: str,
+    stage: str,
+    message: str,
+    details: dict[str, Any] | None = None,
+) -> None:
     error = {"stage": stage, "message": message, **(details or {})}
     transition(session, req, State.FAILED, actor=actor, reason=message, error=error)

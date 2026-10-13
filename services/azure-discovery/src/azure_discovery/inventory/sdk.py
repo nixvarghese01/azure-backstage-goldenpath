@@ -96,25 +96,27 @@ class SdkInventory:
                 result = self._graph.resources(
                     QueryRequest(subscriptions=[subscription_id], query=kql, options=options)
                 )
-                rows.extend(result.data or [])
+                # objectArray results are lists; the table format would be a mapping.
+                if isinstance(result.data, list):
+                    rows.extend(result.data)
                 skip_token = result.skip_token
                 if not skip_token:
                     return rows
-        except Exception as exc:  # noqa: BLE001 - translated below
+        except Exception as exc:
             raise _translate(exc) from exc
 
     def list_subscriptions(self) -> list[Subscription]:
         try:
             return [
                 Subscription(
-                    id=s.subscription_id,
-                    name=s.display_name,
+                    id=s.subscription_id or "",
+                    name=s.display_name or s.subscription_id or "",
                     state=str(s.state),
                     quota_id=getattr(s.subscription_policies, "quota_id", None),
                 )
                 for s in self._subs.subscriptions.list()
             ]
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise _translate(exc) from exc
 
     def get_subscription(self, subscription_id: str) -> Subscription | None:
@@ -124,11 +126,11 @@ class SdkInventory:
             if exc.status_code == 404:
                 return None
             raise _translate(exc) from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise _translate(exc) from exc
         return Subscription(
-            id=s.subscription_id,
-            name=s.display_name,
+            id=s.subscription_id or subscription_id,
+            name=s.display_name or s.subscription_id or subscription_id,
             state=str(s.state),
             quota_id=getattr(s.subscription_policies, "quota_id", None),
         )
@@ -166,8 +168,12 @@ class SdkInventory:
     def list_container_registries(self, subscription_id: str) -> list[ContainerRegistry]:
         return [
             ContainerRegistry(
-                id=r["id"], name=r["name"], resource_group=r["resourceGroup"], location=r["location"],
-                sku=r.get("sku") or "", login_server=r.get("loginServer") or "",
+                id=r["id"],
+                name=r["name"],
+                resource_group=r["resourceGroup"],
+                location=r["location"],
+                sku=r.get("sku") or "",
+                login_server=r.get("loginServer") or "",
             )
             for r in self._query(subscription_id, _Q_ACR)
         ]
@@ -175,8 +181,12 @@ class SdkInventory:
     def list_data_resources(self, subscription_id: str) -> list[DataResource]:
         return [
             DataResource(
-                id=r["id"], name=r["name"], type=r["type"], resource_group=r["resourceGroup"],
-                location=r["location"], sku=r.get("sku"),
+                id=r["id"],
+                name=r["name"],
+                type=r["type"],
+                resource_group=r["resourceGroup"],
+                location=r["location"],
+                sku=r.get("sku"),
             )
             for r in self._query(subscription_id, _Q_DATA)
         ]
@@ -187,7 +197,7 @@ class SdkInventory:
             for usage in client.usage.list(region):
                 if usage.name and usage.name.value == "cores":
                     return int(usage.current_value), int(usage.limit)
-        except Exception as exc:  # noqa: BLE001 - quota is advisory
+        except Exception as exc:
             log.warning("could not read vCPU usage: %s", type(exc).__name__)
         return None
 
@@ -195,5 +205,5 @@ class SdkInventory:
         try:
             self._credential.get_token(_ARM_SCOPE)
             return True
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False

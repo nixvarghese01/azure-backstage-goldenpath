@@ -28,9 +28,24 @@ def upgrade() -> None:
         sa.Column("stack", sa.String(32), nullable=False),
         sa.Column("requested_by", sa.String(200), nullable=False),
         sa.Column("state", sa.String(32), nullable=False),
-        *[sa.Column(c, J, nullable=False) for c in (
-            "spec", "validation", "repository", "platform", "plan", "approval", "protection_rule",
-            "outputs", "application", "deployment", "cleanup", "runs", "error")],
+        *[
+            sa.Column(c, J, nullable=False)
+            for c in (
+                "spec",
+                "validation",
+                "repository",
+                "platform",
+                "plan",
+                "approval",
+                "protection_rule",
+                "outputs",
+                "application",
+                "deployment",
+                "cleanup",
+                "runs",
+                "error",
+            )
+        ],
         sa.Column("ready_for_repository", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("created_at", TS, nullable=False),
         sa.Column("updated_at", TS, nullable=False),

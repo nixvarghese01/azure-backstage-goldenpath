@@ -14,10 +14,14 @@ request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 
 _REDACTIONS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(?i)(authorization[\"']?\s*[:=]\s*[\"']?)(bearer\s+)?[^\s\"',]+"), r"\1[REDACTED]"),
-    (re.compile(r"(?i)((?:token|secret|password|passwd|api[_-]?key)[\"']?\s*[:=]\s*[\"']?)[^\s\"',]+"),
-     r"\1[REDACTED]"),
-    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.S),
-     "[REDACTED PRIVATE KEY]"),
+    (
+        re.compile(r"(?i)((?:token|secret|password|passwd|api[_-]?key)[\"']?\s*[:=]\s*[\"']?)[^\s\"',]+"),
+        r"\1[REDACTED]",
+    ),
+    (
+        re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.S),
+        "[REDACTED PRIVATE KEY]",
+    ),
     (re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"), "[REDACTED JWT]"),
 ]
 

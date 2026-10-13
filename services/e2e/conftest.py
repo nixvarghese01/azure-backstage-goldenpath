@@ -9,14 +9,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.pool import StaticPool
-
 from azure_discovery.config import Settings as DiscoverySettings
 from azure_discovery.inventory.mock import MockInventory
 from azure_discovery.main import create_app as create_discovery
 from azure_discovery.policy import load_allowlist
+from fastapi.testclient import TestClient
 from provisioning_orchestrator.clients.backstage import NullBackstageClient
 from provisioning_orchestrator.clients.github import MockGitHubClient
 from provisioning_orchestrator.config import Settings as OrchestratorSettings
@@ -25,6 +22,8 @@ from provisioning_orchestrator.engine import Context
 from provisioning_orchestrator.main import create_app as create_orchestrator
 from provisioning_orchestrator.models import Base
 from provisioning_orchestrator.worker import Worker
+from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 
 REPO = Path(__file__).resolve().parents[2]
 TOKEN = "e2e-token"  # noqa: S105 - test value
@@ -38,8 +37,9 @@ class CapturingGitHub(MockGitHubClient):
         super().__init__()
         self.files: dict[str, dict[str, str]] = {}
 
-    def commit_files_on_branch(self, repo: str, base: str, branch: str, files: dict[str, str],
-                               message: str) -> str:
+    def commit_files_on_branch(
+        self, repo: str, base: str, branch: str, files: dict[str, str], message: str
+    ) -> str:
         self.files[branch] = dict(files)
         return super().commit_files_on_branch(repo, base, branch, files, message)
 
@@ -71,7 +71,9 @@ def inventory() -> MockInventory:
 @pytest.fixture
 def discovery(inventory: MockInventory) -> TestClient:
     policy_file = REPO / "policies" / "allowlist.yaml"
-    settings = DiscoverySettings(azure_mode="mock", policy_file=policy_file, cache_ttl_seconds=0, log_level="WARNING")
+    settings = DiscoverySettings(
+        azure_mode="mock", policy_file=policy_file, cache_ttl_seconds=0, log_level="WARNING"
+    )
     return TestClient(create_discovery(settings, inventory, load_allowlist(policy_file)))
 
 
@@ -90,12 +92,22 @@ def system(discovery: TestClient, stacks: Path):
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     sessions = make_session_factory(engine)
-    settings = replace(OrchestratorSettings.from_env(), database_url="sqlite://", github_mode="mock",
-                       stack_templates_dir=stacks, backstage_base_url="https://backstage.example",
-                       reconcile_interval_seconds=3600)
+    settings = replace(
+        OrchestratorSettings.from_env(),
+        database_url="sqlite://",
+        github_mode="mock",
+        stack_templates_dir=stacks,
+        backstage_base_url="https://backstage.example",
+        reconcile_interval_seconds=3600,
+    )
     github = CapturingGitHub()
-    ctx = Context(settings=settings, github=github, discovery=InProcessDiscovery(discovery),
-                  backstage=NullBackstageClient(), sessions=sessions)
+    ctx = Context(
+        settings=settings,
+        github=github,
+        discovery=InProcessDiscovery(discovery),
+        backstage=NullBackstageClient(),
+        sessions=sessions,
+    )
     return {
         "api": TestClient(create_orchestrator(settings, sessions)),
         "worker": Worker(ctx, worker_id="e2e"),

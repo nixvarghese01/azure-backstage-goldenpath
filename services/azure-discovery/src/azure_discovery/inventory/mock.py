@@ -30,37 +30,51 @@ class MockInventory:
         ]
         self.resource_groups = [
             ResourceGroup(id=f"{_P}/rg-sportify-apps-dev", name="rg-sportify-apps-dev", location="uksouth"),
-            ResourceGroup(id=f"{_P}/rg-sportify-platform-dev", name="rg-sportify-platform-dev",
-                          location="uksouth"),
+            ResourceGroup(
+                id=f"{_P}/rg-sportify-platform-dev", name="rg-sportify-platform-dev", location="uksouth"
+            ),
             ResourceGroup(id=f"{_P}/rg-other", name="rg-other", location="westeurope"),
         ]
         self.clusters = [
             AksCluster(
                 id=f"{_P}/rg-sportify-platform-dev/providers/Microsoft.ContainerService/managedClusters/"
-                   "aks-sportify-shared-dev",
+                "aks-sportify-shared-dev",
                 name="aks-sportify-shared-dev",
                 resource_group="rg-sportify-platform-dev",
                 location="uksouth",
                 kubernetes_version="1.36.4",
                 oidc_issuer_enabled=True,
                 workload_identity_enabled=True,
-                node_pools=[NodePool(name="system", mode="System", vm_size="Standard_D2s_v5", count=1,
-                                     zones=cluster_zones or [])],
+                node_pools=[
+                    NodePool(
+                        name="system",
+                        mode="System",
+                        vm_size="Standard_D2s_v5",
+                        count=1,
+                        zones=cluster_zones or [],
+                    )
+                ],
             )
         ]
         self.registries = [
             ContainerRegistry(
                 id=f"{_P}/rg-sportify-platform-dev/providers/Microsoft.ContainerRegistry/registries/"
-                   "acrsportifydev",
-                name="acrsportifydev", resource_group="rg-sportify-platform-dev", location="uksouth",
-                sku="Basic", login_server="acrsportifydev.azurecr.io",
+                "acrsportifydev",
+                name="acrsportifydev",
+                resource_group="rg-sportify-platform-dev",
+                location="uksouth",
+                sku="Basic",
+                login_server="acrsportifydev.azurecr.io",
             )
         ]
         self.data = [
             DataResource(
                 id=f"{_P}/rg-sportify-apps-dev/providers/Microsoft.Storage/storageAccounts/stsportifyshareddev",
-                name="stsportifyshareddev", type="microsoft.storage/storageaccounts",
-                resource_group="rg-sportify-apps-dev", location="uksouth", sku="Standard_LRS",
+                name="stsportifyshareddev",
+                type="microsoft.storage/storageaccounts",
+                resource_group="rg-sportify-apps-dev",
+                location="uksouth",
+                sku="Standard_LRS",
             )
         ]
         self.vcpus = vcpus
