@@ -1,0 +1,21 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: ${{ values.description | dump }}
+  annotations:
+    github.com/project-slug: ${{ values.org }}/${{ values.name }}
+    backstage.io/techdocs-ref: dir:.
+    sportify.io/request-id: ${{ values.requestId }}
+    sportify.io/environment: ${{ values.environment }}
+    sportify.io/availability-tier: ${{ values.availabilityTier }}
+  tags: [nestjs, typescript, golden-path]
+  links:
+    - url: https://${{ values.endpointHost }}
+      title: Application endpoint
+    - url: https://${{ values.endpointHost }}/docs
+      title: API docs
+spec:
+  type: service
+  lifecycle: experimental
+  owner: ${{ values.owner }}

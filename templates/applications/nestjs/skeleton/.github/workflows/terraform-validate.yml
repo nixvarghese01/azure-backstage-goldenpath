@@ -1,0 +1,25 @@
+name: terraform-validate
+run-name: "validate ${{ inputs.request_id || github.head_ref || github.ref_name }}"
+
+on:
+  pull_request:
+    paths: ["infra/**", "deploy/**"]
+  workflow_dispatch:
+    inputs:
+      request_id:
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: sportify-org/sportify-azure-backstage/.github/workflows/reusable-terraform.yml@main
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      operation: validate
+      request_id: ${{ inputs.request_id || '' }}
+      environment: dev

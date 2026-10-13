@@ -1,0 +1,223 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: secure-nestjs-api
+  title: Secure NestJS REST API
+  description: >-
+    Request a secure NestJS REST API. The platform validates your choices, creates a repository with the
+    infrastructure, provisions or reuses approved Azure resources after approval, adds the application
+    as a pull request, deploys it to AKS and shares the URLs.
+  tags: [nestjs, typescript, aks, golden-path, recommended]
+  annotations:
+    backstage.io/techdocs-ref: dir:../../../docs
+spec:
+  owner: group:default/platform-team
+  type: service
+
+  parameters:
+    # ------------------------------------------------------------------ 1. Application
+    - title: Application
+      required: [name, owner]
+      properties:
+        name:
+          title: Name
+          type: string
+          description: 4-32 lowercase letters, digits and hyphens. Also the repository and namespace name.
+          pattern: '^[a-z][a-z0-9-]{2,30}[a-z0-9]$'
+          ui:autofocus: true
+        description:
+          title: Description
+          type: string
+          maxLength: 300
+        owner:
+          title: Owning team
+          type: string
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+
+    # ------------------------------------------------------------------ 2. Stack
+    - title: Stack
+      required: [stack]
+      properties:
+        stack:
+          title: Stack
+          type: string
+          default: nestjs
+          ui:field: SportifyStackPicker
+          ui:help: More stacks are coming soon; they appear here disabled until they are enabled.
+        includeSampleEndpoint:
+          title: Include the sample /v1/orders endpoint
+          type: boolean
+          default: true
+        includeOpenApi:
+          title: Publish OpenAPI (Swagger) docs at /docs
+          type: boolean
+          default: true
+
+    # ------------------------------------------------------------------ 3. Infrastructure
+    - title: Infrastructure
+      required: [infrastructure]
+      properties:
+        infrastructure:
+          title: Azure resources
+          type: object
+          description: >-
+            For each resource choose Create new or Select existing. Options your subscription can't
+            support are disabled with the reason.
+          ui:field: SportifyAzureResourcePicker
+          ui:options:
+            environmentField: environment
+
+    # ------------------------------------------------------------------ 4. Deployment
+    - title: Deployment
+      required: [environment, endpointHost, availability, repoVisibility]
+      properties:
+        environment:
+          title: Environment
+          type: string
+          enum: [dev]
+          default: dev
+        endpointHost:
+          title: Endpoint host
+          type: string
+          description: For example orders-api.dev.sportify.example
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)+$'
+        availability:
+          title: High availability
+          type: object
+          ui:field: SportifyAvailabilityPicker
+          ui:options:
+            environmentField: environment
+        repoVisibility:
+          title: Repository visibility
+          type: string
+          enum: [public, private]
+          default: public
+          ui:help: Public is recommended; see the README section "Repository visibility".
+
+  steps:
+    # 1. Validate on the server BEFORE anything is created (waits for platform resources if needed).
+    - id: submit
+      name: Validate request
+      action: sportify:request:submit
+      input:
+        name: ${{ parameters.name }}
+        description: ${{ parameters.description }}
+        owner: ${{ parameters.owner }}
+        environment: ${{ parameters.environment }}
+        stack: ${{ parameters.stack }}
+        infrastructure: ${{ parameters.infrastructure }}
+        availability: ${{ parameters.availability }}
+        endpointHost: ${{ parameters.endpointHost }}
+        repoVisibility: ${{ parameters.repoVisibility }}
+
+    # 2. Render the infrastructure-only skeleton.
+    - id: fetch
+      name: Render infrastructure skeleton
+      action: fetch:template
+      input:
+        url: ./skeleton
+        copyWithoutTemplating:
+          - .github/workflows/**
+          - deploy/helm/**
+          - infra/terraform/*.tf
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          environment: ${{ parameters.environment }}
+          requestId: ${{ steps.submit.output.requestId }}
+          org: ${{ steps.submit.output.githubOrg }}
+          infrastructure: ${{ parameters.infrastructure }}
+          availabilityTier: ${{ parameters.availability.tier }}
+          endpointHost: ${{ parameters.endpointHost }}
+
+    # 3. Create the repository (built-in), with identifiers as Actions *variables* (no secrets).
+    - id: publish
+      name: Create repository
+      action: publish:github
+      input:
+        repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
+        description: ${{ parameters.description }}
+        repoVisibility: ${{ parameters.repoVisibility }}
+        defaultBranch: main
+        protectDefaultBranch: true
+        protectEnforceAdmins: false
+        requireCodeOwnerReviews: false
+        requiredStatusCheckContexts: []
+        repoVariables:
+          SPORTIFY_REQUEST_ID: ${{ steps.submit.output.requestId }}
+          AZURE_SUBSCRIPTION_ID: ${{ steps.submit.output.subscriptionId }}
+          ACR_NAME: ${{ steps.submit.output.acrName }}
+          AKS_NAME: ${{ steps.submit.output.aksName }}
+          AKS_RESOURCE_GROUP: ${{ steps.submit.output.aksResourceGroup }}
+
+    # 4. GitHub environments used by the reusable workflows (ADR-0005).
+    - id: env-plan
+      name: Environment (plan)
+      action: github:environment:create
+      input:
+        repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
+        name: ${{ parameters.environment }}-infra-plan
+    - id: env-infra
+      name: Environment (apply, held for approval in Backstage)
+      action: github:environment:create
+      input:
+        repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
+        name: ${{ parameters.environment }}-infra
+        deploymentBranchPolicy:
+          protected_branches: true
+          custom_branch_policies: false
+    - id: env-build
+      name: Environment (build)
+      action: github:environment:create
+      input:
+        repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
+        name: ${{ parameters.environment }}-build
+        deploymentBranchPolicy:
+          protected_branches: true
+          custom_branch_policies: false
+    - id: env-deploy
+      name: Environment (deploy)
+      action: github:environment:create
+      input:
+        repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
+        name: ${{ parameters.environment }}
+        deploymentBranchPolicy:
+          protected_branches: true
+          custom_branch_policies: false
+
+    # 5. Register in the catalog (built-in).
+    - id: register
+      name: Register in catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+    # 6. Hand over to the orchestrator: attaches the approval protection rule and starts provisioning.
+    - id: repository-created
+      name: Start provisioning
+      action: sportify:request:repository-created
+      input:
+        requestId: ${{ steps.submit.output.requestId }}
+        repoUrl: ${{ steps.publish.output.remoteUrl }}
+        owner: ${{ steps.submit.output.githubOrg }}
+        name: ${{ parameters.name }}
+        approvalEnvironment: ${{ parameters.environment }}-infra
+
+  output:
+    links:
+      - title: Provisioning status
+        icon: dashboard
+        entityRef: ${{ steps.register.output.entityRef }}
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+    text:
+      - title: What happens next
+        content: |
+          Request `${{ steps.submit.output.requestId }}` is provisioning. Infrastructure waits for
+          **approval in Backstage** (Sportify → Approvals). Follow progress on the entity's
+          **Provisioning** tab; you'll get a notification with the URLs when it's deployed.

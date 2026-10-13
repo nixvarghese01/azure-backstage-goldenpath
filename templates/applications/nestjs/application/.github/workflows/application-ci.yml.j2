@@ -1,0 +1,20 @@
+name: application-ci
+run-name: "ci ${{ vars.SPORTIFY_REQUEST_ID }} ${{ github.head_ref || github.ref_name }}"
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: [[ values.org ]]/sportify-azure-backstage/.github/workflows/reusable-application-ci.yml@main
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: [[ values.environment ]]
+      image_name: [[ values.app ]]

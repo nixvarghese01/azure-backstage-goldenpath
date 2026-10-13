@@ -1,0 +1,86 @@
+# Secure defaults. Environment-specific values (image, identity client ID, host) are in values-<env>.yaml,
+# added by the platform's application pull request after infrastructure is provisioned.
+
+nameOverride: ""
+
+image:
+  repository: example.azurecr.io/app
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# ADR-0004: "standard" (1 replica) or "ha" (>=2 replicas, HPA, PDB, zone spreading).
+availability:
+  tier: standard
+replicaCount: 1
+ha:
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+serviceAccount:
+  # Name defaults to the release name; the runtime identity is federated to it.
+  name: ""
+  # Set from Terraform output identity_client_id. Not a secret.
+  workloadIdentityClientId: ""
+
+service:
+  port: 80
+  targetPort: 3000
+
+route:
+  enabled: true
+  host: ""
+  gateway:
+    name: sportify-gateway
+    namespace: sportify-gateway
+
+containerPort: 3000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+probes:
+  liveness:
+    path: /health/live
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readiness:
+    path: /health/ready
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+# Plain, non-secret configuration only. Secrets come from Key Vault through Workload Identity.
+env: {}
+
+azure:
+  storageAccountName: ""
+  blobContainer: app-data
+  keyVaultUri: ""
+
+# Optional: mount Key Vault secrets as files through the Secrets Store CSI driver (never Secret objects).
+keyVault:
+  name: ""
+  tenantId: ""
+  secrets: []
+
+networkPolicy:
+  enabled: true
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

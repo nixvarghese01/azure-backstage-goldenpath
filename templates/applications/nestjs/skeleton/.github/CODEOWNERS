@@ -1,0 +1,3 @@
+# Workflow and infrastructure changes need platform review.
+/.github/workflows/  @${{ values.org }}/platform-team
+/infra/              @${{ values.org }}/platform-team

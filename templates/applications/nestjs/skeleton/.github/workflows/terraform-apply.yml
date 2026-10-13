@@ -1,0 +1,34 @@
+name: terraform-apply
+run-name: "apply ${{ inputs.mode }} ${{ inputs.request_id }}"
+
+# Held by the dev-infra environment's custom deployment protection rule until approved in Backstage.
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        required: true
+      mode:
+        required: false
+        default: apply
+      plan_run_id:
+        required: true
+      expected_plan_hash:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    uses: sportify-org/sportify-azure-backstage/.github/workflows/reusable-terraform.yml@main
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    with:
+      operation: apply
+      request_id: ${{ inputs.request_id }}
+      mode: ${{ inputs.mode }}
+      environment: dev
+      plan_run_id: ${{ inputs.plan_run_id }}
+      expected_plan_hash: ${{ inputs.expected_plan_hash }}

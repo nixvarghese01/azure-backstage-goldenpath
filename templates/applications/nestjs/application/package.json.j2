@@ -1,0 +1,49 @@
+{
+  "name": "[[ values.app ]]",
+  "version": "1.0.0",
+  "description": "[[ values.description | replace('"', '\\"') ]]",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.13.0",
+    "@azure/storage-blob": "^12.34.0",
+    "@nestjs/common": "^12.1.0",
+    "@nestjs/config": "^5.0.0",
+    "@nestjs/core": "^12.1.0",
+    "@nestjs/platform-express": "^12.1.0",
+    "@nestjs/swagger": "^12.0.0",
+    "@nestjs/terminus": "^12.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@nestjs/cli": "^12.0.0",
+    "@nestjs/testing": "^12.1.0",
+    "@swc/core": "^1.13.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "@types/supertest": "^6.0.0",
+    "eslint": "^9.0.0",
+    "supertest": "^7.1.0",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.40.0",
+    "unplugin-swc": "^1.5.0",
+    "vitest": "^4.1.2"
+  }
+}

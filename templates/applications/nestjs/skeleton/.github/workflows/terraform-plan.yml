@@ -1,0 +1,27 @@
+name: terraform-plan
+run-name: "plan ${{ inputs.mode }} ${{ inputs.request_id }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        required: true
+      mode:
+        description: apply | destroy
+        required: false
+        default: apply
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    uses: sportify-org/sportify-azure-backstage/.github/workflows/reusable-terraform.yml@main
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      operation: plan
+      request_id: ${{ inputs.request_id }}
+      mode: ${{ inputs.mode }}
+      environment: dev
