@@ -2,7 +2,7 @@
 
 How Sportify Azure Backstage is split into services: what each one owns, how they communicate, how they authenticate to each other, and how they are deployed, scaled and observed.
 
-> **Status:** design for milestone 1. Related documents: [README](../../README.md), [ADR-0001](../adr/0001-python-platform-services.md), [IMPLEMENTATION_PLAN.md](../../IMPLEMENTATION_PLAN.md), [COMPATIBILITY.md](../../COMPATIBILITY.md).
+> **Status:** milestone 1 service code and container definitions written; builds and runtime validation pending. The AKS topology below remains the deployment target. Related documents: [README](../../README.md), [ADR-0001](../adr/0001-python-platform-services.md), [ADR-0006](../adr/0006-container-delivery.md), [local container setup](../../deploy/local/README.md), [COMPATIBILITY.md](../../COMPATIBILITY.md).
 
 ---
 
@@ -225,13 +225,34 @@ All pods run with the same hardened defaults as generated applications: non-root
 
 | Service | Path | Image |
 |---|---|---|
-| `backstage` | `packages/app`, `packages/backend`, `plugins/sportify-platform*` | `acr…/sportify/backstage:<sha>` |
+| `backstage` | `portal/packages/app`, `portal/packages/backend`, `portal/plugins/sportify-platform*` | `acr…/sportify/backstage:<sha>` |
 | `azure-discovery` | `services/azure-discovery` | `acr…/sportify/azure-discovery:<sha>` |
 | `provisioning-orchestrator` | `services/provisioning-orchestrator` | `acr…/sportify/provisioning-orchestrator:<sha>` (api and worker differ only in the start command) |
 | Shared Python code | `services/libs/sportify-common` (auth verification, logging, OTel setup) | Packaged into each service by the uv workspace |
 | Helm charts | `deploy/charts/{backstage,azure-discovery,provisioning-orchestrator}` | — |
 
 Each service has its own CI path filter, tests, image and Helm release, so it can be built and deployed independently.
+
+### Local container implementation
+
+`deploy/local/docker-compose.yml` defines Backstage, Azure discovery, orchestrator API and worker,
+a one-shot Alembic migration job, and PostgreSQL with a persistent volume. All image builds use
+the repository root as their context. Backstage serves the bundled UI and backend from port 7007.
+Discovery and the orchestrator API are exposed only on the Compose bridge network. PostgreSQL's
+host port and the portal bind to loopback.
+
+Startup waits for PostgreSQL readiness, successful migrations, discovery readiness and API readiness.
+The worker additionally waits for Backstage, allowing outbox delivery through its static local
+external-access token. API health checks are disabled for the worker and migration job, which
+do not listen on HTTP. A worker heartbeat remains a follow-up improvement.
+
+The local override explicitly opts into guest sign-in as `alex`, with owning team `team-orders`;
+the backend guest module also requires an environment opt-in. Production loads a different config
+and keeps GitHub sign-in and Entra authentication. Azure and orchestrator GitHub integrations are
+mocked locally, while Backstage's repository publishing actions still require real GitHub credentials.
+The local stack is not a complete simulation of Actions, Terraform or AKS.
+
+See [deploy/local/README.md](../../deploy/local/README.md) for build/start commands and pending checks.
 
 ## 10. Why three services, and when to split further
 

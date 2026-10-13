@@ -10,6 +10,26 @@ Self-hosted Backstage 1.55 for Sportify Azure Backstage. Custom TypeScript is li
 
 Everything else is built-in: catalog, scaffolder (`fetch:template`, `publish:github`, `github:environment:create`, `catalog:register`), TechDocs, GitHub auth, permissions and notifications.
 
+## Container deployment
+
+[`Dockerfile`](Dockerfile) builds the frontend/backend bundle in a Node build stage and assembles
+a non-root runtime with production dependencies and TechDocs tooling. Build it from the repository
+root, which supplies the catalog, local templates and documentation:
+
+```bash
+docker build -f portal/Dockerfile -t sportify/backstage:local .
+```
+
+The default command loads `app-config.container.yaml` followed by `app-config.production.yaml`.
+The [local Compose stack](../deploy/local/README.md) selects `app-config.docker.yaml` instead,
+serves the UI and backend together at `http://localhost:7007`, and enables guest sign-in for
+the demo developer. Python services communicate through container DNS names; the browser uses
+only Backstage. GitHub and Azure actions require their own integration configuration.
+
+The older `packages/backend/Dockerfile` remains available for a prepared host-built bundle.
+Compose and the platform release workflow use the new repository-root build. Image builds and
+startup have not been executed; dependency lockfiles and runtime validation remain pending.
+
 ## Run locally (WSL2 / Linux / macOS)
 
 ```bash

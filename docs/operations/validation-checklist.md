@@ -26,7 +26,7 @@ Things most likely to need adjustment:
 ## 2. Local stack
 
 ```bash
-cd deploy/local && cp .env.example .env && docker compose up -d
+cd deploy/local && cp .env.example .env && docker compose up -d postgres
 cd ../../services
 DISCOVERY_AZURE_MODE=mock SPORTIFY_AUTH_MODE=static SPORTIFY_DEV_SERVICE_TOKEN=dev-only-change-me \
   DISCOVERY_POLICY_FILE=../policies/allowlist.yaml uv run uvicorn azure_discovery.main:create_app --factory --port 8001

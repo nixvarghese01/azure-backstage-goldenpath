@@ -1,20 +1,138 @@
-# Local development dependencies only. Credentials here are throwaway dev values, not secrets.
+# Local microservice stack: mock Azure/GitHub, no cloud provisioning or publication.
+name: sportify-platform
+
+x-orchestrator: &orchestrator
+  image: sportify/provisioning-orchestrator:local
+  build:
+    context: ../..
+    dockerfile: services/provisioning-orchestrator/Dockerfile
+  init: true
+  read_only: true
+  tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  networks: [platform]
+  environment:
+    SPORTIFY_AUTH_MODE: static
+    SPORTIFY_DEV_SERVICE_TOKEN: ${SPORTIFY_DEV_SERVICE_TOKEN:-dev-only-change-me}
+    ORCHESTRATOR_DATABASE_URL: postgresql+psycopg://orchestrator:dev-only-not-a-secret@postgres:5432/orchestrator
+    ORCHESTRATOR_DATABASE_ENTRA_AUTH: "false"
+    ORCHESTRATOR_GITHUB_MODE: mock
+    ORCHESTRATOR_GITHUB_ORG: ${ORCHESTRATOR_GITHUB_ORG:-sportify-org}
+    ORCHESTRATOR_PLATFORM_REPO: sportify-azure-backstage
+    ORCHESTRATOR_BACKSTAGE_BASE_URL: http://backstage:7007
+    ORCHESTRATOR_GITHUB_WEBHOOK_SECRET_FILE: /run/secrets/webhook-secret
+    DISCOVERY_BASE_URL: http://azure-discovery:8001
+  secrets: [webhook-secret]
+
 services:
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev-only-not-a-secret}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    networks: [platform]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 3s
       retries: 10
 
+  azure-discovery:
+    image: sportify/azure-discovery:local
+    build:
+      context: ../..
+      dockerfile: services/azure-discovery/Dockerfile
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      SPORTIFY_AUTH_MODE: static
+      SPORTIFY_DEV_SERVICE_TOKEN: ${SPORTIFY_DEV_SERVICE_TOKEN:-dev-only-change-me}
+      DISCOVERY_AZURE_MODE: mock
+      DISCOVERY_POLICY_FILE: /etc/sportify/allowlist.yaml
+    volumes:
+      - ../../policies/allowlist.yaml:/etc/sportify/allowlist.yaml:ro
+    expose: ["8001"]
+    networks: [platform]
+
+  orchestrator-migrate:
+    <<: *orchestrator
+    command: [alembic, -c, /app/alembic.ini, upgrade, head]
+    restart: "no"
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  orchestrator-api:
+    <<: *orchestrator
+    restart: unless-stopped
+    expose: ["8002"]
+    depends_on:
+      orchestrator-migrate:
+        condition: service_completed_successfully
+      azure-discovery:
+        condition: service_healthy
+
+  orchestrator-worker:
+    <<: *orchestrator
+    command: [orchestrator-worker]
+    restart: unless-stopped
+    stop_grace_period: 60s
+    # The API probe baked into the shared image does not apply to this process.
+    healthcheck:
+      disable: true
+    depends_on:
+      orchestrator-api:
+        condition: service_healthy
+      backstage:
+        condition: service_healthy
+
+  backstage:
+    image: sportify/backstage:local
+    build:
+      context: ../..
+      dockerfile: portal/Dockerfile
+    command: [node, packages/backend, --config, app-config.container.yaml, --config, app-config.docker.yaml]
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs: ["/tmp:rw,nosuid,size=512m,uid=1000,gid=1000,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      SPORTIFY_LOCAL_GUEST_AUTH: "true"
+      SPORTIFY_DEV_SERVICE_TOKEN: ${SPORTIFY_DEV_SERVICE_TOKEN:-dev-only-change-me}
+      ORCHESTRATOR_GITHUB_ORG: ${ORCHESTRATOR_GITHUB_ORG:-sportify-org}
+    ports:
+      - "127.0.0.1:7007:7007"
+    networks: [platform]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      azure-discovery:
+        condition: service_healthy
+      orchestrator-api:
+        condition: service_healthy
+
+networks:
+  platform:
+    driver: bridge
+
 volumes:
   pgdata:
+
+secrets:
+  webhook-secret:
+    file: ./webhook-secret.dev

@@ -1,7 +1,7 @@
 import { createApp } from '@backstage/app-defaults';
 import { AppRouter, FlatRoutes } from '@backstage/core-app-api';
 import { AlertDisplay, OAuthRequestDialog, SignInPage } from '@backstage/core-components';
-import { githubAuthApiRef } from '@backstage/core-plugin-api';
+import { configApiRef, githubAuthApiRef, useApi } from '@backstage/core-plugin-api';
 import { CatalogEntityPage, CatalogIndexPage, catalogPlugin } from '@backstage/plugin-catalog';
 import { NotificationsPage } from '@backstage/plugin-notifications';
 import { ScaffolderPage, scaffolderPlugin } from '@backstage/plugin-scaffolder';
@@ -21,6 +21,18 @@ import { apis } from './apis';
 import { entityPage } from './components/catalog/EntityPage';
 import { Root } from './components/Root';
 
+function PlatformSignInPage(props: React.ComponentProps<typeof SignInPage>) {
+  const config = useApi(configApiRef);
+  if (config.getString('auth.environment') === 'local-docker') {
+    return <SignInPage {...props} auto provider="guest" />;
+  }
+  return (
+    <SignInPage {...props} auto
+      provider={{ id: 'github-auth-provider', title: 'GitHub', message: 'Sign in with GitHub', apiRef: githubAuthApiRef }}
+    />
+  );
+}
+
 const app = createApp({
   apis,
   bindRoutes({ bind }) {
@@ -28,13 +40,7 @@ const app = createApp({
     bind(scaffolderPlugin.externalRoutes, { registerComponent: catalogPlugin.routes.catalogIndex });
   },
   components: {
-    SignInPage: props => (
-      <SignInPage
-        {...props}
-        auto
-        provider={{ id: 'github-auth-provider', title: 'GitHub', message: 'Sign in with GitHub', apiRef: githubAuthApiRef }}
-      />
-    ),
+    SignInPage: PlatformSignInPage,
   },
 });
 

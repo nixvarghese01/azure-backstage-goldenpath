@@ -1,0 +1,41 @@
+# Loopback-only local Compose profile. Never load this override in AKS.
+backend:
+  database:
+    client: pg
+    connection:
+      host: postgres
+      port: 5432
+      user: backstage
+      password: dev-only-not-a-secret
+      database: backstage
+    pluginDivisionMode: schema
+  auth:
+    externalAccess:
+      - type: static
+        options:
+          token: ${SPORTIFY_DEV_SERVICE_TOKEN}
+          subject: local-orchestrator
+        accessRestrictions:
+          - plugin: notifications
+          - plugin: catalog
+            permission: catalog.entity.read
+          - plugin: catalog
+            permission: catalog.entity.delete
+auth:
+  environment: local-docker
+  providers:
+    guest:
+      # The image runs NODE_ENV=production; this opt-in applies only to this local override.
+      dangerouslyAllowOutsideDevelopment: true
+      userEntityRef: user:default/alex
+      ownershipEntityRefs: [user:default/alex, group:default/team-orders]
+sportify:
+  githubOrg: ${ORCHESTRATOR_GITHUB_ORG}
+  orchestratorGithubAppId: 0
+  discovery:
+    baseUrl: http://azure-discovery:8001
+  orchestrator:
+    baseUrl: http://orchestrator-api:8002
+  auth:
+    mode: static
+    devToken: ${SPORTIFY_DEV_SERVICE_TOKEN}

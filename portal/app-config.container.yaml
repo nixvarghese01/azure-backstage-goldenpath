@@ -1,0 +1,52 @@
+# Shared container settings. Load a local Docker or production override after this file.
+app:
+  title: Sportify Azure Backstage
+  baseUrl: http://localhost:7007
+organization:
+  name: Sportify
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+    host: 0.0.0.0
+  cors:
+    origin: http://localhost:7007
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+auth:
+  environment: production
+permission:
+  enabled: true
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location, Template, Group, User]
+  locations:
+    - type: file
+      target: ./catalog/org.yaml
+      rules:
+        - allow: [Group, User]
+    - type: file
+      target: ./catalog/platform.yaml
+    - type: file
+      target: ./templates/applications/nestjs/template.yaml
+      rules:
+        - allow: [Template]
+techdocs:
+  builder: local
+  generator:
+    runIn: local
+  publisher:
+    type: local
+    local:
+      publishDirectory: /tmp/techdocs
+scaffolder:
+  defaultAuthor:
+    name: Sportify Platform
+    email: platform@sportify.example
+sportify:
+  approverGroup: group:default/platform-approvers
+  submitTimeoutMinutes: 360
+  stacks:
+    - { id: nestjs, name: NestJS (TypeScript), enabled: true }
+    - { id: fastapi, name: Python FastAPI, enabled: false }
+    - { id: dotnet, name: .NET, enabled: false }

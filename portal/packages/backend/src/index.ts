@@ -8,6 +8,10 @@ const backend = createBackend();
 backend.add(import('@backstage/plugin-app-backend'));
 backend.add(import('@backstage/plugin-auth-backend'));
 backend.add(import('@backstage/plugin-auth-backend-module-github-provider'));
+// Guest tokens are available only in the explicitly selected local container profile.
+if (process.env.SPORTIFY_LOCAL_GUEST_AUTH === 'true') {
+  backend.add(import('@backstage/plugin-auth-backend-module-guest-provider'));
+}
 backend.add(import('@backstage/plugin-catalog-backend'));
 backend.add(import('@backstage/plugin-catalog-backend-module-scaffolder-entity-model'));
 backend.add(import('@backstage/plugin-scaffolder-backend'));

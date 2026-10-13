@@ -488,9 +488,20 @@ These are the planned prerequisites. Versions were checked on 2026-10-10; the fu
 
 > The code is written but not yet validated; see [docs/operations/validation-checklist.md](docs/operations/validation-checklist.md).
 
+The full container setup is in [deploy/local/README.md](deploy/local/README.md). It includes Backstage,
+Azure discovery, the orchestrator API and worker, schema migrations and PostgreSQL. The local profile
+uses guest sign-in and mock integrations. Builds and runtime verification are deferred.
+
+```bash
+docker compose -f deploy/local/docker-compose.yml up --build -d
+# Portal: http://localhost:7007
+```
+
+For running application processes on the host instead, start only PostgreSQL:
+
 ```bash
 # PostgreSQL (one database + role per service)
-cd deploy/local && cp .env.example .env && docker compose up -d && cd ../..
+cd deploy/local && cp .env.example .env && docker compose up -d postgres && cd ../..
 
 # Python platform services, local mode: mock Azure + mock GitHub, static dev token (one terminal each)
 cd services && uv sync --all-packages
