@@ -11,11 +11,14 @@ services:
     tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    cpus: ${APP_CPUS:-0.5}
-    mem_limit: ${APP_MEMORY:-384m}
+    # Same runtime profile as the Kubernetes pod (deploy/helm/application/values-dev.yaml).
+    cpus: ${APP_CPUS:-[[ values.profile.cpu_cores ]]}
+    mem_limit: ${APP_MEMORY:-[[ values.profile.memory_compose ]]}
     environment:
       NODE_ENV: production
-      NODE_OPTIONS: --max-old-space-size=256
+[%- for name, value in values.profile.env.items() %]
+      [[ name ]]: "[[ value ]]"
+[%- endfor %]
       PORT: "3000"
       # Explicitly select the in-memory demo repository for local development.
       AZURE_STORAGE_ACCOUNT: ""

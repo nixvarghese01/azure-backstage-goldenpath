@@ -45,6 +45,12 @@ resources:
     memory: 256Mi
 
 probes:
+  # Holds liveness back until the app has started; the generated values-<env>.yaml sets the
+  # failureThreshold per stack (slow JVM/.NET starts get longer).
+  startup:
+    path: /health/live
+    periodSeconds: 2
+    failureThreshold: 15
   liveness:
     path: /health/live
     initialDelaySeconds: 5

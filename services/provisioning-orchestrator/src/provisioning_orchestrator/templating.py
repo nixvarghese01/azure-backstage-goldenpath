@@ -7,6 +7,7 @@ Only values from the validated request and non-sensitive infrastructure outputs 
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -15,10 +16,61 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 _SUFFIX = ".j2"
 
 
+@dataclass(frozen=True)
+class RuntimeProfile:
+    """Minimum per-pod resources for one stack: a single replica on the standard tier.
+
+    Memory request equals the limit, so the scheduler reserves what the pod may use and the pod is
+    never evicted for node memory pressure. CPU requests stay small; limits leave headroom for startup.
+    The same numbers size the local Compose service, so local runs match the cluster.
+    """
+
+    cpu_request_m: int
+    cpu_limit_m: int
+    memory_mi: int
+    startup_seconds: int
+    env: dict[str, str] = field(default_factory=dict)
+
+    def as_values(self) -> dict[str, Any]:
+        return {
+            "cpu_request": f"{self.cpu_request_m}m",
+            "cpu_limit": f"{self.cpu_limit_m}m",
+            "cpu_cores": f"{self.cpu_limit_m / 1000:g}",
+            "memory": f"{self.memory_mi}Mi",
+            "memory_compose": f"{self.memory_mi}m",
+            # Startup probe polls every 2 s; the pod gets this long before liveness applies.
+            "startup_failure_threshold": self.startup_seconds // 2,
+            "env": dict(self.env),
+        }
+
+
+_NODE = RuntimeProfile(50, 500, 384, 30, {"NODE_OPTIONS": "--max-old-space-size=256"})
+_STATIC = RuntimeProfile(10, 100, 64, 30)  # nginx serving a built single-page app
+
+RUNTIME_PROFILES: dict[str, RuntimeProfile] = {
+    "nestjs": _NODE,
+    "nextjs": _NODE,
+    "fastapi": RuntimeProfile(50, 500, 256, 30),
+    "go": RuntimeProfile(25, 250, 128, 30, {"GOMEMLIMIT": "100MiB"}),
+    "dotnet": RuntimeProfile(50, 1000, 384, 60, {"DOTNET_gcServer": "0"}),
+    "springboot": RuntimeProfile(100, 1000, 512, 60, {"JAVA_TOOL_OPTIONS": "-XX:MaxRAMPercentage=65"}),
+    "react": _STATIC,
+    "vue": _STATIC,
+}
+
+
+def runtime_profile(stack: str) -> RuntimeProfile:
+    try:
+        return RUNTIME_PROFILES[stack]
+    except KeyError:
+        raise ValueError(f"no runtime profile for stack '{stack}'") from None
+
+
 def render_stack(templates_dir: Path, stack: str, values: dict[str, Any]) -> dict[str, str]:
     root = templates_dir / stack
     if not root.is_dir():
         raise FileNotFoundError(f"stack template '{stack}' not found")
+    values = {**values, "profile": runtime_profile(values.get("stack") or "nestjs").as_values()}
     files: dict[str, str] = {}
     shared = templates_dir / "_shared"
     if shared.is_dir():

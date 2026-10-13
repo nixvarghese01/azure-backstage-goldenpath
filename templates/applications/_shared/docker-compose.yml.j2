@@ -9,17 +9,17 @@ services:
     tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    cpus: ${APP_CPUS:-0.5}
-    mem_limit: ${APP_MEMORY:-[[ {"springboot": "512m", "fastapi": "256m", "go": "128m", "react": "128m", "vue": "128m"}.get(values.stack | default("nestjs"), "384m") ]]}
+    # Same runtime profile as the Kubernetes pod (deploy/helm/application/values-dev.yaml).
+    cpus: ${APP_CPUS:-[[ values.profile.cpu_cores ]]}
+    mem_limit: ${APP_MEMORY:-[[ values.profile.memory_compose ]]}
     environment:
       PORT: "3000"
 [% if values.stack | default("nestjs") in ["nestjs", "nextjs"] %]
       NODE_ENV: production
-      NODE_OPTIONS: --max-old-space-size=256
 [% endif %]
-[% if values.stack | default("nestjs") == "springboot" %]
-      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=65"
-[% endif %]
+[%- for name, value in values.profile.env.items() %]
+      [[ name ]]: "[[ value ]]"
+[%- endfor %]
     ports: ["127.0.0.1:${APP_PORT:-3000}:3000"]
     logging:
       driver: json-file

@@ -41,6 +41,36 @@ Enable a validated stack consistently in `policies/allowlist.yaml`, `portal/app-
 `portal/app-config.container.yaml`. Dependency locks, image digests, security results and load-based
 resource sizing must be checked on the target system before release.
 
+## Runtime sizing
+
+Each application runs as **one pod** on the shared cluster (standard availability tier), sized at
+the minimum its runtime needs to start and serve the demo endpoints. The sizes are defined once in
+`RUNTIME_PROFILES` in the orchestrator's `templating.py`. The renderer writes them into the
+generated `values-dev.yaml` and `docker-compose.yml`, so a local run has the same limits as the pod.
+
+| Stack | CPU request / limit | Memory request = limit | Startup allowance | Runtime setting |
+|---|---|---|---|---|
+| `nestjs`, `nextjs` | 50m / 500m | 384Mi | 30 s | `NODE_OPTIONS=--max-old-space-size=256` |
+| `fastapi` | 50m / 500m | 256Mi | 30 s | — |
+| `go` | 25m / 250m | 128Mi | 30 s | `GOMEMLIMIT=100MiB` |
+| `dotnet` | 50m / 1000m | 384Mi | 60 s | `DOTNET_gcServer=0` (workstation GC) |
+| `springboot` | 100m / 1000m | 512Mi | 60 s | `JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=65` |
+| `react`, `vue` | 10m / 100m | 64Mi | 30 s | — (Nginx static files) |
+
+- **Memory request equals the limit.** The scheduler reserves exactly what the pod may use, and the
+  pod is never evicted for node memory pressure. Runtime heap settings keep the heap below the limit
+  so the process doesn't get OOM-killed.
+- **CPU requests are small** so many demo apps fit on the single small node. The CPU limit gives
+  headroom for startup; the JVM and .NET get a full core because they start slowly when throttled.
+- **A startup probe** (every 2 s, for the allowance above) holds the liveness probe back until the
+  app has started, so a slow start isn't mistaken for a hung process.
+- **The `ha` tier** keeps the same pod size and adds replicas, an HPA, a PDB and zone spreading
+  ([ADR-0004](../adr/0004-availability-tier-option.md)).
+
+These are starting points for empty starters. Resize an application in its own `values-dev.yaml` and
+`docker-compose.yml` once it has real load; change a profile in `templating.py` to change the default
+for every new application of that stack.
+
 ## Upstream design references
 
 - [FastAPI container guidance](https://fastapi.tiangolo.com/deployment/docker/)

@@ -8,6 +8,26 @@ image:
 availability:
   tier: [[ values.availability.get("tier", "standard") ]]
 
+# Runtime profile for the [[ values.stack | default("nestjs") ]] stack: one pod with the minimum resources it needs.
+# The ha tier scales this same pod size with the HPA. Change both numbers together with docker-compose.yml.
+replicaCount: 1
+resources:
+  requests:
+    cpu: [[ values.profile.cpu_request ]]
+    memory: [[ values.profile.memory ]]
+  limits:
+    cpu: [[ values.profile.cpu_limit ]]
+    memory: [[ values.profile.memory ]]
+probes:
+  startup:
+    failureThreshold: [[ values.profile.startup_failure_threshold ]]
+[%- if values.profile.env %]
+env:
+[%- for name, value in values.profile.env.items() %]
+  [[ name ]]: "[[ value ]]"
+[%- endfor %]
+[%- endif %]
+
 serviceAccount:
   name: [[ values.app ]]
   workloadIdentityClientId: "[[ values.outputs.get("identity_client_id", "") ]]"
