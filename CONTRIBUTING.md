@@ -2,11 +2,43 @@
 
 Thanks for helping improve Sportify Azure Backstage. This is a model project, so changes should keep the design consistent and documented.
 
-## Branches and commits
+## Branching model
 
-- Work on a branch from `develop`, and open the pull request against `develop`. `main` receives tested releases.
+| Branch | Purpose | Branches from | Merges into |
+|---|---|---|---|
+| `main` | Released code; every release is a tag `vX.Y.Z` on it | — | — |
+| `develop` | Integration branch, the default | `main` | `main` (release) |
+| `feature/<issue>-<topic>` | New behaviour | `develop` | `develop` |
+| `bugfix/<issue>-<topic>` | A fix for something not yet released | `develop` | `develop` |
+| `hotfix/<issue>-<topic>` | An urgent fix for a release | `main` | `main`, then `main` back into `develop` |
+| `docs/`, `chore/`, `refactor/`, `test/`, `ci/` | Docs, upkeep, restructuring, tests, pipelines | `develop` | `develop` |
+
+Examples: `feature/12-endpoint-host-picker`, `bugfix/31-namespace-default`, `hotfix/40-plan-hash-check`.
+A fix for something only on `develop` is a `bugfix/` branch, not a hotfix.
+
+**Branch protection** (repository rulesets):
+
+- **`develop`:** no deletion or force pushes. Changes arrive as pull requests from the prefixes above
+  (squash merge; a merge commit for the `main` back-merge), checked by the `branch policy` workflow,
+  and the security checks must pass.
+- **`main`:** no deletion or force pushes. Pull requests only from `develop` (a release, merge commit)
+  or `hotfix/*`, with the same checks.
+- **Release and module tags** (`v*`, `<module>/v*`) can't be moved or deleted: generated
+  repositories pin modules by tag.
+- **The maintainer (repository admin) may bypass these rules** and push directly to either branch.
+  Everyone else goes through pull requests; [`CODEOWNERS`](.github/CODEOWNERS) requests the
+  maintainer's review on each one.
+
+### Hotfixes
+
+1. Branch `hotfix/<issue>-<topic>` from `main` and fix it, with tests.
+2. Open a pull request into `main`.
+3. Open a pull request `main` → `develop` so the fix isn't lost.
+
+## Commits and pull requests
+
 - Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `ci:`, `chore:`).
-- Keep pull requests focused on one concern.
+- Keep pull requests focused on one concern, and fill in the pull request template.
 
 ## Before opening a pull request
 
@@ -32,7 +64,7 @@ marking the change verified. Do not push or create a pull request without author
 - **No user-supplied Terraform, scripts or workflows run through the platform.** Templates render values, not code.
 - **Decisions are recorded.** A change to architecture, identity, security or a major version gets an ADR in `docs/adr/`, and an update to [COMPATIBILITY.md](COMPATIBILITY.md) where versions are involved.
 - **Docs stay in sync.** If you change behaviour described in the README or `docs/`, update them in the same pull request.
-- Changes to `.github/workflows/`, `iac/`, `policies/` and `templates/` need platform-team review (`CODEOWNERS`).
+- Changes to `.github/workflows/`, `iac/`, `policies/` and `templates/` need the maintainer's review (`CODEOWNERS`).
 
 ## Adding a new stack
 
