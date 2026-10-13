@@ -47,9 +47,12 @@ iac/
     ├── 10-identities/           # identities (backstage, discovery, orchestrator, platform,
     │                            #   platform deployment, provisioning, deployment, vending),
     │                            #   federated credentials, platform Key Vault + per-secret RBAC
-    └── 20-shared-dev/           # AKS (system pool + zonal user pool, Key Vault secrets provider
-                                 #   add-on), ACR, App Routing Gateway API + shared Gateway,
-                                 #   DNS zone, PostgreSQL flexible server
+    ├── 20-shared-dev/           # AKS (system pool + zonal user pool, Key Vault secrets provider
+    │                            #   add-on), ACR, App Routing Gateway API, DNS zone,
+    │                            #   PostgreSQL flexible server, app-provisioner role
+    └── 30-cluster-config/       # in-cluster config for an EXISTING cluster: namespaces, shared
+                                 #   Gateway, ClusterRoles/bindings, Workload Identity federation
+                                 #   for the platform services (needs the cluster's OIDC issuer)
 ```
 
 - Stacks are numbered to show their apply order, and each stack has its own state. Destroying the dev cluster stack can't touch identities or state storage.

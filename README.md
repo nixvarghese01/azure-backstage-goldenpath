@@ -320,6 +320,7 @@ stateDiagram-v2
     FAILED --> CLEANUP_PENDING : cleanup requested
     CANCELLED --> CLEANUP_PENDING
     CLEANUP_PENDING --> CLEANED_UP
+    SUCCEEDED --> CLEANUP_PENDING : cleanup requested
     SUCCEEDED --> [*]
     CLEANED_UP --> [*]
 ```
@@ -370,7 +371,7 @@ For a public demo, keep the platform repository public. Keep one generated examp
 | **Subscription vending** (only when a new subscription is requested) | Subscription creator on the billing scope, and management group placement | GitHub OIDC federated credential, used by a platform-team-approved workflow |
 | **Platform** (used by `platform-plan.yml` and `platform-apply.yml`) | Creates and changes shared platform infrastructure in `iac/platform`: AKS, ACR, Key Vault, PostgreSQL, DNS, identities and their role assignments. Plans on pull requests use a separate read-only plan identity | GitHub OIDC federated credential, `platform` environment with required reviewers |
 | **Platform deployment** (used by `images.yml` and `deploy-platform.yml`) | Pushes platform images to ACR and deploys to the `sportify-platform` namespace only | GitHub OIDC federated credential |
-| **Terraform provisioning** | Narrowly scoped to approved resource groups and role-assignment conditions | GitHub OIDC federated credential |
+| **Terraform provisioning** | Custom `Sportify App Provisioner` role (resource groups, identities, Storage, Key Vault only) plus RBAC Administrator limited by an ABAC condition to the allowlisted data roles; trusted only through the platform's reusable Terraform workflow ([ADR-0005](docs/adr/0005-reusable-workflows-and-ci-identity.md)) | GitHub OIDC federated credential (customised subject with `job_workflow_ref`) |
 | **Deployment** | Push to the approved ACR and deploy to the application's namespace only | GitHub OIDC federated credential |
 | **Application runtime** | User-assigned managed identity with access only to its own Storage account or Key Vault | Microsoft Entra Workload Identity |
 
@@ -390,53 +391,35 @@ The secrets design is in [docs/security/secret-management.md](docs/security/secr
 
 ## Repository layout
 
-The planned platform monorepo layout, adapted to Backstage conventions:
+The platform monorepo, grouped by area (only project-wide files at the root):
 
 ```
 sportify-azure-backstage/
-├── packages/
-│   ├── app/                         # Backstage frontend
-│   └── backend/                     # Backstage backend (new backend system)
-├── plugins/                         # TypeScript, kept thin
-│   ├── sportify-platform-backend/   # bridge + scaffolder actions
-│   └── sportify-platform/           # resource picker field + status card
-├── services/                        # Python, all platform logic
-│   ├── pyproject.toml               # uv workspace
-│   ├── libs/sportify-common/        # shared auth verification, settings, logging, OTel
-│   ├── azure-discovery/             # FastAPI, read-only Azure discovery
-│   │   ├── app/                     # routers, Azure clients, policy filter
-│   │   ├── tests/
-│   │   └── Dockerfile
-│   └── provisioning-orchestrator/   # FastAPI API + worker
-│       ├── app/                     # API, state machine, worker, GitHub client
-│       ├── migrations/              # Alembic
-│       ├── tests/
-│       └── Dockerfile
-├── deploy/charts/                   # Helm charts: backstage, azure-discovery, provisioning-orchestrator
-├── templates/
-│   └── applications/
-│       └── nestjs/                  # golden-path software template
-├── iac/                             # see ADR-0002
-│   ├── modules/                     # reusable, versioned modules (naming, app-identity,
-│   │                                #   app-namespace, storage-account, key-vault, aks-cluster, ...)
-│   └── platform/                    # shared platform stacks, one state each
-│       ├── 00-bootstrap/            #   Terraform state storage
-│       ├── 05-subscriptions/        #   subscription vending (EA/MCA billing only)
-│       ├── 10-identities/           #   platform identities, OIDC federation, Key Vault
-│       └── 20-shared-dev/           #   AKS (zonal user pool), ACR, Gateway, DNS, PostgreSQL
-├── policies/                        # allowlists + OPA/Conftest rules for Terraform plans
-├── docs/
-│   ├── architecture/
-│   ├── adr/
-│   ├── developer-guide/
-│   ├── security/
-│   └── operations/
-├── scripts/
-├── .github/workflows/
-├── README.md
-├── CONTRIBUTING.md
-├── SECURITY.md
-└── LICENSE
+├── README.md  IMPLEMENTATION_PLAN.md  COMPATIBILITY.md
+├── .github/
+│   ├── workflows/                   # platform CI/CD + reusable golden-path workflows (ADR-0005)
+│   └── CODEOWNERS
+├── portal/                          # Backstage 1.55 (Node workspace)
+│   ├── packages/app/                #   frontend
+│   ├── packages/backend/            #   backend (new backend system) + permission policy
+│   ├── plugins/sportify-platform*/  #   thin bridge, UI and shared types
+│   ├── catalog/                     #   org and platform entities
+│   └── app-config*.yaml
+├── services/                        # Python (uv workspace), all platform logic
+│   ├── libs/sportify-common/        #   auth, secrets, logging, OTel
+│   ├── azure-discovery/src/azure_discovery/
+│   └── provisioning-orchestrator/src/provisioning_orchestrator/  (+ migrations/)
+├── templates/applications/nestjs/   # golden path: template.yaml, skeleton/, application/
+├── iac/
+│   ├── modules/                     # reusable, versioned Terraform modules
+│   └── platform/                    # 00-bootstrap, 05-subscriptions, 10-identities,
+│                                    #   20-shared-dev, 30-cluster-config
+├── policies/                        # allowlist.yaml + Rego (terraform/, helm/)
+├── deploy/
+│   ├── charts/                      # backstage, azure-discovery, provisioning-orchestrator
+│   └── local/                       # docker-compose.yml, .env.example, init SQL
+├── scripts/                         # ci/, dev-secrets.sh, configure-github-oidc.sh, SQL grants
+└── docs/                            # adr/, architecture/, developer-guide/, operations/, security/
 ```
 
 Generated application repositories are always separate from this platform repository.
@@ -503,30 +486,30 @@ These are the planned prerequisites. Versions were checked on 2026-10-10; the fu
 
 ## Local development
 
-> The commands below describe the intended developer experience and will work once Phase 2 is complete.
+> The code is written but not yet validated; see [docs/operations/validation-checklist.md](docs/operations/validation-checklist.md).
 
 ```bash
-# install dependencies
-yarn install
+# PostgreSQL (one database + role per service)
+cd deploy/local && cp .env.example .env && docker compose up -d && cd ../..
 
-# start PostgreSQL
-docker compose up -d postgres
+# Python platform services, local mode: mock Azure + mock GitHub, static dev token (one terminal each)
+cd services && uv sync --all-packages
+export SPORTIFY_AUTH_MODE=static SPORTIFY_DEV_SERVICE_TOKEN=dev-only-change-me
+DISCOVERY_AZURE_MODE=mock DISCOVERY_POLICY_FILE=../policies/allowlist.yaml \
+  uv run uvicorn azure_discovery.main:create_app --factory --port 8001
+export ORCHESTRATOR_DATABASE_URL=postgresql+psycopg://orchestrator:dev-only-not-a-secret@localhost:5432/orchestrator
+export ORCHESTRATOR_GITHUB_MODE=mock DISCOVERY_BASE_URL=http://localhost:8001
+uv run --package provisioning-orchestrator alembic -c provisioning-orchestrator/alembic.ini upgrade head
+uv run uvicorn provisioning_orchestrator.main:create_app --factory --port 8002
+uv run orchestrator-worker
 
-# start the Python platform services (one terminal each)
-cd services && uv sync
-uv run --package azure-discovery fastapi dev azure-discovery/app/main.py --port 8001
-uv run --package provisioning-orchestrator fastapi dev provisioning-orchestrator/app/main.py --port 8002
-uv run --package provisioning-orchestrator python -m app.worker
+# Backstage (WSL2), in another terminal
+cd portal && corepack enable && yarn install && yarn dev
 
-# start Backstage (frontend + backend)
-yarn dev
-
-# run all tests
-yarn test:all
+# Tests
 (cd services && uv run pytest)
-
-# lint and type-check
-yarn lint:all && yarn tsc
+(cd portal && yarn tsc && yarn test:all)
+conftest verify -p policies/terraform
 ```
 
 Mock adapters are only for local development and isolated tests. Live integrations are real code paths, enabled through configuration in `app-config.local.yaml`, which is never committed.
@@ -554,11 +537,11 @@ Mock adapters are only for local development and isolated tests. Live integratio
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Repository inspection, gap analysis, architecture documentation | ✅ Done (design documents, see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)) |
-| 2 | Backstage portal, catalog, scaffolder, local dev environment | ⚪ Not started |
-| 3 | NestJS golden path: Python orchestrator, repository generation, Terraform validation, workflow execution, Helm deploy, status reporting | ⚪ Not started |
-| 4 | Azure discovery service (Python FastAPI) and secure identity integration | ⚪ Not started |
-| 5 | Real Azure provisioning, approvals, state management, failure recovery, cleanup | ⚪ Not started |
-| 6 | Full automated testing, security checks, documentation, reproducible demo | ⚪ Not started |
+| 2 | Backstage portal, catalog, scaffolder, local dev environment | 🟡 Code written, not yet validated |
+| 3 | NestJS golden path: Python orchestrator, repository generation, Terraform validation, workflow execution, Helm deploy, status reporting | 🟡 Code written, not yet validated |
+| 4 | Azure discovery service (Python FastAPI) and secure identity integration | 🟡 Code written, not yet validated |
+| 5 | Real Azure provisioning, approvals, state management, failure recovery, cleanup | 🟡 Terraform and workflows written; not applied |
+| 6 | Full automated testing, security checks, documentation, reproducible demo | ⚪ Tests written but not run; validation pending ([checklist](docs/operations/validation-checklist.md)) |
 
 ### Definition of done for milestone 1
 
@@ -591,7 +574,8 @@ Planned documentation, published through TechDocs:
 - [`COMPATIBILITY.md`](COMPATIBILITY.md): component version compatibility plan
 - [`docs/architecture/microservices.md`](docs/architecture/microservices.md): platform microservices architecture (Backstage, discovery, orchestrator)
 - [`docs/security/secret-management.md`](docs/security/secret-management.md): secret inventory, Key Vault, delivery, rotation and incident response
-- `docs/adr/`: Architecture Decision Records: [0001 Python platform services](docs/adr/0001-python-platform-services.md), [0002 Terraform structure](docs/adr/0002-terraform-structure.md), [0003 Ingress through the Gateway API](docs/adr/0003-ingress-gateway-api.md), [0004 High-availability option](docs/adr/0004-availability-tier-option.md)
+- `docs/adr/`: Architecture Decision Records: [0001 Python platform services](docs/adr/0001-python-platform-services.md), [0002 Terraform structure](docs/adr/0002-terraform-structure.md), [0003 Ingress through the Gateway API](docs/adr/0003-ingress-gateway-api.md), [0004 High-availability option](docs/adr/0004-availability-tier-option.md), [0005 Reusable workflows and CI identity](docs/adr/0005-reusable-workflows-and-ci-identity.md)
+- [`docs/operations/validation-checklist.md`](docs/operations/validation-checklist.md): how to validate the code, step by step
 - [`docs/developer-guide/golden-path.md`](docs/developer-guide/golden-path.md): the end-to-end golden path, approval in Backstage and the shared URLs
 - [`docs/operations/cleanup.md`](docs/operations/cleanup.md): cleanup and teardown; troubleshooting and recovery procedures will follow
 - [`docs/operations/demo-environment.md`](docs/operations/demo-environment.md): running the first demo on a free Azure subscription

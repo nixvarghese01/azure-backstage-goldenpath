@@ -130,6 +130,8 @@ Platform infrastructure is approved through **GitHub environment reviewers**, no
 
 ### 3.2 Generated application repository
 
+> **As implemented (ADR-0005):** these workflows are thin callers of the platform's reusable workflows (`reusable-terraform.yml`, `reusable-application-ci.yml`, `reusable-application-deploy.yml`). The Azure identities trust only those reusable workflows, through the organisation's customised OIDC subject. Environments are `<env>-infra-plan`, `<env>-infra`, `<env>-build` and `<env>`. Deploys use `HELM_DRIVER=configmap`.
+
 | Workflow | Trigger | Jobs | Permissions / identity | Environment | Reports to orchestrator |
 |---|---|---|---|---|---|
 | `terraform-validate.yml` | PR touching `infra/` or `deploy/`; dispatch | `fmt -check`, `init -backend=false`, `validate`, TFLint, Checkov, `helm lint` and `helm template`, Conftest on the rendered chart, gitleaks | `contents: read` (no Azure) | — | `workflow_run` result |

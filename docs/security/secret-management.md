@@ -56,7 +56,7 @@ Notes:
 | Protection | Soft delete (90 days) and **purge protection** enabled |
 | Network | Model project: public endpoint with Entra-only access, plus firewall rules for the AKS egress IP and named operators. Production: **private endpoint** with public access disabled |
 | Logging | Diagnostic settings send `AuditEvent` logs to Log Analytics. Alerts fire on access-denied spikes and on secret reads by unexpected identities |
-| Managed by | Terraform `iac/platform/10-identities` creates the vault and the role assignments. **Secret values are not managed by Terraform** (see §6) |
+| Managed by | Terraform `iac/platform/10-identities` creates the vault, **placeholder secrets** (value `set-out-of-band`, changes ignored) so access can be granted per secret, and the role assignments. **Real secret values are never managed by Terraform** (see §6) |
 
 ### Access matrix (RBAC at secret scope)
 
@@ -66,7 +66,7 @@ Notes:
 | `id-sportify-orchestrator` | Key Vault Secrets User | S4, S5 |
 | App Routing add-on identity | Key Vault Certificate User | S6 |
 | Platform operators (Entra group, through PIM) | Key Vault Secrets Officer | Vault, **just-in-time** for rotation only |
-| Terraform platform identity | Key Vault Data Access Administrator, limited by a condition to the roles above | Vault (manages role assignments, not secret values) |
+| Terraform platform identity | Key Vault Secrets Officer (creates the placeholder secret *names*; never reads or sets real values) | Platform vault only |
 | Everyone else, including discovery, provisioning, deployment and app identities | — | No access |
 
 ## 5. Delivery to workloads

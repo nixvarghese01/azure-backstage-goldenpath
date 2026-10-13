@@ -38,10 +38,11 @@ terraform apply destroy.tfplan
 Only do this when no applications remain on the cluster. Destroy the stacks in `iac/platform/` of the platform repository in **reverse order**:
 
 1. Remove every application first (section 1).
-2. `iac/platform/20-shared-dev`: destroy the shared AKS cluster, shared Gateway, DNS zone, container registry and PostgreSQL flexible server. Export anything you want to keep from PostgreSQL first.
-3. `iac/platform/10-identities`: remove the platform identities, federated credentials and the platform Key Vault. With purge protection on, the vault stays **soft-deleted and its name stays reserved** until the retention period ends. The demo uses the minimum 7-day retention for this reason ([demo-environment.md](demo-environment.md)).
-4. `iac/platform/05-subscriptions`, if used: vended subscriptions are cancelled through the billing process, not destroyed directly.
-5. `iac/platform/00-bootstrap`, **last**: export anything you want to keep from the state storage account, remove its `CanNotDelete` lock, migrate this stack's state back to local, then destroy it.
+2. `iac/platform/30-cluster-config`: destroy the in-cluster configuration (namespaces, Gateway, RBAC, platform Workload Identity federation).
+3. `iac/platform/20-shared-dev`: destroy the shared AKS cluster, shared Gateway, DNS zone, container registry and PostgreSQL flexible server. Export anything you want to keep from PostgreSQL first.
+4. `iac/platform/10-identities`: remove the platform identities, federated credentials and the platform Key Vault. With purge protection on, the vault stays **soft-deleted and its name stays reserved** until the retention period ends. The demo uses the minimum 7-day retention for this reason ([demo-environment.md](demo-environment.md)).
+5. `iac/platform/05-subscriptions`, if used: vended subscriptions are cancelled through the billing process, not destroyed directly.
+6. `iac/platform/00-bootstrap`, **last**: export anything you want to keep from the state storage account, remove its `CanNotDelete` lock, migrate this stack's state back to local, then destroy it.
 
 ## 3. Verify nothing is left running
 
