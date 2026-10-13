@@ -1,12 +1,12 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = "==3.14.*"
 
 [manifest]
 members = [
     "azure-discovery",
-    "provisioning-orchestrator",
     "idp-common",
+    "provisioning-orchestrator",
 ]
 
 [manifest.dependency-groups]
@@ -151,9 +151,9 @@ dependencies = [
     { name = "azure-mgmt-resource-subscriptions" },
     { name = "azure-mgmt-resourcegraph" },
     { name = "fastapi" },
+    { name = "idp-common" },
     { name = "pydantic" },
     { name = "pyyaml" },
-    { name = "idp-common" },
     { name = "uvicorn" },
 ]
 
@@ -164,9 +164,9 @@ requires-dist = [
     { name = "azure-mgmt-resource-subscriptions", specifier = "~=1.0" },
     { name = "azure-mgmt-resourcegraph", specifier = "~=8.0" },
     { name = "fastapi", specifier = "~=0.143.0" },
+    { name = "idp-common", editable = "libs/idp-common" },
     { name = "pydantic", specifier = "~=2.14" },
     { name = "pyyaml", specifier = ">=6.0" },
-    { name = "idp-common", editable = "libs/idp-common" },
     { name = "uvicorn", specifier = "~=0.54.0" },
 ]
 
@@ -514,6 +514,27 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f5/08/8eea9d4b8302028f3abb2c0813953f7aec26d33b7a8960ed760e65ff29fa/idna-3.20.tar.gz", hash = "sha256:a7db850025b95ded1eae8a46181a1a6c56c92c96f0e2b005d9ff8dc0210cab44", size = 216463, upload-time = "2026-09-17T14:11:04.752Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl", hash = "sha256:ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c", size = 69583, upload-time = "2026-09-17T14:11:03.168Z" },
+]
+
+[[package]]
+name = "idp-common"
+version = "0.1.0"
+source = { editable = "libs/idp-common" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
+    { name = "pydantic" },
+    { name = "pyjwt", extra = ["crypto"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = "~=0.143.0" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = "~=1.45" },
+    { name = "opentelemetry-sdk", specifier = "~=1.45" },
+    { name = "pydantic", specifier = "~=2.14" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.15.1" },
 ]
 
 [[package]]
@@ -892,11 +913,11 @@ dependencies = [
     { name = "azure-identity" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "idp-common" },
     { name = "jinja2" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "pyjwt", extra = ["crypto"] },
-    { name = "idp-common" },
     { name = "sqlalchemy" },
     { name = "uvicorn" },
 ]
@@ -907,11 +928,11 @@ requires-dist = [
     { name = "azure-identity", specifier = "~=1.26" },
     { name = "fastapi", specifier = "~=0.143.0" },
     { name = "httpx", specifier = ">=0.28" },
+    { name = "idp-common", editable = "libs/idp-common" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "psycopg", extras = ["binary"], specifier = "~=3.3" },
     { name = "pydantic", specifier = "~=2.14" },
-    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10" },
-    { name = "idp-common", editable = "libs/idp-common" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.15.1" },
     { name = "sqlalchemy", specifier = "~=2.1.0" },
     { name = "uvicorn", specifier = "~=0.54.0" },
 ]
@@ -1176,27 +1197,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ae/bf/024e01e1f6aec87768696725e648ed5b438941341eea8f8100beb681961f/ruff-0.17.0-py3-none-win32.whl", hash = "sha256:5e50aa5b84decd9fe5b0bb0e6f71c3b592f1767ed09faa4b7207d933961e35cd", size = 9904112, upload-time = "2026-10-09T19:47:19.75Z" },
     { url = "https://files.pythonhosted.org/packages/cc/77/1ee73df41dcc8d1cdb686ee4bc46ea29704ea175feb6b95c78420f631ab8/ruff-0.17.0-py3-none-win_amd64.whl", hash = "sha256:8ab76bcda86dfd28e13776cb5de3c7bcdcf1ae3d37ed761113d1a5a415dc134c", size = 10115585, upload-time = "2026-10-09T19:47:22.698Z" },
     { url = "https://files.pythonhosted.org/packages/fd/71/eb4f0ccc844aece56963e8578df9c95d4c00f580547d52329d4035d3af18/ruff-0.17.0-py3-none-win_arm64.whl", hash = "sha256:c154c73ff43f9854395e24cac507af13078962e53d2b511605058d22af1fdb88", size = 9872035, upload-time = "2026-10-09T19:47:26.306Z" },
-]
-
-[[package]]
-name = "idp-common"
-version = "0.1.0"
-source = { editable = "libs/idp-common" }
-dependencies = [
-    { name = "fastapi" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-sdk" },
-    { name = "pydantic" },
-    { name = "pyjwt", extra = ["crypto"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = "~=0.143.0" },
-    { name = "opentelemetry-exporter-otlp-proto-http", specifier = "~=1.45" },
-    { name = "opentelemetry-sdk", specifier = "~=1.45" },
-    { name = "pydantic", specifier = "~=2.14" },
-    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10" },
 ]
 
 [[package]]
