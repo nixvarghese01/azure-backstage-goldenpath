@@ -1,6 +1,6 @@
 # uv workspace root (virtual): shared dev tooling for all Python platform services.
 [tool.uv.workspace]
-members = ["libs/sportify-common", "azure-discovery", "provisioning-orchestrator"]
+members = ["libs/idp-common", "azure-discovery", "provisioning-orchestrator"]
 
 [dependency-groups]
 dev = [

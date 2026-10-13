@@ -2,7 +2,7 @@
 
 ${{ values.description }}
 
-Created by **Sportify Azure Backstage** (request `${{ values.requestId }}`). Owned by `${{ values.owner }}`.
+Created by **Internal Developer Portal** (request `${{ values.requestId }}`). Owned by `${{ values.owner }}`.
 
 ## How this repository is built
 

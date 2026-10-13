@@ -49,13 +49,13 @@ The scaffolder creates these environments (`github:environment:create`). The bri
 
 ### 4. Helm stores releases in ConfigMaps
 
-All deploys set `HELM_DRIVER=configmap`, and the `sportify-app-deployer` ClusterRole has **no access to Secrets**. Release metadata isn't sensitive, so ConfigMaps are acceptable.
+All deploys set `HELM_DRIVER=configmap`, and the `idp-app-deployer` ClusterRole has **no access to Secrets**. Release metadata isn't sensitive, so ConfigMaps are acceptable.
 
 ### 5. The provisioning identity's Azure scope
 
 The provisioning identity creates application resources: resource groups (for "Create new"), managed identities with federated credentials, Storage and Key Vault. It needs:
 
-- **`Sportify App Provisioner`**, a custom role at subscription scope, limited to those resource types. No compute, network or key-listing actions.
+- **`IDP App Provisioner`**, a custom role at subscription scope, limited to those resource types. No compute, network or key-listing actions.
 - **`Role Based Access Control Administrator`** with an ABAC condition that allows assigning only the allowlisted data roles (Storage Blob Data Contributor and Reader, Key Vault Secrets User).
 
 This is broader than "per resource group", because "Create new resource group" can't be pre-scoped. The plan policies (`policies/terraform/app.rego`), the resource-type allowlist and approval in Backstage compensate. A production platform would add Azure Policy assignments that restrict regions, SKUs and tags at subscription scope.

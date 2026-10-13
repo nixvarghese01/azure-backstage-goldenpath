@@ -49,7 +49,7 @@ spec:
           title: Stack
           type: string
           default: nestjs
-          ui:field: SportifyStackPicker
+          ui:field: IdpStackPicker
           ui:help: Stacks awaiting target-system validation are listed as coming soon.
         environment:
           title: Environment
@@ -60,17 +60,17 @@ spec:
         infrastructure:
           title: Azure resources
           type: object
-          ui:field: SportifyAzureResourcePicker
+          ui:field: IdpAzureResourcePicker
           ui:options:
             environmentField: environment
         endpointHost:
           title: Endpoint host
           type: string
-          ui:field: SportifyEndpointHostPicker
+          ui:field: IdpEndpointHostPicker
         availability:
           title: Availability
           type: object
-          ui:field: SportifyAvailabilityPicker
+          ui:field: IdpAvailabilityPicker
           ui:options:
             environmentField: environment
         repoVisibility:
@@ -93,7 +93,7 @@ spec:
     # 1. Validate on the server BEFORE anything is created (waits for platform resources if needed).
     - id: submit
       name: Validate request
-      action: sportify:request:submit
+      action: idp:request:submit
       input:
         name: ${{ parameters.name }}
         description: ${{ parameters.description }}
@@ -141,7 +141,7 @@ spec:
         requireCodeOwnerReviews: false
         requiredStatusCheckContexts: []
         repoVariables:
-          SPORTIFY_REQUEST_ID: ${{ steps.submit.output.requestId }}
+          IDP_REQUEST_ID: ${{ steps.submit.output.requestId }}
           AZURE_SUBSCRIPTION_ID: ${{ steps.submit.output.subscriptionId }}
           ACR_NAME: ${{ steps.submit.output.acrName }}
           AKS_NAME: ${{ steps.submit.output.aksName }}
@@ -193,7 +193,7 @@ spec:
     # 6. Hand over to the orchestrator: attaches the approval protection rule and starts provisioning.
     - id: repository-created
       name: Start provisioning
-      action: sportify:request:repository-created
+      action: idp:request:repository-created
       input:
         requestId: ${{ steps.submit.output.requestId }}
         repoUrl: ${{ steps.publish.output.remoteUrl }}
@@ -212,5 +212,5 @@ spec:
       - title: What happens next
         content: |
           Request `${{ steps.submit.output.requestId }}` is provisioning. Infrastructure waits for
-          **approval in Backstage** (Sportify → Approvals). Follow progress on the entity's
+          **approval in Backstage** (IDP → Approvals). Follow progress on the entity's
           **Provisioning** tab; you'll get a notification with the URLs when it's deployed.

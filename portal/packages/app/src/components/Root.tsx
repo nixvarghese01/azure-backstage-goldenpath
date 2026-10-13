@@ -6,13 +6,15 @@ import AssignmentTurnedIn from '@material-ui/icons/AssignmentTurnedIn';
 import Category from '@material-ui/icons/Category';
 import LibraryBooks from '@material-ui/icons/LibraryBooks';
 import React, { type PropsWithChildren } from 'react';
+import { SidebarLogo } from './SidebarLogo';
 
 export const Root = ({ children }: PropsWithChildren<{}>) => (
   <SidebarPage>
     <Sidebar>
+      <SidebarLogo />
       <SidebarItem icon={Category} to="catalog" text="Catalog" />
       <SidebarItem icon={AddCircleOutline} to="create" text="Create" />
-      <SidebarItem icon={AssignmentTurnedIn} to="sportify/approvals" text="Approvals" />
+      <SidebarItem icon={AssignmentTurnedIn} to="idp/approvals" text="Approvals" />
       <SidebarItem icon={LibraryBooks} to="docs" text="Docs" />
       <SidebarDivider />
       <SidebarSpace />

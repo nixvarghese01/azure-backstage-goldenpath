@@ -44,6 +44,6 @@ deny contains msg if {
 	rc.type == "kubernetes_role_binding_v1"
 	"create" in rc.change.actions
 	some ref in rc.change.after.role_ref
-	ref.name != "sportify-app-deployer"
-	msg := sprintf("%s: only the sportify-app-deployer ClusterRole may be bound", [rc.address])
+	ref.name != "idp-app-deployer"
+	msg := sprintf("%s: only the idp-app-deployer ClusterRole may be bound", [rc.address])
 }

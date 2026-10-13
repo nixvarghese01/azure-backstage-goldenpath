@@ -78,13 +78,13 @@ catalog:
       rules:
         - allow: [Template]
 
-sportify:
+idp:
   githubOrg: ${GITHUB_ORG}
   orchestratorGithubAppId: ${GITHUB_APP_ORCHESTRATOR_ID}
   discovery:
-    baseUrl: http://azure-discovery.sportify-platform.svc.cluster.local:8001
+    baseUrl: http://azure-discovery.idp-platform.svc.cluster.local:8001
   orchestrator:
-    baseUrl: http://provisioning-orchestrator-api.sportify-platform.svc.cluster.local:8002
+    baseUrl: http://provisioning-orchestrator-api.idp-platform.svc.cluster.local:8002
   auth:
     mode: entra
     discoveryScope: ${DISCOVERY_ENTRA_SCOPE}

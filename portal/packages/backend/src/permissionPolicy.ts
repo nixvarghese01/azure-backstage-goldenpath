@@ -2,21 +2,21 @@ import { coreServices, createBackendModule, type UserInfoService } from '@backst
 import { AuthorizeResult, type PolicyDecision, isPermission } from '@backstage/plugin-permission-common';
 import type { PermissionPolicy, PolicyQuery, PolicyQueryUser } from '@backstage/plugin-permission-node';
 import { policyExtensionPoint } from '@backstage/plugin-permission-node/alpha';
-import { sportifyRequestApprovePermission } from '@internal/plugin-sportify-platform-common';
+import { idpRequestApprovePermission } from '@internal/plugin-idp-platform-common';
 
 /**
  * Model-project policy: everything is allowed except approving infrastructure changes, which requires
  * membership of the approver group. The orchestrator re-checks group membership and separation of
  * duties (approver != requester) on its side.
  */
-class SportifyPermissionPolicy implements PermissionPolicy {
+class IdpPermissionPolicy implements PermissionPolicy {
   constructor(
     private readonly approverGroup: string,
     private readonly userInfo: UserInfoService,
   ) {}
 
   async handle(request: PolicyQuery, user?: PolicyQueryUser): Promise<PolicyDecision> {
-    if (isPermission(request.permission, sportifyRequestApprovePermission)) {
+    if (isPermission(request.permission, idpRequestApprovePermission)) {
       const groups = user ? (await this.userInfo.getUserInfo(user.credentials)).ownershipEntityRefs : [];
       return { result: groups.includes(this.approverGroup) ? AuthorizeResult.ALLOW : AuthorizeResult.DENY };
     }
@@ -24,16 +24,16 @@ class SportifyPermissionPolicy implements PermissionPolicy {
   }
 }
 
-export const sportifyPermissionPolicyModule = createBackendModule({
+export const idpPermissionPolicyModule = createBackendModule({
   pluginId: 'permission',
-  moduleId: 'sportify-policy',
+  moduleId: 'idp-policy',
   register(reg) {
     reg.registerInit({
       deps: { policy: policyExtensionPoint, config: coreServices.rootConfig, userInfo: coreServices.userInfo },
       async init({ policy, config, userInfo }) {
         policy.setPolicy(
-          new SportifyPermissionPolicy(
-            config.getOptionalString('sportify.approverGroup') ?? 'group:default/platform-approvers',
+          new IdpPermissionPolicy(
+            config.getOptionalString('idp.approverGroup') ?? 'group:default/platform-approvers',
             userInfo,
           ),
         );

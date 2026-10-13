@@ -7,7 +7,7 @@ import {
 } from '@backstage/plugin-catalog';
 import { EntityMembersListCard, EntityOwnershipCard } from '@backstage/plugin-org';
 import { EntityTechdocsContent } from '@backstage/plugin-techdocs';
-import { EntitySportifyProvisioningContent } from '@internal/plugin-sportify-platform';
+import { EntityIdpProvisioningContent } from '@internal/plugin-idp-platform';
 import { Grid } from '@material-ui/core';
 import React from 'react';
 
@@ -24,7 +24,7 @@ const componentPage = (
       </Grid>
     </EntityLayout.Route>
     <EntityLayout.Route path="/provisioning" title="Provisioning">
-      <EntitySportifyProvisioningContent />
+      <EntityIdpProvisioningContent />
     </EntityLayout.Route>
     <EntityLayout.Route path="/docs" title="Docs">
       <EntityTechdocsContent />

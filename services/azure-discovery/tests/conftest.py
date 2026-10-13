@@ -15,8 +15,8 @@ AUTH = {"Authorization": "Bearer test-token"}
 
 @pytest.fixture(autouse=True)
 def _static_auth(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SPORTIFY_AUTH_MODE", "static")
-    monkeypatch.setenv("SPORTIFY_DEV_SERVICE_TOKEN", "test-token")
+    monkeypatch.setenv("IDP_AUTH_MODE", "static")
+    monkeypatch.setenv("IDP_DEV_SERVICE_TOKEN", "test-token")
 
 
 @pytest.fixture
@@ -41,11 +41,11 @@ def base_request(**overrides) -> dict:
         "environment": "dev",
         "region": "uksouth",
         "subscription": {"mode": "existing", "id": SUB},
-        "resource_group": {"mode": "existing", "name": "rg-sportify-apps-dev"},
-        "aks_cluster": {"mode": "existing", "name": "aks-sportify-shared-dev"},
-        "container_registry": {"mode": "existing", "name": "acrsportifydev"},
+        "resource_group": {"mode": "existing", "name": "rg-idp-apps-dev"},
+        "aks_cluster": {"mode": "existing", "name": "aks-idp-shared-dev"},
+        "container_registry": {"mode": "existing", "name": "acridpdev"},
         "namespace": {"mode": "new", "name": "orders-api"},
-        "runtime_capability": {"type": "storage", "mode": "existing", "name": "stsportifyshareddev"},
+        "runtime_capability": {"type": "storage", "mode": "existing", "name": "stidpshareddev"},
         "availability": {"tier": "standard"},
         "stack": "nestjs",
     }

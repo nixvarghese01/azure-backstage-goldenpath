@@ -29,17 +29,17 @@ FIXTURE = {
     "infrastructure.region": "uksouth",
     "infrastructure.subscription.id": "00000000-0000-0000-0000-000000000000",
     "infrastructure.resourceGroup.mode": "existing",
-    "infrastructure.resourceGroup.name": "rg-sportify-apps-dev",
-    "infrastructure.aksCluster.name": "aks-sportify-shared-dev",
-    "infrastructure.aksCluster.resourceGroup": "rg-sportify-platform-dev",
-    "infrastructure.containerRegistry.name": "acrsportifydev",
-    "infrastructure.containerRegistry.resourceGroup": "rg-sportify-platform-dev",
+    "infrastructure.resourceGroup.name": "rg-idp-apps-dev",
+    "infrastructure.aksCluster.name": "aks-idp-shared-dev",
+    "infrastructure.aksCluster.resourceGroup": "rg-idp-platform-dev",
+    "infrastructure.containerRegistry.name": "acridpdev",
+    "infrastructure.containerRegistry.resourceGroup": "rg-idp-platform-dev",
     "infrastructure.namespace.mode": "new",
     "infrastructure.namespace.name": "orders-api",
     "infrastructure.runtimeCapability.type": "storage",
     "infrastructure.runtimeCapability.mode": "existing",
-    "infrastructure.runtimeCapability.name": "stsportifyshareddev",
-    "infrastructure.runtimeCapability.resourceGroup": "rg-sportify-apps-dev",
+    "infrastructure.runtimeCapability.name": "stidpshareddev",
+    "infrastructure.runtimeCapability.resourceGroup": "rg-idp-apps-dev",
 }
 EXPR = re.compile(r"\$\{\{\s*values\.([a-zA-Z0-9_.]+)\s*(\|[^}]*)?\}\}")
 COPY_ONLY = (".github/workflows/", "deploy/helm/", "infra/terraform/main.tf", "infra/terraform/versions.tf",
@@ -95,7 +95,7 @@ def main() -> None:
         "namespace": "orders-api", "endpoint_host": FIXTURE["endpointHost"],
         "availability": {"tier": "standard"}, "runtime_capability": {"type": "storage", "mode": "existing"},
         "outputs": {"identity_client_id": "11111111-1111-1111-1111-111111111111",
-                    "acr_login_server": "acrsportifydev.azurecr.io", "storage_account_name": "stsportifyshareddev"},
+                    "acr_login_server": "acridpdev.azurecr.io", "storage_account_name": "stidpshareddev"},
         "resolved": {},
     }
     if args.stack != "nestjs":

@@ -19,7 +19,7 @@ class Settings:
             raise ValueError("DISCOVERY_AZURE_MODE must be 'sdk' or 'mock'")
         return cls(
             azure_mode=mode,
-            policy_file=Path(os.environ.get("DISCOVERY_POLICY_FILE", "/etc/sportify/allowlist.yaml")),
+            policy_file=Path(os.environ.get("DISCOVERY_POLICY_FILE", "/etc/idp/allowlist.yaml")),
             cache_ttl_seconds=int(os.environ.get("DISCOVERY_CACHE_TTL_SECONDS", "60")),
             log_level=os.environ.get("LOG_LEVEL", "INFO"),
         )

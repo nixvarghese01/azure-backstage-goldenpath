@@ -1,6 +1,6 @@
 # Implementation plan
 
-The proposed workflow, CI/CD design and phased delivery plan for milestone 1 of Sportify Azure Backstage: **a developer requests a secure NestJS API in Backstage and receives a running application on AKS, with its URLs.**
+The proposed workflow, CI/CD design and phased delivery plan for milestone 1 of Internal Developer Portal: **a developer requests a secure NestJS API in Backstage and receives a running application on AKS, with its URLs.**
 
 | Document | Purpose |
 |---|---|
@@ -81,7 +81,7 @@ flowchart TB
 
 | # | Stage | Trigger | Actor / system | Inputs | Outputs | State after | Failure handling |
 |---|---|---|---|---|---|---|---|
-| 1 | Submit | Developer clicks **Create** | Backstage scaffolder → `sportify:request:submit` | Form values, user identity | Request ID | `REQUESTED` | Form errors shown inline; nothing is created |
+| 1 | Submit | Developer clicks **Create** | Backstage scaffolder → `idp:request:submit` | Form values, user identity | Request ID | `REQUESTED` | Form errors shown inline; nothing is created |
 | 2 | Validate | Submit received | Orchestrator → discovery `/v1/validate`, policies | Request, allowlists | Validated request | `VALIDATING` | Rejected with reasons; no repository is created |
 | 2a | Platform provisioning *(only for a new subscription, AKS cluster or ACR)* | Validation passes | Orchestrator raises a platform-repo PR; `platform-plan.yml` and `platform-apply.yml` behind the `platform` environment reviewers | Platform definition | New shared resource | `PLATFORM_PROVISIONING` | `FAILED` with the PR or run link; the application request doesn't continue |
 | 3 | Repository | Validation passes | Scaffolder `fetch:template`, `publish:github`, `catalog:register` | Template and values | Repository URL, catalog entity | `REPOSITORY_CREATED` | Retried idempotently; an existing repository for the same request is reused |
@@ -122,7 +122,7 @@ All workflows pin Actions to SHAs, declare least-privilege `permissions:` at the
 | `platform-plan.yml` | PR touching `iac/platform/**` (including orchestrator-raised platform requests), manual dispatch | Per changed stack: static gate (fmt, validate, TFLint, Checkov) → plan with `-lock=false` → Conftest and Checkov on the plan JSON → comment the summary | OIDC: **platform plan identity** (Reader on Azure, Storage Blob Data Reader on the `platform` state container) | `platform-plan` |
 | `platform-apply.yml` | Manual dispatch after merge | Static gate → plan → Conftest and Checkov on the plan → apply that saved plan | OIDC: **platform identity** | `platform` (GitHub required reviewers) |
 | `images.yml` | Push to `main` | Build, scan and push the images for Backstage, `azure-discovery` and `provisioning-orchestrator` | OIDC: **deployment identity (platform)**, `acrPush` | — |
-| `deploy-platform.yml` | After `images.yml`, manual | Helm deploy into the `sportify-platform` namespace, then smoke tests | OIDC: **deployment identity (platform)** | `platform` |
+| `deploy-platform.yml` | After `images.yml`, manual | Helm deploy into the `idp-platform` namespace, then smoke tests | OIDC: **deployment identity (platform)** | `platform` |
 | `codeql.yml` / dependency review | PR, push, weekly | CodeQL (Python, TypeScript, Actions, and the Go, C# and Java starters) and dependency review | `security-events: write` | — |
 | `ci-security.yml` | PR, push, weekly | gitleaks over the full history; actionlint and zizmor on workflows; Trivy for lockfile vulnerabilities, secrets and Dockerfile misconfiguration (SARIF to code scanning) | `contents: read`, `security-events: write` | — |
 
@@ -154,7 +154,7 @@ Platform infrastructure is approved through **GitHub environment reviewers**, no
 
 | Component | Local development (Phases 2–4) | Cloud demo (Phase 5 onwards) |
 |---|---|---|
-| Backstage | `yarn dev` in WSL2 | Container in the `sportify-platform` namespace on the shared AKS cluster |
+| Backstage | `yarn dev` in WSL2 | Container in the `idp-platform` namespace on the shared AKS cluster |
 | `azure-discovery` | `uv run fastapi dev`, signed in with `az login` | Container, Workload Identity (**discovery identity**) |
 | `provisioning-orchestrator` | API + worker via `uv run` | Containers (API + worker), with the GitHub App key from Key Vault through the CSI driver |
 | PostgreSQL 17 | `docker compose` | Azure Database for PostgreSQL flexible server (Burstable), Entra authentication |
@@ -196,9 +196,9 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 - [ ] Configure PostgreSQL through `docker compose`, GitHub sign-in, the GitHub integration (App #1), the catalog and TechDocs (local builder).
 - [ ] Register the platform's own `catalog-info.yaml` with System, Components and Group entities, and seed the teams `team-orders` and `platform-approvers`.
 - [ ] Set up the `services/` uv workspace with `azure-discovery` and `provisioning-orchestrator` skeletons: health endpoints, settings, structured logging, Dockerfiles.
-- [ ] Create the `sportify-platform-backend` bridge plugin: service-to-service authentication, forwarding with the user's identity, and a stub `sportify:request:submit` action.
+- [ ] Create the `idp-platform-backend` bridge plugin: service-to-service authentication, forwarding with the user's identity, and a stub `idp:request:submit` action.
 - [ ] Add `ci-backstage.yml` and `ci-python.yml`.
-- [ ] Secret hygiene from day one: `.gitignore` entries, `.env.example`, a gitleaks pre-commit hook and CI job, GitHub secret scanning with push protection, and `scripts/dev-secrets.sh` fetching the dev GitHub App keys from a dev Key Vault into `~/.config/sportify/`.
+- [ ] Secret hygiene from day one: `.gitignore` entries, `.env.example`, a gitleaks pre-commit hook and CI job, GitHub secret scanning with push protection, and `scripts/dev-secrets.sh` fetching the dev GitHub App keys from a dev Key Vault into `~/.config/idp/`.
 
 **Deliverables:** a running portal, two Python services, and the bridge, all running locally.
 
@@ -231,8 +231,8 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 
 **Tasks: Backstage UI**
 
-- [ ] `sportify-platform` frontend plugin: the **Create new / Select existing** picker field, the **Provisioning** entity tab (stage timeline, URLs) and the **Approvals** page.
-- [ ] Permission `sportify.request.approve`, and a Backstage notification on approval-needed and on success.
+- [ ] `idp-platform` frontend plugin: the **Create new / Select existing** picker field, the **Provisioning** entity tab (stage timeline, URLs) and the **Approvals** page.
+- [ ] Permission `idp.request.approve`, and a Backstage notification on approval-needed and on success.
 
 **Deliverables:** the golden path working against **mocked** Azure and GitHub adapters, with the real adapters implemented.
 
@@ -276,7 +276,7 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 
 - A real request reaches `SUCCEEDED`. `https://orders-api.dev.<domain>/health/ready` returns 200 and reports Storage access through Workload Identity, with no secrets anywhere.
 - Re-running `terraform-apply` from the GitHub UI without approval stays blocked.
-- An application cleanup removes only the platform-created resources (checked with `az resource list --tag managed-by=sportify-platform`).
+- An application cleanup removes only the platform-created resources (checked with `az resource list --tag managed-by=idp-platform`).
 - The secret-management verification checklist ([secret-management.md §11](docs/security/secret-management.md#11-verification-exit-criteria-for-phase-5-and-6)) passes, including a GitHub App key rotation without failed dispatches.
 
 ### Phase 6: Hardening, tests, documentation and demo *(about 3–4 days)*

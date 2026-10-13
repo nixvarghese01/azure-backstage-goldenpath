@@ -1,8 +1,8 @@
-# Sportify Azure Backstage
+# Internal Developer Portal
 
 An Internal Developer Platform (IDP) built on [Backstage](https://backstage.io), Microsoft Azure, Azure Kubernetes Service (AKS), Terraform, Helm and GitHub Actions.
 
-Sportify Azure Backstage lets developers request a production-shaped service through a self-service portal. The platform then validates the request, creates a dedicated repository, provisions or reuses approved Azure infrastructure behind an approval gate, and deploys the application to a shared AKS cluster. Backstage reports the status of each stage.
+Internal Developer Portal lets developers request a production-shaped service through a self-service portal. The platform then validates the request, creates a dedicated repository, provisions or reuses approved Azure infrastructure behind an approval gate, and deploys the application to a shared AKS cluster. Backstage reports the status of each stage.
 
 > **This is a model project.** It is a reference design that shows how an enterprise-grade IDP on Backstage and Azure can be structured, secured and operated. The implementation is deliberately scoped to one golden path, to demonstrate the design end to end. It is not intended for wide production rollout as-is. Where a production platform would make a different trade-off, the [ADRs](docs/adr/) say so.
 
@@ -91,13 +91,13 @@ For every Azure resource, from the subscription down to the Storage account, the
 
 ```
 Subscription        ( ) Create new        (•) Select existing
-                    [ sub-sportify-dev  ▼ ]   ← populated from azure-discovery
+                    [ sub-idp-dev  ▼ ]   ← populated from azure-discovery
 
 Resource group      ( ) Create new        (•) Select existing
-                    [ rg-sportify-apps-dev  (uksouth)  ▼ ]
+                    [ rg-idp-apps-dev  (uksouth)  ▼ ]
 
 AKS cluster         ( ) Create new        (•) Select existing
-                    [ aks-sportify-shared-dev  ▼ ]
+                    [ aks-idp-shared-dev  ▼ ]
 
 Storage account     (•) Create new        ( ) Select existing
                     Name: storordersapidev           [validated as you type]
@@ -109,7 +109,7 @@ Each selection narrows the next one: the resource groups listed depend on the ch
 |---|---|---|
 | Form input | Name field, pre-filled with a name that follows the naming convention | Dropdown filled from the discovery service. It shows only resources that are allowlisted, in an approved region and visible to the discovery identity |
 | Server-side validation | Naming rules, global name availability (e.g. Storage), region and SKU allowlist, quota | The ID is re-resolved through `POST /v1/validate`, confirming it still exists, its type and region are correct, and it is eligible for this team and environment |
-| Terraform | Generated as a `resource` block, tagged with owner, environment, application and `managed-by: sportify-platform` | Generated as a `data` block. The platform only adds role assignments and never modifies or destroys the existing resource |
+| Terraform | Generated as a `resource` block, tagged with owner, environment, application and `managed-by: idp-platform` | Generated as a `data` block. The platform only adds role assignments and never modifies or destroys the existing resource |
 | Plan and approval | Shown as an addition in the plan summary; requires approval before apply | Shown as reuse. Role assignments still appear in the plan and require approval |
 | Cleanup on failure or deletion | Can be removed by the controlled cleanup procedure | Never deleted by the platform |
 
@@ -151,7 +151,7 @@ The form asks **"Do you need high availability?"** so the cost and complexity of
 
 Animated overview of the proposed solution, including Azure Key Vault secret delivery:
 
-![Proposed Sportify Azure Backstage architecture](docs/assets/proposed-platform.gif)
+![Proposed Internal Developer Portal architecture](docs/assets/proposed-platform.gif)
 
 ```mermaid
 flowchart LR
@@ -160,7 +160,7 @@ flowchart LR
     subgraph Backstage["Backstage · TypeScript (built-ins + thin bridges)"]
         Portal[Frontend<br/>Catalog · Scaffolder · TechDocs<br/>+ resource picker · status card]
         Portal --> API[Backend<br/>built-in plugins]
-        API --> Bridge[sportify-platform-backend<br/>bridge plugin]
+        API --> Bridge[idp-platform-backend<br/>bridge plugin]
     end
 
     subgraph Python["Platform services · Python (FastAPI)"]
@@ -189,8 +189,8 @@ flowchart LR
 |---|---|
 | **Software Catalog** | Ownership, metadata and discovery of services, including generated applications |
 | **Scaffolder + Software Templates** | Self-service request form and repository generation, using the built-in `fetch:template`, `publish:github` and `catalog:register` actions |
-| **`sportify-platform-backend`** (TypeScript, thin bridge) | One small backend plugin. It forwards discovery and orchestrator calls to the Python services with the signed-in user's identity and a service token. It also adds two scaffolder actions, `sportify:request:submit` and `sportify:request:repository-created`. It contains no business logic |
-| **`sportify-platform`** (TypeScript, thin frontend) | A scaffolder field extension that provides the **Create new / Select existing** resource picker, the **Provisioning** entity tab (stage timeline, URLs), and the **Approvals** page. All of them only call the bridge |
+| **`idp-platform-backend`** (TypeScript, thin bridge) | One small backend plugin. It forwards discovery and orchestrator calls to the Python services with the signed-in user's identity and a service token. It also adds two scaffolder actions, `idp:request:submit` and `idp:request:repository-created`. It contains no business logic |
+| **`idp-platform`** (TypeScript, thin frontend) | A scaffolder field extension that provides the **Create new / Select existing** resource picker, the **Provisioning** entity tab (stage timeline, URLs), and the **Approvals** page. All of them only call the bridge |
 | **`azure-discovery`** (Python, FastAPI) | Standalone, read-only REST service. It lists the existing subscriptions visible to the discovery identity (the same ones shown in the Azure portal), then their resource groups, AKS clusters, registries and data services, using ARM and Azure Resource Graph. Results are filtered against the policy allowlists before they are returned |
 | **`provisioning-orchestrator`** (Python, FastAPI + worker) | Durable asynchronous workflow engine. It owns request validation, the state machine, idempotency, GitHub workflow dispatch, approval tracking, retries, cleanup and the audit log, with state stored in PostgreSQL |
 | **Policies** | Allowlists for subscriptions, regions, environments, clusters, resource types and operations, enforced on the server |
@@ -206,8 +206,8 @@ flowchart LR
 ### Request flow
 
 1. **Submit.** The developer fills in the whole scaffolder form. The resource pickers load their options from the discovery service through the bridge.
-2. **Validate.** `sportify:request:submit` sends the request to the orchestrator, using the scaffolder task ID as the idempotency key. The orchestrator re-validates every selection through the discovery service and the policies. It then returns a request ID, or rejects the request before any repository exists. If the request asks for a new subscription, AKS cluster or registry, the orchestrator first raises the platform pull request and waits for it to be applied (`PLATFORM_PROVISIONING`).
-3. **Repository.** The built-in `publish:github` creates the repository with **infrastructure code only**, and `catalog:register` registers it. `sportify:request:repository-created` reports it to the orchestrator, and the scaffolder task finishes.
+2. **Validate.** `idp:request:submit` sends the request to the orchestrator, using the scaffolder task ID as the idempotency key. The orchestrator re-validates every selection through the discovery service and the policies. It then returns a request ID, or rejects the request before any repository exists. If the request asks for a new subscription, AKS cluster or registry, the orchestrator first raises the platform pull request and waits for it to be applied (`PLATFORM_PROVISIONING`).
+3. **Repository.** The built-in `publish:github` creates the repository with **infrastructure code only**, and `catalog:register` registers it. `idp:request:repository-created` reports it to the orchestrator, and the scaffolder task finishes.
 4. **Infrastructure.** The orchestrator dispatches the validate and plan workflows. The apply job is held until a reviewer **approves in the Backstage UI** (see [Approval in Backstage](#approval-in-backstage)). It then applies the saved plan.
 5. **Application.** Once the infrastructure is ready, the orchestrator opens a pull request that adds the starter for the chosen stack: source, tests, a rendered Dockerfile, local Compose configuration, checkout instructions and CI/CD. Developers can run the dummy API without Azure credentials after the pull request merges.
 6. **Deploy.** CI builds, scans and pushes the image. The deploy workflow installs the Helm chart on AKS, then smoke-tests the endpoint.
@@ -220,7 +220,7 @@ Reviewers approve infrastructure changes in the Backstage UI. GitHub enforces th
 - Each infrastructure environment (for example `dev-infra`) has a **custom deployment protection rule** owned by the orchestrator's GitHub App. GitHub holds the apply job until the orchestrator releases it.
 - Approvers get a Backstage notification. On the **Approvals** page or the request's *Provisioning* tab, they see the plan summary (added, changed, destroyed, reused), the policy and security results, and links to the full plan, then click **Approve** or **Reject**.
 - Before releasing the job, the orchestrator checks:
-  - the `sportify.request.approve` permission
+  - the `idp.request.approve` permission
   - that the approver is not the requester
   - that the approval matches the **exact plan hash**, so a changed plan needs a new approval
   - that the request has not already been decided
@@ -383,8 +383,8 @@ For a public demo, keep the platform repository public. Keep one generated examp
 | **Orchestrator** (used by `provisioning-orchestrator`) | GitHub App installation on the generated repositories (Actions and Deployments write, to dispatch workflows and answer protection rules; Contents and Pull requests write, for the application pull request) and on the platform repository (Pull requests and Contents write, to raise platform change requests). No Azure resource access: it reads only its own Key Vault secrets and signs in to PostgreSQL | Workload Identity, plus the GitHub App private key from Key Vault through the Secrets Store CSI driver |
 | **Subscription vending** (only when a new subscription is requested) | Subscription creator on the billing scope, and management group placement | GitHub OIDC federated credential, used by a platform-team-approved workflow |
 | **Platform** (used by `platform-plan.yml` and `platform-apply.yml`) | Creates and changes shared platform infrastructure in `iac/platform`: AKS, ACR, Key Vault, PostgreSQL, DNS, identities and their role assignments. Plans on pull requests use a separate read-only plan identity | GitHub OIDC federated credential, `platform` environment with required reviewers |
-| **Platform deployment** (used by `images.yml` and `deploy-platform.yml`) | Pushes platform images to ACR and deploys to the `sportify-platform` namespace only | GitHub OIDC federated credential |
-| **Terraform provisioning** | Custom `Sportify App Provisioner` role (resource groups, identities, Storage, Key Vault only) plus RBAC Administrator limited by an ABAC condition to the allowlisted data roles; trusted only through the platform's reusable Terraform workflow ([ADR-0005](docs/adr/0005-reusable-workflows-and-ci-identity.md)) | GitHub OIDC federated credential (customised subject with `job_workflow_ref`) |
+| **Platform deployment** (used by `images.yml` and `deploy-platform.yml`) | Pushes platform images to ACR and deploys to the `idp-platform` namespace only | GitHub OIDC federated credential |
+| **Terraform provisioning** | Custom `IDP App Provisioner` role (resource groups, identities, Storage, Key Vault only) plus RBAC Administrator limited by an ABAC condition to the allowlisted data roles; trusted only through the platform's reusable Terraform workflow ([ADR-0005](docs/adr/0005-reusable-workflows-and-ci-identity.md)) | GitHub OIDC federated credential (customised subject with `job_workflow_ref`) |
 | **Deployment** | Push to the approved ACR and deploy to the application's namespace only | GitHub OIDC federated credential |
 | **Application runtime** | User-assigned managed identity with access only to its own Storage account or Key Vault | Microsoft Entra Workload Identity |
 
@@ -415,11 +415,11 @@ azure-backstage-goldenpath/
 ├── portal/                          # Backstage 1.55 (Node workspace)
 │   ├── packages/app/                #   frontend
 │   ├── packages/backend/            #   backend (new backend system) + permission policy
-│   ├── plugins/sportify-platform*/  #   thin bridge, UI and shared types
+│   ├── plugins/idp-platform*/  #   thin bridge, UI and shared types
 │   ├── catalog/                     #   org and platform entities
 │   └── app-config*.yaml
 ├── services/                        # Python (uv workspace), all platform logic
-│   ├── libs/sportify-common/        #   auth, secrets, logging, OTel
+│   ├── libs/idp-common/        #   auth, secrets, logging, OTel
 │   ├── azure-discovery/src/azure_discovery/
 │   └── provisioning-orchestrator/src/provisioning_orchestrator/  (+ migrations/)
 ├── templates/applications/nestjs/   # golden path: template.yaml, skeleton/, application/
@@ -539,7 +539,7 @@ cd deploy/local && cp .env.example .env && docker compose up -d postgres && cd .
 
 # Python platform services, local mode: mock Azure + mock GitHub, static dev token (one terminal each)
 cd services && uv sync --all-packages
-export SPORTIFY_AUTH_MODE=static SPORTIFY_DEV_SERVICE_TOKEN=dev-only-change-me
+export IDP_AUTH_MODE=static IDP_DEV_SERVICE_TOKEN=dev-only-change-me
 DISCOVERY_AZURE_MODE=mock DISCOVERY_POLICY_FILE=../policies/allowlist.yaml \
   uv run uvicorn azure_discovery.main:create_app --factory --port 8001
 export ORCHESTRATOR_DATABASE_URL=postgresql+psycopg://orchestrator:dev-only-not-a-secret@localhost:5432/orchestrator

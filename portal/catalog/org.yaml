@@ -3,7 +3,7 @@ apiVersion: backstage.io/v1alpha1
 kind: Group
 metadata:
   name: platform-team
-  description: Owns the Sportify platform
+  description: Owns the IDP platform
 spec:
   type: team
   children: []
@@ -12,7 +12,7 @@ apiVersion: backstage.io/v1alpha1
 kind: Group
 metadata:
   name: platform-approvers
-  description: May approve infrastructure changes (sportify.request.approve)
+  description: May approve infrastructure changes (idp.request.approve)
 spec:
   type: team
   children: []

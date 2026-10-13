@@ -11,11 +11,11 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi import Request as HttpRequest
 from fastapi.responses import JSONResponse
-from sportify_common.auth import AuthSettings, Caller, authenticate, require_caller, require_user
-from sportify_common.jwt_verify import TokenVerificationError, github_actions_verifier
-from sportify_common.logging import configure_logging
-from sportify_common.secrets import read_secret_file
-from sportify_common.telemetry import configure_tracing
+from idp_common.auth import AuthSettings, Caller, authenticate, require_caller, require_user
+from idp_common.jwt_verify import TokenVerificationError, github_actions_verifier
+from idp_common.logging import configure_logging
+from idp_common.secrets import read_secret_file
+from idp_common.telemetry import configure_tracing
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker

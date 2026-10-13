@@ -1,17 +1,17 @@
 image:
-  repository: acrsportifydev.azurecr.io/sportify/provisioning-orchestrator
+  repository: acridpdev.azurecr.io/idp/provisioning-orchestrator
   tag: latest
 api:
   replicas: 2
 worker:
   replicas: 2
 workloadIdentity:
-  clientId: ""            # id-sportify-orchestrator-<env> (no Azure resource access)
+  clientId: ""            # id-idp-orchestrator-<env> (no Azure resource access)
 keyVault:
-  name: kv-sportify-plat-dev
+  name: kv-idp-plat-dev
   tenantId: ""
 database:
-  url: ""                 # postgresql+psycopg://id-sportify-orchestrator-dev@<server>.postgres.database.azure.com:5432/orchestrator?sslmode=require
+  url: ""                 # postgresql+psycopg://id-idp-orchestrator-dev@<server>.postgres.database.azure.com:5432/orchestrator?sslmode=require
 auth:
   tenantId: ""
   audience: ""            # app ID URI of this service
@@ -21,12 +21,12 @@ config:
   githubAppId: ""
   githubInstallationId: ""
   platformRepo: azure-backstage-goldenpath
-  discoveryScope: ""      # api://sportify-discovery/.default
-  backstageScope: ""      # api://sportify-backstage/.default
+  discoveryScope: ""      # api://idp-discovery/.default
+  backstageScope: ""      # api://idp-backstage/.default
   approverGroup: group:default/platform-approvers
 hooks:
   host: platform-hooks.dev.xycorp.local
-  gateway: { name: sportify-gateway, namespace: sportify-gateway }
+  gateway: { name: idp-gateway, namespace: idp-gateway }
 resources:
   requests: { cpu: 50m, memory: 128Mi }
   limits: { cpu: 500m, memory: 384Mi }

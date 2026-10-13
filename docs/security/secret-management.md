@@ -1,6 +1,6 @@
 # Secret management
 
-How Sportify Azure Backstage avoids, stores, delivers, rotates and protects secrets, across the platform services, CI/CD, Terraform and the generated applications.
+How Internal Developer Portal avoids, stores, delivers, rotates and protects secrets, across the platform services, CI/CD, Terraform and the generated applications.
 
 > **Status:** design for milestone 1. Related documents: [microservices architecture](../architecture/microservices.md), [README: identity and security model](../../README.md#identity-and-security-model), [ADR-0002](../adr/0002-terraform-structure.md).
 
@@ -35,7 +35,7 @@ Only these secrets exist in the platform:
 
 | # | Secret | Used by | Stored in | Delivered as | Rotation | Owner |
 |---|---|---|---|---|---|---|
-| S1 | GitHub App #1 (Backstage) **private key** | `backstage` | `kv-sportify-platform-<env>` / `gh-app-backstage-key` | CSI file → Backstage config `$file:` | 90 days | Platform team |
+| S1 | GitHub App #1 (Backstage) **private key** | `backstage` | `kv-idp-platform-<env>` / `gh-app-backstage-key` | CSI file → Backstage config `$file:` | 90 days | Platform team |
 | S2 | GitHub App #1 **client secret** (user sign-in) | `backstage` | `…/gh-app-backstage-client-secret` | CSI file | 90 days | Platform team |
 | S3 | Backstage **auth session secret** | `backstage` | `…/backstage-session-secret` | CSI file | 180 days | Platform team |
 | S4 | GitHub App #2 (orchestrator) **private key** | `provisioning-orchestrator` | `…/gh-app-orchestrator-key` | CSI file | 90 days | Platform team |
@@ -51,7 +51,7 @@ Notes:
 
 | Setting | Value |
 |---|---|
-| Vaults | `kv-sportify-platform-<env>` for platform secrets. Per-application vaults only when the **Key Vault** runtime capability is chosen in the form |
+| Vaults | `kv-idp-platform-<env>` for platform secrets. Per-application vaults only when the **Key Vault** runtime capability is chosen in the form |
 | Permission model | **Azure RBAC** (no access policies) |
 | Protection | Soft delete (90 days) and **purge protection** enabled |
 | Network | Model project: public endpoint with Entra-only access, plus firewall rules for the AKS egress IP and named operators. Production: **private endpoint** with public access disabled |
@@ -62,8 +62,8 @@ Notes:
 
 | Identity | Role | Scope |
 |---|---|---|
-| `id-sportify-backstage` | Key Vault Secrets User | S1, S2, S3, (S7) |
-| `id-sportify-orchestrator` | Key Vault Secrets User | S4, S5 |
+| `id-idp-backstage` | Key Vault Secrets User | S1, S2, S3, (S7) |
+| `id-idp-orchestrator` | Key Vault Secrets User | S4, S5 |
 | App Routing add-on identity | Key Vault Certificate User | S6 |
 | Platform operators (Entra group, through PIM) | Key Vault Secrets Officer | Vault, **just-in-time** for rotation only |
 | Terraform platform identity | None on secrets (it manages the vault and role assignments through ARM only) | — |
@@ -73,7 +73,7 @@ Notes:
 
 ```mermaid
 flowchart LR
-    KV[(Key Vault<br/>kv-sportify-platform)]
+    KV[(Key Vault<br/>kv-idp-platform)]
     subgraph Pod["Pod (e.g. orchestrator-api)"]
         SA[ServiceAccount<br/>azure.workload.identity/client-id]
         CSI[Secrets Store CSI volume<br/>/mnt/secrets · read-only · tmpfs]
@@ -88,7 +88,7 @@ flowchart LR
 - The AKS **`azure-keyvault-secrets-provider`** add-on (Secrets Store CSI driver) is enabled on the shared cluster.
 - Each workload has a `SecretProviderClass` that names only its own secrets, using **workload identity** (`clientID` of the pod's identity), never the kubelet identity.
 - Secrets are mounted as **read-only files on tmpfs**. Kubernetes `Secret` objects are **not** created (no `secretObjects` sync), so secrets don't sit in etcd and can't be read with `kubectl get secret`.
-- **Backstage** reads secrets with the `$file:` config substitution. The **Python services** read them through a small `sportify-common` settings loader that reads file paths from environment variables. Environment variables contain only *paths*, never values.
+- **Backstage** reads secrets with the `$file:` config substitution. The **Python services** read them through a small `idp-common` settings loader that reads file paths from environment variables. Environment variables contain only *paths*, never values.
 - **Auto-rotation** in the CSI driver is enabled (poll interval about 2 minutes). Backstage reads config at start-up, so a rotation is finished with a rolling restart (§6). The Python services re-read the GitHub App key whenever they create an installation token.
 
 ## 6. Lifecycle: creation, rotation and revocation
@@ -157,7 +157,7 @@ If a secret might be exposed:
 | Item | Approach |
 |---|---|
 | Azure access | `az login` as the developer. Discovery uses `DefaultAzureCredential`, which picks up the Azure CLI credential |
-| GitHub Apps | **Separate dev Apps**, installed only on a sandbox organisation. Their keys are stored in a **dev Key Vault** and fetched by `scripts/dev-secrets.sh` into `~/.config/sportify/` (outside the repository, permissions `0600`) |
+| GitHub Apps | **Separate dev Apps**, installed only on a sandbox organisation. Their keys are stored in a **dev Key Vault** and fetched by `scripts/dev-secrets.sh` into `~/.config/idp/` (outside the repository, permissions `0600`) |
 | Config files | `app-config.local.yaml` and `.env` are **git-ignored**. Committed examples (`.env.example`) contain placeholders only |
 | Local PostgreSQL | `docker compose` with a throwaway password, documented as dev-only. It is not a secret and is never reused |
 | Webhooks | Not used locally (polling), so no local webhook secret is needed |
@@ -170,13 +170,13 @@ If a secret might be exposed:
 | **GitHub secret scanning with push protection** (free on public repositories) | Platform repository and generated repositories |
 | **gitleaks** pre-commit hook and CI job | Platform repository and generated repositories |
 | **Trivy secret scan** of container images | `images.yml`, `application-ci.yml` |
-| Logger redaction (Authorization headers, `token`, `secret`, `password`, PEM blocks) | `sportify-common`, Backstage logger config |
+| Logger redaction (Authorization headers, `token`, `secret`, `password`, PEM blocks) | `idp-common`, Backstage logger config |
 | Terraform `sensitive = true` on secret-bearing outputs and variables; a policy check that no module declares a secret input | `iac/modules`, Conftest |
 | Key Vault diagnostics and alerts | Log Analytics |
 
 ## 11. Verification (exit criteria for Phase 5 and 6)
 
-- [ ] `kubectl get secrets -n sportify-platform` shows no application secrets (only service-account and Helm release data).
+- [ ] `kubectl get secrets -n idp-platform` shows no application secrets (only service-account and Helm release data).
 - [ ] `gitleaks detect` on all repositories reports nothing, and push protection is enabled.
 - [ ] Repository and environment **secrets** lists are empty in a generated repository. Only **variables** are set.
 - [ ] Removing the orchestrator identity's role on S4 causes a clear "cannot read GitHub App key" readiness failure. Restoring it recovers.

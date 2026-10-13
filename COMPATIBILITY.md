@@ -1,6 +1,6 @@
 # Component compatibility plan
 
-The component versions chosen for Sportify Azure Backstage milestone 1, why each was chosen, and how they depend on each other. Related documents: [README](README.md), [implementation plan](IMPLEMENTATION_PLAN.md), [ADR-0002 Terraform structure](docs/adr/0002-terraform-structure.md) and [ADR-0003 ingress](docs/adr/0003-ingress-gateway-api.md).
+The component versions chosen for Internal Developer Portal milestone 1, why each was chosen, and how they depend on each other. Related documents: [README](README.md), [implementation plan](IMPLEMENTATION_PLAN.md), [ADR-0002 Terraform structure](docs/adr/0002-terraform-structure.md) and [ADR-0003 ingress](docs/adr/0003-ingress-gateway-api.md).
 
 - **Verified on:** 2026-10-10, against each project's official release page, registry or documentation (see [Sources](#sources)).
 - **Rule:** use the newest release that every dependent component supports, not simply the newest release. Where the newest release is not adopted, the reason is given.

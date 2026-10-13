@@ -14,13 +14,13 @@ import urllib.error
 import urllib.request
 import uuid
 
-TOKEN = os.environ.get("SPORTIFY_DEV_SERVICE_TOKEN", "dev-only-change-me")
+TOKEN = os.environ.get("IDP_DEV_SERVICE_TOKEN", "dev-only-change-me")
 BACKSTAGE = "http://backstage:7007"
 DISCOVERY = "http://azure-discovery:8001"
 ORCHESTRATOR = "http://orchestrator-api:8002"
 SUB = "00000000-0000-0000-0000-000000000000"
 SERVICE = {"Authorization": f"Bearer {TOKEN}"}
-REQUESTER = {**SERVICE, "X-Sportify-User": "user:default/e2e", "X-Sportify-Groups": "group:default/team-orders"}
+REQUESTER = {**SERVICE, "X-IDP-User": "user:default/e2e", "X-IDP-Groups": "group:default/team-orders"}
 
 failures = 0
 
@@ -75,11 +75,11 @@ body = {
     "region": "uksouth",
     "stack": "nestjs",
     "subscription": {"mode": "existing", "id": SUB},
-    "resource_group": {"mode": "existing", "name": "rg-sportify-apps-dev"},
-    "aks_cluster": {"mode": "existing", "name": "aks-sportify-shared-dev"},
-    "container_registry": {"mode": "existing", "name": "acrsportifydev"},
+    "resource_group": {"mode": "existing", "name": "rg-idp-apps-dev"},
+    "aks_cluster": {"mode": "existing", "name": "aks-idp-shared-dev"},
+    "container_registry": {"mode": "existing", "name": "acridpdev"},
     "namespace": {"mode": "new", "name": name},
-    "runtime_capability": {"type": "storage", "mode": "existing", "name": "stsportifyshareddev"},
+    "runtime_capability": {"type": "storage", "mode": "existing", "name": "stidpshareddev"},
     "availability": {"tier": "standard"},
     "endpoint_host": "",
 }

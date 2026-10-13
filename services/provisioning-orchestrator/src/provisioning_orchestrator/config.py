@@ -51,7 +51,7 @@ class Settings:
                 _env("ORCHESTRATOR_BACKSTAGE_BASE_URL", "http://backstage:7007") or ""
             ).rstrip("/"),
             backstage_scope=_env("BACKSTAGE_ENTRA_SCOPE"),
-            callback_audience=_env("ORCHESTRATOR_CALLBACK_AUDIENCE", "sportify-orchestrator") or "",
+            callback_audience=_env("ORCHESTRATOR_CALLBACK_AUDIENCE", "idp-orchestrator") or "",
             approver_group=_env("ORCHESTRATOR_APPROVER_GROUP", "group:default/platform-approvers") or "",
             stack_templates_dir=Path(_env("ORCHESTRATOR_STACK_TEMPLATES_DIR", "/app/stack-templates") or ""),
             infra_environment=_env("ORCHESTRATOR_INFRA_ENVIRONMENT", "dev-infra") or "dev-infra",

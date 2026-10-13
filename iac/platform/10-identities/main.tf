@@ -81,15 +81,15 @@ variable "state_resource_group_name" {
 
 variable "key_vault_name" {
   type    = string
-  default = "kv-sportify-plat-dev"
+  default = "kv-idp-plat-dev"
 }
 
 locals {
   tags = {
-    "managed-by"  = "sportify-platform"
+    "managed-by"  = "idp-platform"
     "environment" = var.environment
     "lifecycle"   = "platform"
-    "application" = "sportify-platform"
+    "application" = "idp-platform"
     "owner"       = "platform-team"
   }
   platform_repo = "${var.github_org}/${var.platform_repo}"
@@ -105,7 +105,7 @@ locals {
 }
 
 resource "azurerm_resource_group" "identities" {
-  name     = "rg-sportify-identities-${var.environment}"
+  name     = "rg-idp-identities-${var.environment}"
   location = var.location
   tags     = local.tags
 }
@@ -113,7 +113,7 @@ resource "azurerm_resource_group" "identities" {
 # ------------------------------------------------------------------ GitHub-federated identities
 module "platform" {
   source              = "../../modules/github-oidc-identity"
-  name                = "id-sportify-platform-${var.environment}"
+  name                = "id-idp-platform-${var.environment}"
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
   subjects            = { "platform-apply" = "repo:${local.platform_repo}:environment:platform" }
@@ -122,7 +122,7 @@ module "platform" {
 
 module "platform_plan" {
   source              = "../../modules/github-oidc-identity"
-  name                = "id-sportify-platform-plan-${var.environment}"
+  name                = "id-idp-platform-plan-${var.environment}"
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
   subjects            = { "platform-plan" = "repo:${local.platform_repo}:environment:platform-plan" }
@@ -131,7 +131,7 @@ module "platform_plan" {
 
 module "platform_deploy" {
   source              = "../../modules/github-oidc-identity"
-  name                = "id-sportify-platform-deploy-${var.environment}"
+  name                = "id-idp-platform-deploy-${var.environment}"
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
   subjects            = { "platform-deploy" = "repo:${local.platform_repo}:environment:platform-deploy" }
@@ -140,7 +140,7 @@ module "platform_deploy" {
 
 module "vending" {
   source              = "../../modules/github-oidc-identity"
-  name                = "id-sportify-vending-${var.environment}"
+  name                = "id-idp-vending-${var.environment}"
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
   subjects            = { "platform-vending" = "repo:${local.platform_repo}:environment:platform-vending" }
@@ -149,7 +149,7 @@ module "vending" {
 
 module "provisioning" {
   source              = "../../modules/github-oidc-identity"
-  name                = "id-sportify-provisioning-${var.environment}"
+  name                = "id-idp-provisioning-${var.environment}"
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
   subjects            = { "apps-plan" = local.app_subject.plan, "apps-apply" = local.app_subject.apply }
@@ -158,7 +158,7 @@ module "provisioning" {
 
 module "deployment" {
   source              = "../../modules/github-oidc-identity"
-  name                = "id-sportify-deployment-${var.environment}"
+  name                = "id-idp-deployment-${var.environment}"
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
   subjects            = { "apps-build" = local.app_subject.build, "apps-deploy" = local.app_subject.deploy }
@@ -168,7 +168,7 @@ module "deployment" {
 # ------------------------------------------------------------------ platform service identities
 resource "azurerm_user_assigned_identity" "service" {
   for_each            = toset(["backstage", "discovery", "orchestrator"])
-  name                = "id-sportify-${each.key}-${var.environment}"
+  name                = "id-idp-${each.key}-${var.environment}"
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
   tags                = local.tags
@@ -270,8 +270,8 @@ resource "azurerm_role_assignment" "platform_plan_reader" {
 # which must be an app registration exposing an identifier URI. v2 tokens: aud = the app's client ID.
 resource "azuread_application" "audience" {
   for_each         = toset(["backstage", "discovery", "orchestrator"])
-  display_name     = "sportify-${each.key}-${var.environment}"
-  identifier_uris  = ["api://sportify-${each.key}-${var.environment}"]
+  display_name     = "idp-${each.key}-${var.environment}"
+  identifier_uris  = ["api://idp-${each.key}-${var.environment}"]
   sign_in_audience = "AzureADMyOrg"
   owners           = [data.azuread_client_config.current.object_id]
 
@@ -291,7 +291,7 @@ output "service_auth" {
   value = {
     for k, app in azuread_application.audience : k => {
       audience = app.client_id
-      scope    = "api://sportify-${k}-${var.environment}/.default"
+      scope    = "api://idp-${k}-${var.environment}/.default"
     }
   }
 }

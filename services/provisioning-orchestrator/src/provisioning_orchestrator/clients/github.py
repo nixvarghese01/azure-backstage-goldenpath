@@ -13,7 +13,7 @@ from typing import Any, Protocol
 
 import httpx
 import jwt
-from sportify_common.secrets import read_secret_file
+from idp_common.secrets import read_secret_file
 
 API = "https://api.github.com"
 

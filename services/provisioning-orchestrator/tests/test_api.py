@@ -10,7 +10,7 @@ def test_submit_requires_user_context(client) -> None:
 
 
 def test_submit_requires_owner_membership(client) -> None:
-    headers = {**REQUESTER, "X-Sportify-Groups": "group:default/other-team"}
+    headers = {**REQUESTER, "X-IDP-Groups": "group:default/other-team"}
     res = client.post("/v1/requests", json=submission(), headers=headers)
     assert res.status_code == 403
 
@@ -58,7 +58,7 @@ def test_webhook_deduplicates_deliveries(client) -> None:
 @pytest.mark.parametrize("run_id, expected_status", [(42, 202), (43, 403), (None, 403)])
 def test_actions_callback_binds_run_id_to_token(client, monkeypatch, run_id, expected_status) -> None:
     rid = client.post("/v1/requests", json=submission(), headers=REQUESTER).json()["id"]
-    monkeypatch.setenv("SPORTIFY_AUTH_MODE", "entra")
+    monkeypatch.setenv("IDP_AUTH_MODE", "entra")
     claims = {
         "repository": "nixvarghese01/azure-backstage-goldenpath",
         "repository_owner": "nixvarghese01",

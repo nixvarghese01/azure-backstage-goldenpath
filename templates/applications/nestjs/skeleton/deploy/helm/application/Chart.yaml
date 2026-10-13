@@ -1,6 +1,6 @@
 apiVersion: v2
 name: application
-description: Sportify golden-path application chart (Deployment, Service, ServiceAccount, HTTPRoute; HPA + PDB for HA)
+description: IDP golden-path application chart (Deployment, Service, ServiceAccount, HTTPRoute; HPA + PDB for HA)
 type: application
 version: 1.0.0
 appVersion: "1.0.0"

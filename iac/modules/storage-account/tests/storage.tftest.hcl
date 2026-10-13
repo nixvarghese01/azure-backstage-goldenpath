@@ -2,9 +2,9 @@ mock_provider "azurerm" {}
 
 variables {
   name                = "stordersapidev"
-  resource_group_name = "rg-sportify-apps-dev"
+  resource_group_name = "rg-idp-apps-dev"
   location            = "uksouth"
-  tags                = { "managed-by" = "sportify-platform" }
+  tags                = { "managed-by" = "idp-platform" }
 }
 
 run "standard_is_lrs_without_shared_keys" {

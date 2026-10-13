@@ -32,8 +32,8 @@
     "@backstage/plugin-scaffolder-backend-module-github": "backstage:^",
     "@backstage/plugin-signals-backend": "backstage:^",
     "@backstage/plugin-techdocs-backend": "backstage:^",
-    "@internal/plugin-sportify-platform-backend": "workspace:^",
-    "@internal/plugin-sportify-platform-common": "workspace:^",
+    "@internal/plugin-idp-platform-backend": "workspace:^",
+    "@internal/plugin-idp-platform-common": "workspace:^",
     "app": "link:../app",
     "pg": "^8.13.0"
   },

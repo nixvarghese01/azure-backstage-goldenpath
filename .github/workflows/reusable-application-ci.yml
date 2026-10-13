@@ -26,8 +26,8 @@ permissions:
   contents: read
 
 env:
-  SPORTIFY_REQUEST_ID: ${{ vars.SPORTIFY_REQUEST_ID }}
-  SPORTIFY_CALLBACK_URL: ${{ vars.SPORTIFY_CALLBACK_URL }}
+  IDP_REQUEST_ID: ${{ vars.IDP_REQUEST_ID }}
+  IDP_CALLBACK_URL: ${{ vars.IDP_CALLBACK_URL }}
   PLATFORM: .platform
   RUNTIME: ${{ inputs.runtime }}
   IMAGE: ${{ inputs.image_name }}:${{ github.sha }}
@@ -192,7 +192,7 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
       - name: Report
-        if: always() && env.SPORTIFY_REQUEST_ID != ''
+        if: always() && env.IDP_REQUEST_ID != ''
         env:
           JOB_STATUS: ${{ job.status }}
         run: |

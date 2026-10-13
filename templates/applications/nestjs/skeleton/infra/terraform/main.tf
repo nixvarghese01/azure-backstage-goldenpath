@@ -74,7 +74,7 @@ data "kubernetes_namespace_v1" "existing" {
 check "existing_namespace_owned_by_team" {
   assert {
     condition = var.namespace.mode == "new" || try(
-      data.kubernetes_namespace_v1.existing[0].metadata[0].labels["sportify.io/owner"], ""
+      data.kubernetes_namespace_v1.existing[0].metadata[0].labels["idp.io/owner"], ""
     ) == var.owner
     error_message = "The existing namespace is not labelled as owned by ${var.owner}."
   }

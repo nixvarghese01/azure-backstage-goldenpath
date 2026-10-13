@@ -4,7 +4,7 @@ import rego.v1
 
 import data.main
 
-tags := {"managed-by": "sportify-platform", "environment": "dev", "owner": "team-orders", "application": "orders-api", "lifecycle": "application"}
+tags := {"managed-by": "idp-platform", "environment": "dev", "owner": "team-orders", "application": "orders-api", "lifecycle": "application"}
 
 allow_data := {"regions": ["uksouth"], "skus": {"storage_account": ["Standard_LRS", "Standard_ZRS"]}}
 
@@ -35,5 +35,5 @@ test_shared_keys_denied if {
 test_unmanaged_update_denied if {
 	inp := {"resource_changes": [{"address": "azurerm_storage_account.existing", "type": "azurerm_storage_account", "change": {"actions": ["update"], "before": {"tags": {"owner": "someone"}}, "after": good_storage}}]}
 	some msg in main.deny with input as inp with data.regions as allow_data.regions with data.skus as allow_data.skus
-	contains(msg, "not managed by sportify-platform")
+	contains(msg, "not managed by idp-platform")
 }

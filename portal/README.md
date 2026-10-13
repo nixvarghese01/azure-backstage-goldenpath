@@ -1,12 +1,12 @@
 # Portal (Backstage)
 
-Self-hosted Backstage 1.55 for Sportify Azure Backstage. Custom TypeScript is limited to three thin plugins:
+Self-hosted Backstage 1.55 for Internal Developer Portal. Custom TypeScript is limited to three thin plugins:
 
 | Package | Purpose |
 |---|---|
-| `plugins/sportify-platform-common` | Shared types and the `sportify.request.approve` permission |
-| `plugins/sportify-platform-backend` | Bridge to the Python services (`/api/sportify/*`) with the user's verified identity; scaffolder actions `sportify:request:submit` and `sportify:request:repository-created` |
-| `plugins/sportify-platform` | Scaffolder fields (resource picker, availability, stack), the **Provisioning** entity tab and the **Approvals** page |
+| `plugins/idp-platform-common` | Shared types and the `idp.request.approve` permission |
+| `plugins/idp-platform-backend` | Bridge to the Python services (`/api/idp/*`) with the user's verified identity; scaffolder actions `idp:request:submit` and `idp:request:repository-created` |
+| `plugins/idp-platform` | Scaffolder fields (resource picker, availability, stack), the **Provisioning** entity tab and the **Approvals** page |
 
 Everything else is built-in: catalog, scaffolder (`fetch:template`, `publish:github`, `github:environment:create`, `catalog:register`), TechDocs, GitHub auth, permissions and notifications.
 
@@ -18,7 +18,7 @@ the local `runtime-lite` target omits Python and MkDocs. Build it from the repos
 root, which supplies the catalog, local templates and documentation:
 
 ```bash
-docker build -f portal/Dockerfile -t sportify/backstage:local .
+docker build -f portal/Dockerfile -t idp/backstage:local .
 ```
 
 The default command loads `app-config.container.yaml` followed by `app-config.production.yaml`.
@@ -39,7 +39,7 @@ cd portal
 corepack enable
 yarn install
 # PostgreSQL and the Python services: see deploy/local and services/
-export SPORTIFY_DEV_SERVICE_TOKEN=dev-only-change-me   # same value as the services
+export IDP_DEV_SERVICE_TOKEN=dev-only-change-me   # same value as the services
 yarn dev   # http://localhost:3000
 ```
 

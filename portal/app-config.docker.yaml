@@ -13,7 +13,7 @@ backend:
     externalAccess:
       - type: static
         options:
-          token: ${SPORTIFY_DEV_SERVICE_TOKEN}
+          token: ${IDP_DEV_SERVICE_TOKEN}
           subject: local-orchestrator
         accessRestrictions:
           - plugin: notifications
@@ -31,7 +31,7 @@ auth:
       dangerouslyAllowOutsideDevelopment: true
       userEntityRef: user:default/alex
       ownershipEntityRefs: [user:default/alex, group:default/team-orders]
-sportify:
+idp:
   githubOrg: ${ORCHESTRATOR_GITHUB_ORG}
   orchestratorGithubAppId: 0
   discovery:
@@ -40,4 +40,4 @@ sportify:
     baseUrl: http://orchestrator-api:8002
   auth:
     mode: static
-    devToken: ${SPORTIFY_DEV_SERVICE_TOKEN}
+    devToken: ${IDP_DEV_SERVICE_TOKEN}

@@ -9,7 +9,7 @@ import socket
 import time
 from datetime import UTC, datetime, timedelta
 
-from sportify_common.logging import configure_logging, request_id_var
+from idp_common.logging import configure_logging, request_id_var
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 

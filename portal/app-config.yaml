@@ -1,11 +1,11 @@
 # Local development configuration. Secrets never go here: use app-config.local.yaml (git-ignored)
-# or files fetched by scripts/dev-secrets.sh into ~/.config/sportify/.
+# or files fetched by scripts/dev-secrets.sh into ~/.config/idp/.
 app:
-  title: Sportify Azure Backstage
+  title: Internal Developer Portal
   baseUrl: http://localhost:3000
 
 organization:
-  name: Sportify
+  name: IDP
 
 backend:
   baseUrl: http://localhost:7007
@@ -70,11 +70,11 @@ techdocs:
 
 scaffolder:
   defaultAuthor:
-    name: Sportify Platform
+    name: IDP Platform
     email: platform@xycorp.local
 
-# --------------------------------------------------------------------- Sportify
-sportify:
+# --------------------------------------------------------------------- IDP
+idp:
   githubOrg: nixvarghese01
   orchestratorGithubAppId: 0              # GitHub App #2 ID (set in app-config.local.yaml)
   approverGroup: group:default/platform-approvers
@@ -85,7 +85,7 @@ sportify:
     baseUrl: http://localhost:8002
   auth:
     mode: static                          # local only; production uses Entra (see production config)
-    devToken: ${SPORTIFY_DEV_SERVICE_TOKEN}
+    devToken: ${IDP_DEV_SERVICE_TOKEN}
   stacks:
     - { id: nestjs, name: NestJS (TypeScript), enabled: true }
     - { id: fastapi, name: Python FastAPI, enabled: false }

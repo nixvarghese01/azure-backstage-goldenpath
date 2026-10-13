@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Build from the repository root: docker build -f portal/Dockerfile -t sportify/backstage:local .
+# Build from the repository root: docker build -f portal/Dockerfile -t idp/backstage:local .
 FROM node:24-bookworm-slim AS build
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ libsqlite3-dev git ca-certificates \
     && rm -rf /var/lib/apt/lists/* && corepack enable

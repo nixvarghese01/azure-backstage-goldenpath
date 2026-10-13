@@ -5,9 +5,9 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
-from sportify_common.auth import Caller, require_caller
-from sportify_common.logging import configure_logging
-from sportify_common.telemetry import configure_tracing
+from idp_common.auth import Caller, require_caller
+from idp_common.logging import configure_logging
+from idp_common.telemetry import configure_tracing
 
 from azure_discovery.cache import TtlCache
 from azure_discovery.capabilities import compute_capabilities
@@ -53,7 +53,7 @@ def create_app(
     app = FastAPI(
         title="azure-discovery",
         version="1.0.0",
-        description="Read-only Azure discovery for Sportify Azure Backstage",
+        description="Read-only Azure discovery for Internal Developer Portal",
     )
     app.state.inventory = inventory
     app.state.policy = policy

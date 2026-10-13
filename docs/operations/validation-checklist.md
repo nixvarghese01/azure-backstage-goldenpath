@@ -8,8 +8,8 @@ The code for milestone 1 was written without being run. Work through this list, 
 cd services
 uv sync --all-packages
 uv run ruff check . && uv run ruff format --check .
-uv run mypy libs/sportify-common/src azure-discovery/src provisioning-orchestrator/src
-uv run pytest libs/sportify-common/tests
+uv run mypy libs/idp-common/src azure-discovery/src provisioning-orchestrator/src
+uv run pytest libs/idp-common/tests
 (cd azure-discovery && uv run pytest)
 (cd provisioning-orchestrator && uv run pytest -m "not integration")
 (cd provisioning-orchestrator && uv run pytest -m integration)   # needs Docker
@@ -28,7 +28,7 @@ Things most likely to need adjustment:
 ```bash
 cd deploy/local && cp .env.example .env && docker compose up -d postgres
 cd ../../services
-DISCOVERY_AZURE_MODE=mock SPORTIFY_AUTH_MODE=static SPORTIFY_DEV_SERVICE_TOKEN=dev-only-change-me \
+DISCOVERY_AZURE_MODE=mock IDP_AUTH_MODE=static IDP_DEV_SERVICE_TOKEN=dev-only-change-me \
   DISCOVERY_POLICY_FILE=../policies/allowlist.yaml uv run uvicorn azure_discovery.main:create_app --factory --port 8001
 ORCHESTRATOR_DATABASE_URL=postgresql+psycopg://orchestrator:dev-only-not-a-secret@localhost:5432/orchestrator \
   uv run --package provisioning-orchestrator alembic -c provisioning-orchestrator/alembic.ini upgrade head
@@ -89,7 +89,7 @@ If APIs moved, generate a fresh app (`npx @backstage/create-app@latest`) and por
    - `AZURE_TENANT_ID`
    - `PROVISIONING_CLIENT_ID`
    - `DEPLOYMENT_CLIENT_ID`
-   - `SPORTIFY_CALLBACK_URL`
+   - `IDP_CALLBACK_URL`
 5. Set platform repository variables:
    - client IDs, `ACR_NAME`, `AKS_NAME`, `AKS_RESOURCE_GROUP`
    - `PLATFORM_BACKEND_HCL`, `PLATFORM_TFVARS_JSON`, `PLATFORM_CHART_VALUES_JSON`

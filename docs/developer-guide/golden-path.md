@@ -22,12 +22,12 @@ The examples in this guide use the following request.
 | Owner | `team-orders` |
 | Stack | NestJS (TypeScript) |
 | Environment | `dev` |
-| Subscription | Select existing: `sub-sportify-dev` |
-| Resource group | Select existing: `rg-sportify-apps-dev` |
-| AKS cluster | Select existing: `aks-sportify-shared-dev` |
-| Container registry | Select existing: `acrsportifydev` |
+| Subscription | Select existing: `sub-idp-dev` |
+| Resource group | Select existing: `rg-idp-apps-dev` |
+| AKS cluster | Select existing: `aks-idp-shared-dev` |
+| Container registry | Select existing: `acridpdev` |
 | Namespace | Create new: `orders-api` |
-| Runtime capability | Storage, select existing: `stsportifyshareddev` (blob read and write) |
+| Runtime capability | Storage, select existing: `stidpshareddev` (blob read and write) |
 | Endpoint host | `orders-api.dev.xycorp.local` |
 | High availability | **No** (the `dev` default, so no justification is needed) |
 | Repository visibility | Public |
@@ -50,12 +50,12 @@ sequenceDiagram
     Disc->>Az: Resource Graph / ARM (read-only)
     Disc-->>BS: Allowlisted options
     Dev->>BS: Fill all 4 pages, click Create
-    BS->>Orch: sportify:request:submit (idempotency key = task ID)
+    BS->>Orch: idp:request:submit (idempotency key = task ID)
     Orch->>Disc: POST /v1/validate (re-check every selection)
     Orch-->>BS: requestId (state VALIDATING → accepted)
     BS->>GH: publish:github (infrastructure-only repository)
     BS->>BS: catalog:register
-    BS->>Orch: sportify:request:repository-created
+    BS->>Orch: idp:request:repository-created
     Note over Orch: REPOSITORY_CREATED
 
     Orch->>GH: Dispatch terraform-validate, terraform-plan
@@ -134,7 +134,7 @@ the cluster's `gateway.base_domain` in `policies/allowlist.yaml`.
 
 When the developer clicks **Create**:
 
-- `sportify:request:submit` sends the full request to the orchestrator. The scaffolder task ID is the idempotency key, so submitting twice returns the same request.
+- `idp:request:submit` sends the full request to the orchestrator. The scaffolder task ID is the idempotency key, so submitting twice returns the same request.
 - The orchestrator validates everything on the server: naming rules, duplicates, team membership, the environment policy, and every Azure ID through `POST /v1/validate`. An invalid request is rejected here, **before** any repository exists.
 - The developer is taken to the request's status page.
 
@@ -158,9 +158,9 @@ The plan for the example request:
 + kubernetes_resource_quota               orders-api/default
 + kubernetes_limit_range                  orders-api/default
 + kubernetes_role_binding                 orders-api/deployer
-+ azurerm_role_assignment                 Storage Blob Data Contributor → stsportifyshareddev
-= reused (data sources): sub-sportify-dev, rg-sportify-apps-dev,
-  aks-sportify-shared-dev, acrsportifydev, stsportifyshareddev
++ azurerm_role_assignment                 Storage Blob Data Contributor → stidpshareddev
+= reused (data sources): sub-idp-dev, rg-idp-apps-dev,
+  aks-idp-shared-dev, acridpdev, stidpshareddev
 Plan: 7 to add, 0 to change, 0 to destroy.
 ```
 
@@ -168,7 +168,7 @@ Plan: 7 to add, 0 to change, 0 to destroy.
 
 The approval decision is made in Backstage, and GitHub enforces it.
 
-**What the approver sees.** Members of the approver group, for example `platform-approvers`, receive a Backstage notification linking to **Sportify → Approvals**. The approval card shows:
+**What the approver sees.** Members of the approver group, for example `platform-approvers`, receive a Backstage notification linking to **IDP → Approvals**. The approval card shows:
 
 - the requester, application, environment and time
 - the plan summary: resources added, changed, destroyed and reused
@@ -183,7 +183,7 @@ The approval decision is made in Backstage, and GitHub enforces it.
 1. The `dev-infra` GitHub Environment has a **custom deployment protection rule** owned by the orchestrator's GitHub App. GitHub holds the apply job and sends a `deployment_protection_rule` webhook to the orchestrator.
 2. The approver clicks **Approve**. The Backstage bridge forwards the decision with the approver's identity.
 3. The orchestrator checks that:
-   - the approver holds the Backstage permission `sportify.request.approve` for the environment
+   - the approver holds the Backstage permission `idp.request.approve` for the environment
    - the approver is **not** the requester (separation of duties)
    - the approval is bound to the **exact plan hash** (a new plan needs a new approval)
    - the request has not already been decided (a duplicate click or replayed request has no effect)
@@ -209,7 +209,7 @@ The application is added only **after** the infrastructure is ready. A failed pr
 | 3.1 | Open a pull request, "Add orders-api application (NestJS)", generated from the chosen stack's template | Orchestrator (GitHub App) | `APPLICATION_BUILDING` |
 | 3.2 | `application-ci.yml` runs on the pull request: lint, unit tests, integration tests, container build and dependency scan | GitHub Actions | `APPLICATION_BUILDING` |
 | 3.3 | Merge the pull request once the required checks pass | Orchestrator (GitHub App) | `APPLICATION_BUILDING` |
-| 3.4 | `application-ci.yml` runs on `main`: build, image scan, then push `acrsportifydev.azurecr.io/orders-api:<git-sha>` using the deployment identity (OIDC) | GitHub Actions | `APPLICATION_BUILDING` |
+| 3.4 | `application-ci.yml` runs on `main`: build, image scan, then push `acridpdev.azurecr.io/orders-api:<git-sha>` using the deployment identity (OIDC) | GitHub Actions | `APPLICATION_BUILDING` |
 
 The pull request contains:
 
@@ -224,7 +224,7 @@ The pull request contains:
 | # | Action | State |
 |---|---|---|
 | 4.1 | `application-deploy.yml` (environment `dev`) logs in with the deployment identity, which has namespace-scoped access only | `DEPLOYING` |
-| 4.2 | `helm upgrade --install` into the `orders-api` namespace on `aks-sportify-shared-dev`, with the Workload Identity labels and annotations | `DEPLOYING` |
+| 4.2 | `helm upgrade --install` into the `orders-api` namespace on `aks-idp-shared-dev`, with the Workload Identity labels and annotations | `DEPLOYING` |
 | 4.3 | `kubectl rollout status` waits for the new pods | `DEPLOYING` |
 | 4.4 | A smoke test through the endpoint checks `/health/ready` (including the Storage dependency) and `GET /v1/orders` | `DEPLOYING` |
 | 4.5 | The deployment status is reported as success | `SUCCEEDED` |
@@ -242,8 +242,8 @@ The URLs are shown on the Backstage entity page (`orders-api` → *Overview* and
 | Health | `https://orders-api.dev.xycorp.local/health/ready` |
 | Repository | `https://github.com/nixvarghese01/orders-api` |
 | Workflow runs | `https://github.com/nixvarghese01/orders-api/actions` |
-| Container image | `acrsportifydev.azurecr.io/orders-api:<git-sha>` |
-| Azure resource group | Azure portal link to `rg-sportify-apps-dev` |
+| Container image | `acridpdev.azurecr.io/orders-api:<git-sha>` |
+| Azure resource group | Azure portal link to `rg-idp-apps-dev` |
 | Backstage entity | `https://backstage.xycorp.local/catalog/default/component/orders-api` |
 
 Each stage is reported as its own outcome:

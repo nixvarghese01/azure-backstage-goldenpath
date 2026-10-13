@@ -24,23 +24,21 @@ class MockInventory:
         extra_subscriptions: list[Subscription] | None = None,
     ) -> None:
         self.subscriptions = [
-            Subscription(id=SUB, name="sub-sportify-dev", state="Enabled", quota_id="FreeTrial_2014-09-01"),
+            Subscription(id=SUB, name="sub-idp-dev", state="Enabled", quota_id="FreeTrial_2014-09-01"),
             Subscription(id="11111111-1111-1111-1111-111111111111", name="not-allowlisted", state="Enabled"),
             *(extra_subscriptions or []),
         ]
         self.resource_groups = [
-            ResourceGroup(id=f"{_P}/rg-sportify-apps-dev", name="rg-sportify-apps-dev", location="uksouth"),
-            ResourceGroup(
-                id=f"{_P}/rg-sportify-platform-dev", name="rg-sportify-platform-dev", location="uksouth"
-            ),
+            ResourceGroup(id=f"{_P}/rg-idp-apps-dev", name="rg-idp-apps-dev", location="uksouth"),
+            ResourceGroup(id=f"{_P}/rg-idp-platform-dev", name="rg-idp-platform-dev", location="uksouth"),
             ResourceGroup(id=f"{_P}/rg-other", name="rg-other", location="westeurope"),
         ]
         self.clusters = [
             AksCluster(
-                id=f"{_P}/rg-sportify-platform-dev/providers/Microsoft.ContainerService/managedClusters/"
-                "aks-sportify-shared-dev",
-                name="aks-sportify-shared-dev",
-                resource_group="rg-sportify-platform-dev",
+                id=f"{_P}/rg-idp-platform-dev/providers/Microsoft.ContainerService/managedClusters/"
+                "aks-idp-shared-dev",
+                name="aks-idp-shared-dev",
+                resource_group="rg-idp-platform-dev",
                 location="uksouth",
                 kubernetes_version="1.36.4",
                 oidc_issuer_enabled=True,
@@ -58,21 +56,20 @@ class MockInventory:
         ]
         self.registries = [
             ContainerRegistry(
-                id=f"{_P}/rg-sportify-platform-dev/providers/Microsoft.ContainerRegistry/registries/"
-                "acrsportifydev",
-                name="acrsportifydev",
-                resource_group="rg-sportify-platform-dev",
+                id=f"{_P}/rg-idp-platform-dev/providers/Microsoft.ContainerRegistry/registries/acridpdev",
+                name="acridpdev",
+                resource_group="rg-idp-platform-dev",
                 location="uksouth",
                 sku="Basic",
-                login_server="acrsportifydev.azurecr.io",
+                login_server="acridpdev.azurecr.io",
             )
         ]
         self.data = [
             DataResource(
-                id=f"{_P}/rg-sportify-apps-dev/providers/Microsoft.Storage/storageAccounts/stsportifyshareddev",
-                name="stsportifyshareddev",
+                id=f"{_P}/rg-idp-apps-dev/providers/Microsoft.Storage/storageAccounts/stidpshareddev",
+                name="stidpshareddev",
                 type="microsoft.storage/storageaccounts",
-                resource_group="rg-sportify-apps-dev",
+                resource_group="rg-idp-apps-dev",
                 location="uksouth",
                 sku="Standard_LRS",
             )

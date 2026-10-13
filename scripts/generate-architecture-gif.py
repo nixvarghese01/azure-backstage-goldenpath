@@ -81,7 +81,7 @@ def render(scene_index, tick, ticks=14):
             draw.ellipse((x, y, x + 1, y + 1), fill="#20263b")
     draw.rounded_rectangle((60, 38, 280, 66), radius=14, fill="#253356")
     draw.text((75, 41), "PROPOSED SOLUTION", font=font(16, True), fill="#abcfff")
-    draw.text((60, 75), "Sportify Azure Backstage", font=font(42, True), fill="#f5f6ff")
+    draw.text((60, 75), "Internal Developer Portal", font=font(42, True), fill="#f5f6ff")
     draw.text((62, 132), "Self-service applications  /  Guarded provisioning  /  Runtime secrets", font=font(22), fill="#bac4de")
     title, caption, active_edges, active_nodes = SCENES[scene_index]
     for key, (points, color) in EDGES.items():

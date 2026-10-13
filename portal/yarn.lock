@@ -4609,9 +4609,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@internal/plugin-sportify-platform-backend@workspace:^, @internal/plugin-sportify-platform-backend@workspace:plugins/sportify-platform-backend":
+"@internal/plugin-idp-platform-backend@workspace:^, @internal/plugin-idp-platform-backend@workspace:plugins/idp-platform-backend":
   version: 0.0.0-use.local
-  resolution: "@internal/plugin-sportify-platform-backend@workspace:plugins/sportify-platform-backend"
+  resolution: "@internal/plugin-idp-platform-backend@workspace:plugins/idp-platform-backend"
   dependencies:
     "@azure/identity": "npm:^4.13.0"
     "@backstage/backend-plugin-api": "backstage:^"
@@ -4622,7 +4622,7 @@ __metadata:
     "@backstage/integration": "backstage:^"
     "@backstage/plugin-permission-common": "backstage:^"
     "@backstage/plugin-scaffolder-node": "backstage:^"
-    "@internal/plugin-sportify-platform-common": "workspace:^"
+    "@internal/plugin-idp-platform-common": "workspace:^"
     "@octokit/rest": "npm:^21.0.0"
     "@types/express": "npm:^4.17.0"
     express: "npm:^4.21.0"
@@ -4631,18 +4631,18 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@internal/plugin-sportify-platform-common@workspace:^, @internal/plugin-sportify-platform-common@workspace:plugins/sportify-platform-common":
+"@internal/plugin-idp-platform-common@workspace:^, @internal/plugin-idp-platform-common@workspace:plugins/idp-platform-common":
   version: 0.0.0-use.local
-  resolution: "@internal/plugin-sportify-platform-common@workspace:plugins/sportify-platform-common"
+  resolution: "@internal/plugin-idp-platform-common@workspace:plugins/idp-platform-common"
   dependencies:
     "@backstage/cli": "backstage:^"
     "@backstage/plugin-permission-common": "backstage:^"
   languageName: unknown
   linkType: soft
 
-"@internal/plugin-sportify-platform@workspace:^, @internal/plugin-sportify-platform@workspace:plugins/sportify-platform":
+"@internal/plugin-idp-platform@workspace:^, @internal/plugin-idp-platform@workspace:plugins/idp-platform":
   version: 0.0.0-use.local
-  resolution: "@internal/plugin-sportify-platform@workspace:plugins/sportify-platform"
+  resolution: "@internal/plugin-idp-platform@workspace:plugins/idp-platform"
   dependencies:
     "@backstage/catalog-model": "backstage:^"
     "@backstage/cli": "backstage:^"
@@ -4653,7 +4653,7 @@ __metadata:
     "@backstage/plugin-permission-react": "backstage:^"
     "@backstage/plugin-scaffolder-react": "backstage:^"
     "@backstage/test-utils": "backstage:^"
-    "@internal/plugin-sportify-platform-common": "workspace:^"
+    "@internal/plugin-idp-platform-common": "workspace:^"
     "@material-ui/core": "npm:^4.12.4"
     "@material-ui/icons": "npm:^4.11.3"
     "@material-ui/lab": "npm:^4.0.0-alpha.61"
@@ -11694,7 +11694,7 @@ __metadata:
     "@backstage/plugin-user-settings": "backstage:^"
     "@backstage/test-utils": "backstage:^"
     "@backstage/theme": "backstage:^"
-    "@internal/plugin-sportify-platform": "workspace:^"
+    "@internal/plugin-idp-platform": "workspace:^"
     "@material-ui/core": "npm:^4.12.4"
     "@material-ui/icons": "npm:^4.11.3"
     "@testing-library/react": "npm:^16.0.0"
@@ -12295,8 +12295,8 @@ __metadata:
     "@backstage/plugin-scaffolder-backend-module-github": "backstage:^"
     "@backstage/plugin-signals-backend": "backstage:^"
     "@backstage/plugin-techdocs-backend": "backstage:^"
-    "@internal/plugin-sportify-platform-backend": "workspace:^"
-    "@internal/plugin-sportify-platform-common": "workspace:^"
+    "@internal/plugin-idp-platform-backend": "workspace:^"
+    "@internal/plugin-idp-platform-common": "workspace:^"
     app: "link:../app"
     pg: "npm:^8.13.0"
   languageName: unknown
@@ -18288,6 +18288,27 @@ __metadata:
   checksum: 10c0/a3fc4de0042d7b45bf8652d5596c80b42139d8625c9cd6a8834e29e1b6dce8fccabd1228e08744b78677a19ceed7201a32fed8ca3dc3e4852e8fee24360a6cfc
   languageName: node
   linkType: hard
+
+"idp-portal@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "idp-portal@workspace:."
+  dependencies:
+    "@backstage/cli": "backstage:^"
+    "@backstage/cli-defaults": "backstage:^"
+    "@backstage/repo-tools": "backstage:^"
+    "@jest/environment-jsdom-abstract": "npm:^30.0.0"
+    "@testing-library/dom": "npm:^10.0.0"
+    "@types/jest": "npm:^30.0.0"
+    "@types/node": "npm:^24.0.0"
+    "@types/react": "npm:^18.3.0"
+    "@types/react-dom": "npm:^18.3.0"
+    "@types/webpack-env": "npm:^1.18.0"
+    jest: "npm:^30.0.0"
+    jsdom: "npm:^27.1.0"
+    prettier: "npm:^3.3.0"
+    typescript: "npm:~5.8.0"
+  languageName: unknown
+  linkType: soft
 
 "ieee754@npm:^1.1.13, ieee754@npm:^1.1.4, ieee754@npm:^1.2.1":
   version: 1.2.1
@@ -26741,27 +26762,6 @@ __metadata:
   checksum: 10c0/b292beb8ce9215f8c642bb68be6249c5a4c7f332fc8ecadae7be5cbdf1ea95addc95f0459ef2e7ad9d45fd1064698a097e4eb211c83e772b49bc0ee423e91534
   languageName: node
   linkType: hard
-
-"sportify-portal@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "sportify-portal@workspace:."
-  dependencies:
-    "@backstage/cli": "backstage:^"
-    "@backstage/cli-defaults": "backstage:^"
-    "@backstage/repo-tools": "backstage:^"
-    "@jest/environment-jsdom-abstract": "npm:^30.0.0"
-    "@testing-library/dom": "npm:^10.0.0"
-    "@types/jest": "npm:^30.0.0"
-    "@types/node": "npm:^24.0.0"
-    "@types/react": "npm:^18.3.0"
-    "@types/react-dom": "npm:^18.3.0"
-    "@types/webpack-env": "npm:^1.18.0"
-    jest: "npm:^30.0.0"
-    jsdom: "npm:^27.1.0"
-    prettier: "npm:^3.3.0"
-    typescript: "npm:~5.8.0"
-  languageName: unknown
-  linkType: soft
 
 "sprintf-js@npm:~1.0.2":
   version: 1.0.3

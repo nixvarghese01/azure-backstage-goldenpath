@@ -4,7 +4,7 @@ location               = "uksouth"
 admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]
 
 aks = {
-  name     = "aks-sportify-shared-dev"
+  name     = "aks-idp-shared-dev"
   sku_tier = "Free"
   system_pool = {
     vm_size    = "Standard_D2s_v5"
@@ -15,11 +15,11 @@ aks = {
 }
 
 acr = {
-  name = "acrsportifydev"
+  name = "acridpdev"
   sku  = "Basic"
 }
 
-postgres_name        = "psql-sportify-dev"
+postgres_name        = "psql-idp-dev"
 postgres_allowed_ips = {} # e.g. { aks-egress = "20.0.0.1" } once the cluster exists
 dns_zone_name        = null
-shared_storage_name  = "stsportifyshareddev"
+shared_storage_name  = "stidpshareddev"

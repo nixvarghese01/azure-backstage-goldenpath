@@ -1,5 +1,5 @@
 # Reusable deploy / uninstall for generated applications on the shared AKS cluster.
-# The deployment identity is bound only inside the application's namespace (sportify-app-deployer).
+# The deployment identity is bound only inside the application's namespace (idp-app-deployer).
 # Helm stores release state in ConfigMaps (HELM_DRIVER=configmap): no Kubernetes Secret objects (ADR-0005).
 # The exact manifests being deployed are checked against the Helm policies before the upgrade.
 name: reusable-application-deploy
@@ -28,8 +28,8 @@ permissions:
   contents: read
 
 env:
-  SPORTIFY_REQUEST_ID: ${{ vars.SPORTIFY_REQUEST_ID }}
-  SPORTIFY_CALLBACK_URL: ${{ vars.SPORTIFY_CALLBACK_URL }}
+  IDP_REQUEST_ID: ${{ vars.IDP_REQUEST_ID }}
+  IDP_CALLBACK_URL: ${{ vars.IDP_CALLBACK_URL }}
   HELM_DRIVER: configmap
   PLATFORM: .platform
   CHART: deploy/helm/application
@@ -93,7 +93,7 @@ jobs:
           az aks get-credentials --resource-group "$AKS_RESOURCE_GROUP" --name "$AKS_NAME" --overwrite-existing
           kubelogin convert-kubeconfig -l azurecli
       - name: Report start
-        if: inputs.action == 'deploy' && env.SPORTIFY_REQUEST_ID != ''
+        if: inputs.action == 'deploy' && env.IDP_REQUEST_ID != ''
         run: bash "$PLATFORM/scripts/ci/callback.sh" deploy started
       - name: Helm upgrade --install
         if: inputs.action == 'deploy'
@@ -109,7 +109,7 @@ jobs:
         id: smoke
         run: |
           host="$(yq '.route.host' "$CHART/values-${ENVIRONMENT}.yaml")"
-          ip="$(kubectl get gateway sportify-gateway -n sportify-gateway -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)"
+          ip="$(kubectl get gateway idp-gateway -n idp-gateway -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)"
           resolve=(); [[ -n "$ip" ]] && resolve=(--resolve "${host}:80:${ip}")
           for _ in $(seq 1 20); do
             if curl -fsS "${resolve[@]}" "http://${host}/health/ready" > "$RUNNER_TEMP/ready.json"; then break; fi
@@ -124,7 +124,7 @@ jobs:
         if: inputs.action == 'uninstall'
         run: helm uninstall "$RELEASE" --namespace "$NAMESPACE" --wait --ignore-not-found
       - name: Report
-        if: always() && env.SPORTIFY_REQUEST_ID != ''
+        if: always() && env.IDP_REQUEST_ID != ''
         env:
           JOB_STATUS: ${{ job.status }}
         run: |

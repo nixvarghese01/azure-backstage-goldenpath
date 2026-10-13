@@ -29,7 +29,7 @@ Start with the request's **Provisioning** tab in Backstage. It shows the failed 
 | Discovery `/readyz` 503 | Workload Identity federation (stack 30), `azure.workload.identity/use` label, `Reader` assignment |
 | Orchestrator `/readyz` 503 | PostgreSQL reachability and the Entra login role (`scripts/postgres-grant-identities.sql`) |
 | Orchestrator can't read GitHub App key | Key Vault per-secret assignment (`secrets_created = true`), SecretProviderClass, CSI driver pods |
-| Backstage → services 401/403 | Audience/scope config (`service_auth` output of stack 10) and `SPORTIFY_ALLOWED_CALLERS` |
+| Backstage → services 401/403 | Audience/scope config (`service_auth` output of stack 10) and `IDP_ALLOWED_CALLERS` |
 | Notifications not arriving | Outbox backlog (`outbox_messages` with `last_error`), Backstage `externalAccess` JWKS config |
 
 ## Useful queries (orchestrator database)
