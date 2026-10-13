@@ -1,7 +1,6 @@
 """FastAPI application for azure-discovery (read-only)."""
 
-from __future__ import annotations
-
+# Route dependency aliases live inside create_app, so keep annotations evaluable in that scope.
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status

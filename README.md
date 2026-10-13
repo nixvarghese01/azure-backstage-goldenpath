@@ -6,8 +6,8 @@ Sportify Azure Backstage lets developers request a production-shaped service thr
 
 > **This is a model project.** It is a reference design that shows how an enterprise-grade IDP on Backstage and Azure can be structured, secured and operated. The implementation is deliberately scoped to one golden path, to demonstrate the design end to end. It is not intended for wide production rollout as-is. Where a production platform would make a different trade-off, the [ADRs](docs/adr/) say so.
 
-> **Project status: Phase 1 (architecture and planning) complete; Phase 2 next.**
-> This README describes the target design and the first golden path. Nothing listed under [Features](#features) is implemented yet unless the [Implementation status](#implementation-status) table says so. The table is the source of truth and is updated as each phase is completed and verified.
+> **Project status: milestone 1 code written; end-to-end validation pending.**
+> This README describes the target design and the first golden path. The [Implementation status](#implementation-status) table distinguishes code written from verified behaviour. See the [local code review](docs/operations/local-code-review.md) for the latest changes and deferred checks.
 
 ---
 

@@ -8,6 +8,7 @@ Usage: python render_fixture.py <output-dir>
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import sys
@@ -63,7 +64,7 @@ def render_skeleton(out: Path) -> None:
             if "replace('group:default/', '')" in filt:
                 value = value.replace("group:default/", "")
             if filt == "| dump":
-                return f'"{value}"'
+                return json.dumps(value)
             return value
 
         target.write_text(EXPR.sub(sub, path.read_text(encoding="utf-8")), encoding="utf-8")

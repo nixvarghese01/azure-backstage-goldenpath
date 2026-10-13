@@ -14,7 +14,7 @@ async function bootstrap(): Promise<void> {
 
   const config = new DocumentBuilder()
     .setTitle('[[ values.app ]]')
-    .setDescription('[[ values.description | replace("'", "") ]]')
+    .setDescription([[ values.description | tojson ]])
     .setVersion('1.0.0')
     .build();
   SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, config));

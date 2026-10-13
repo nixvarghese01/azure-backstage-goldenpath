@@ -58,6 +58,7 @@ jobs:
           npm install --no-audit --no-fund
           npm run lint
           npm test
+          npm run test:e2e
           npm run build
           docker build -t orders-api:ci .
       - name: Install into kind (restricted Pod Security, read-only root, non-root)

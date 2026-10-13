@@ -12,7 +12,7 @@ Thanks for helping improve Sportify Azure Backstage. This is a model project, so
 
 | Area | Run |
 |---|---|
-| Python services | `cd services && uv run ruff check . && uv run ruff format --check . && uv run mypy ... && uv run pytest` |
+| Python services | `cd services && uv sync --all-packages`, then follow the separate lint, type and test commands in the [validation checklist](docs/operations/validation-checklist.md) |
 | Portal | `cd portal && yarn tsc && yarn lint:all && yarn test:all` |
 | Terraform | `terraform fmt -recursive`, `terraform validate` and `terraform test` in changed modules |
 | Policies | `conftest verify -p policies/terraform` |
@@ -20,6 +20,10 @@ Thanks for helping improve Sportify Azure Backstage. This is a model project, so
 | Secrets | `pre-commit run --all-files` (gitleaks, ruff, terraform fmt) |
 
 See [docs/operations/validation-checklist.md](docs/operations/validation-checklist.md) for the full set.
+
+For local-only work, make the requested changes and commit locally. Publishing, cloud provisioning and
+test execution can be deferred by the maintainer; record the checks that remain pending instead of
+marking the change verified. Do not push or create a pull request without authorization.
 
 ## Rules that reviews enforce
 

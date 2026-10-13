@@ -25,7 +25,8 @@ The exact access each identity has, as implemented in `iac/platform/10-identitie
 | Backstage → discovery / orchestrator | `api://sportify-discovery-<env>` / `api://sportify-orchestrator-<env>` | `SPORTIFY_ALLOWED_CALLERS` = Backstage identity object ID (+ orchestrator for discovery) |
 | Orchestrator worker → discovery | `api://sportify-discovery-<env>` | as above |
 | Orchestrator worker → Backstage notifications | `api://sportify-backstage-<env>` | `backend.auth.externalAccess` (JWKS), restricted to the `notifications` plugin |
-| GitHub Actions → orchestrator callbacks | GitHub OIDC, audience `sportify-orchestrator` | Repository and owner claims must match the request |
+| Orchestrator worker → Backstage catalog cleanup | `api://sportify-backstage-<env>` | The same JWKS entry grants `catalog.entity.read` and `catalog.entity.delete` for unregistering cleaned-up applications |
+| GitHub Actions → orchestrator callbacks | GitHub OIDC, audience `sportify-orchestrator` | Repository and owner claims must match the request; the callback run ID must match the token's run ID |
 | GitHub → orchestrator webhooks | HMAC-SHA256 with the App webhook secret | Signature, with dual-secret rotation |
 
 ## GitHub Apps

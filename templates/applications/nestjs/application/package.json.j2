@@ -1,7 +1,7 @@
 {
   "name": "[[ values.app ]]",
   "version": "1.0.0",
-  "description": "[[ values.description | replace('"', '\\"') ]]",
+  "description": [[ values.description | tojson ]],
   "private": true,
   "license": "UNLICENSED",
   "engines": {

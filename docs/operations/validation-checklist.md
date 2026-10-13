@@ -39,7 +39,13 @@ ORCHESTRATOR_DATABASE_URL=postgresql+psycopg://orchestrator:dev-only-not-a-secre
 
 ```bash
 conftest verify -p policies/terraform
-for d in iac/modules/*; do (cd $d && terraform init -backend=false && terraform validate && [ ! -d tests ] || terraform test); done
+for d in iac/modules/*; do
+  (
+    cd "$d" || exit 1
+    terraform init -backend=false && terraform validate || exit 1
+    if [ -d tests ]; then terraform test; fi
+  ) || exit 1
+done
 uv run --project services python templates/applications/nestjs/render_fixture.py /tmp/orders-api
 helm lint /tmp/orders-api/deploy/helm/application -f /tmp/orders-api/deploy/helm/application/values-dev.yaml
 ```

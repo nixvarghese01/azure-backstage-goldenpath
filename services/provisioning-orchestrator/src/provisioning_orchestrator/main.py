@@ -1,11 +1,11 @@
 """FastAPI application. The API only reads and writes the database; all slow work (GitHub, discovery,
 templating) happens in the worker via queued steps."""
 
-from __future__ import annotations
-
+# Route dependency aliases live inside create_app, so keep annotations evaluable in that scope.
 import hashlib
 import hmac
 import os
+from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request as HttpRequest, status
@@ -65,7 +65,7 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
 
     app = FastAPI(title="provisioning-orchestrator", version="1.0.0")
 
-    def db() -> Session:  # type: ignore[misc]
+    def db() -> Iterator[Session]:
         with sessions() as s:
             yield s
 
@@ -300,7 +300,9 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
                 raise _forbidden("wrong_repository", "Callback is not from the request's repository.")
             if claims.get("repository_owner") != settings.github_org:
                 raise _forbidden("wrong_owner", "Callback is not from the platform organisation.")
-        delivery = f"{claims.get('run_id')}:{claims.get('run_attempt')}:{body.stage}:{body.status}"
+            if body.run_id is None or str(body.run_id) != str(claims.get("run_id")):
+                raise _forbidden("wrong_run", "Callback run ID does not match the authenticated workflow run.")
+        delivery = f"{req.id}:{claims.get('run_id')}:{claims.get('run_attempt')}:{body.stage}:{body.status}"
         try:
             s.add(InboxEvent(source="actions_callback", delivery_id=delivery, event_type=body.stage,
                              payload=body.model_dump()))

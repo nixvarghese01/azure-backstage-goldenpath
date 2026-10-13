@@ -1,10 +1,13 @@
 # Golden path across services with mocked Azure and GitHub (real discovery validation, real orchestrator,
-# real NestJS stack template). Runs on PRs to main and nightly.
+# real NestJS stack template). Runs on PRs and pushes to develop/main, and nightly.
 name: ci-e2e
 
 on:
   pull_request:
-    branches: [main]
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+    paths: ["services/**", "templates/**", "policies/**", ".github/workflows/ci-e2e.yml"]
   schedule:
     - cron: "41 2 * * *"
   workflow_dispatch:

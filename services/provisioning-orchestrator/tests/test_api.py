@@ -1,3 +1,7 @@
+from types import SimpleNamespace
+
+import pytest
+
 from tests.conftest import REQUESTER, SERVICE, submission, webhook
 
 
@@ -41,3 +45,28 @@ def test_webhook_rejects_bad_signature(client) -> None:
 def test_webhook_deduplicates_deliveries(client) -> None:
     assert webhook(client, "ping", "d-1", {"zen": "hi"}).json()["status"] == "accepted"
     assert webhook(client, "ping", "d-1", {"zen": "hi"}).json()["status"] == "duplicate"
+
+
+@pytest.mark.parametrize("run_id, expected_status", [(42, 202), (43, 403), (None, 403)])
+def test_actions_callback_binds_run_id_to_token(client, monkeypatch, run_id, expected_status) -> None:
+    rid = client.post("/v1/requests", json=submission(), headers=REQUESTER).json()["id"]
+    monkeypatch.setenv("SPORTIFY_AUTH_MODE", "entra")
+    claims = {"repository": "sportify-org/sportify-azure-backstage", "repository_owner": "sportify-org",
+              "run_id": "42", "run_attempt": "1"}
+    monkeypatch.setattr("provisioning_orchestrator.main.github_actions_verifier",
+                        lambda _: SimpleNamespace(verify=lambda token: claims))
+    res = client.post("/v1/callbacks/actions", headers=SERVICE, json={
+        "request_id": rid, "stage": "platform_apply", "status": "success", "run_id": run_id})
+    assert res.status_code == expected_status, res.text
+    if expected_status == 403:
+        assert res.json()["detail"]["code"] == "wrong_run"
+
+
+def test_callback_deduplication_is_scoped_to_request(client) -> None:
+    first = client.post("/v1/requests", json=submission(), headers=REQUESTER).json()["id"]
+    second = client.post("/v1/requests", json=submission(
+        application_name="payments-api", idempotency_key="scaffolder-task-0002"), headers=REQUESTER).json()["id"]
+    for rid in (first, second):
+        body = {"request_id": rid, "stage": "platform_apply", "status": "success", "run_id": 42}
+        assert client.post("/v1/callbacks/actions", headers=SERVICE, json=body).json()["status"] == "accepted"
+        assert client.post("/v1/callbacks/actions", headers=SERVICE, json=body).json()["status"] == "duplicate"
