@@ -25,19 +25,32 @@ flowchart LR
     Backstage --> BDB[(Backstage database)]
 ```
 
-## Run later
+## Run it (Windows 11 + WSL2 Ubuntu, Docker Engine)
 
-Docker Engine or Docker Desktop with Linux containers and Docker Compose v2 is required.
-These commands are provided for later execution; the container builds and startup have not been
-run during implementation.
+The platform runs in Ubuntu (WSL2) with Docker Engine; Docker Desktop isn't needed. It is
+independent of other projects in the same Ubuntu: it uses only Docker Engine, its own Compose
+project (`sportify-platform`), volumes and host ports (7007, 5432), and never touches k3s.
 
-From the repository root:
+From Windows (PowerShell, in the repository root):
 
-```bash
-docker compose -f deploy/local/docker-compose.yml up --build -d
-docker compose -f deploy/local/docker-compose.yml ps
-docker compose -f deploy/local/docker-compose.yml logs -f backstage orchestrator-api orchestrator-worker
+```powershell
+.\scripts\local\platform.ps1 up        # build (first time) and start, wait until healthy
+.\scripts\local\platform.ps1 e2e       # golden-path check through the running platform's APIs
+.\scripts\local\platform.ps1 status
+.\scripts\local\platform.ps1 down      # -StopWsl also shuts Ubuntu down when nothing else runs there
 ```
+
+Or inside Ubuntu (`wsl -d Ubuntu-26.04`, then `cd /mnt/e/Github/azure-backstage-goldenpath`):
+
+| Command | Does |
+|---|---|
+| `make up` / `make down` / `make restart` | Start (and wait until healthy) / stop the platform; data stays in the postgres volume |
+| `make status`, `make logs S=<service>` | Container health and the Backstage URL; follow logs |
+| `make e2e` | Backstage, discovery and orchestrator health, approved resources, then a golden-path request that must validate with the default endpoint host (cancelled afterwards) |
+| `make test` | Python lint, types, unit/API and e2e tests in a throwaway `uv` container |
+| `make test-integration` | Orchestrator PostgreSQL tests through Testcontainers on this Docker Engine |
+| `make portal-test` | Portal `yarn install --immutable`, typecheck, lint and tests on a Linux copy of `portal/` |
+| `make images`, `make reset` | Rebuild the images; delete the database volume (asks first) |
 
 Open `http://localhost:7007`. No `.env` file is required for the defaults. To adjust the local
 token, organization, resource limits or PostgreSQL administrator password, copy `.env.example` to `.env` inside

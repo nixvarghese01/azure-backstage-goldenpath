@@ -517,18 +517,19 @@ These are the planned prerequisites. Versions were checked on 2026-10-10; the fu
 
 ## Local development
 
-> The code is written but not yet validated; see [docs/operations/validation-checklist.md](docs/operations/validation-checklist.md).
+The platform runs locally in Ubuntu (WSL2) with Docker Engine: Backstage, Azure discovery, the
+orchestrator API and worker, schema migrations and PostgreSQL, with guest sign-in and mock Azure and
+GitHub. It's independent of other projects in the same Ubuntu. Details are in
+[deploy/local/README.md](deploy/local/README.md).
 
-The full container setup is in [deploy/local/README.md](deploy/local/README.md). It includes Backstage,
-Azure discovery, the orchestrator API and worker, schema migrations and PostgreSQL. The local profile
-uses guest sign-in and mock integrations. Builds and runtime verification are deferred.
-Local defaults use the lightweight Backstage image and configurable resource limits; on-demand
-TechDocs generation is available through the documented optional Compose override.
-
-```bash
-docker compose -f deploy/local/docker-compose.yml up --build -d
-# Portal: http://localhost:7007
+```powershell
+.\scripts\local\platform.ps1 up     # then open http://localhost:7007
+.\scripts\local\platform.ps1 e2e    # golden-path check through the running platform
+.\scripts\local\platform.ps1 down
 ```
+
+Inside Ubuntu the same is `make up`, `make e2e`, `make down`; `make help` lists every target,
+including `make test`, `make test-integration` and `make portal-test` in throwaway containers.
 
 For running application processes on the host instead, start only PostgreSQL:
 
@@ -641,4 +642,4 @@ Repository documentation (TechDocs publication is unverified):
 
 ## License
 
-A license will be added in `LICENSE` before the first public release.
+[MIT](LICENSE) © 2026 Nixon Varghese.
