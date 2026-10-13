@@ -1,0 +1,36 @@
+{
+  "name": "sportify-portal",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "22 || 24"
+  },
+  "packageManager": "yarn@4.13.0",
+  "workspaces": {
+    "packages": [
+      "packages/*",
+      "plugins/*"
+    ]
+  },
+  "scripts": {
+    "dev": "yarn workspaces foreach -A --include backend --include app --parallel -v -i run start",
+    "start": "yarn workspace app start",
+    "start-backend": "yarn workspace backend start",
+    "build:backend": "yarn workspace backend build",
+    "build:all": "backstage-cli repo build --all",
+    "tsc": "tsc",
+    "clean": "backstage-cli repo clean",
+    "test": "backstage-cli repo test",
+    "test:all": "backstage-cli repo test --coverage",
+    "lint": "backstage-cli repo lint --since origin/main",
+    "lint:all": "backstage-cli repo lint",
+    "prettier:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@backstage/cli": "backstage:^",
+    "@backstage/repo-tools": "backstage:^",
+    "prettier": "^3.3.0",
+    "typescript": "~5.8.0"
+  },
+  "prettier": "@backstage/cli/config/prettier"
+}
