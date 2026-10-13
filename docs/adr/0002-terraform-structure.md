@@ -141,7 +141,7 @@ These were checked on 2026-10-10. The full matrix and its reasons are in [COMPAT
 - `azurerm ~> 5.9`. The 5.x line has been current since 2026-07, and new code starts there rather than on 4.x.
 - `kubernetes ~> 3.3`. The 3.x line has been current since 2025-12.
 - `azapi ~> 2.13`, **in the platform AKS stack only**, to enable the App Routing Gateway API `ingressProfile` settings until `azurerm` supports them natively ([ADR-0003](0003-ingress-gateway-api.md)).
-- The `azuread` provider is not needed, because federated credentials on managed identities are `azurerm` resources.
+- `azuread ~> 3.10`, **in `10-identities` only**, for the Entra app registrations that act as token audiences for service-to-service calls (Backstage, discovery, orchestrator). Federated credentials on managed identities are `azurerm` resources and don't need it.
 - `.terraform.lock.hcl` is committed, with hashes for `linux_amd64` (runners) and the developers' platforms.
 
 ### 7. State

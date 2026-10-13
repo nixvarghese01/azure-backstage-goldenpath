@@ -8,3 +8,4 @@ discovery_subscription_ids = ["00000000-0000-0000-0000-000000000000"]
 state_storage_account_name = "stsportifytfstatedev"
 state_resource_group_name  = "rg-sportify-tfstate-dev"
 key_vault_name             = "kv-sportify-plat-dev"
+secrets_created            = false # true after scripts/create-platform-secrets.sh

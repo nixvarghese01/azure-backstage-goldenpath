@@ -16,6 +16,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 5.9"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 3.10"
+    }
   }
   backend "azurerm" {}
 }
@@ -25,7 +29,12 @@ provider "azurerm" {
   storage_use_azuread = true
 }
 
+# Creating app registrations needs Entra rights (Application Developer or the Graph permission
+# Application.ReadWrite.OwnedBy). The first apply of this stack is done by a platform admin.
+provider "azuread" {}
+
 data "azurerm_client_config" "current" {}
+data "azuread_client_config" "current" {}
 
 variable "environment" {
   type    = string
@@ -206,14 +215,15 @@ module "key_vault" {
   tags                = local.tags
 }
 
-# The platform identity creates the secret *names* (placeholders) so access can be granted per secret.
-# Real values are set out of band (secret-management.md §6.1); Terraform ignores value changes, so
-# real values never enter state or plans.
-resource "azurerm_role_assignment" "platform_secrets_officer" {
-  scope                = module.key_vault.id
-  role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = module.platform.principal_id
-  principal_type       = "ServicePrincipal"
+# Secrets are NOT Terraform resources: managing azurerm_key_vault_secret would read real values back
+# into state on every refresh. Instead (secret-management.md §6.1):
+#   1. first apply creates the vault (secrets_created = false)
+#   2. an operator creates the secrets with scripts/create-platform-secrets.sh (JIT Secrets Officer)
+#   3. re-apply with secrets_created = true to grant each service access to ITS secrets only.
+variable "secrets_created" {
+  description = "Set to true once scripts/create-platform-secrets.sh has created the secrets."
+  type        = bool
+  default     = false
 }
 
 locals {
@@ -226,26 +236,64 @@ locals {
   }
 }
 
-resource "azurerm_key_vault_secret" "placeholder" {
-  for_each     = local.secrets
-  name         = each.key
-  value        = "set-out-of-band"
-  key_vault_id = module.key_vault.id
-  content_type = "set-out-of-band"
-  tags         = { owner = "platform-team", "rotation-days" = each.key == "backstage-session-secret" ? "180" : "90" }
-
-  lifecycle {
-    ignore_changes = [value, content_type, expiration_date, tags]
-  }
-  depends_on = [azurerm_role_assignment.platform_secrets_officer]
-}
-
 resource "azurerm_role_assignment" "secret_reader" {
-  for_each             = local.secrets
-  scope                = azurerm_key_vault_secret.placeholder[each.key].resource_versionless_id
+  for_each             = var.secrets_created ? local.secrets : {}
+  scope                = "${module.key_vault.id}/secrets/${each.key}"
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.service[each.value].principal_id
   principal_type       = "ServicePrincipal"
+}
+
+# ------------------------------------------------------------------ platform identity scope
+# The platform identity applies the shared stacks (20, 30): it is the most privileged identity and is
+# only usable from platform-apply.yml behind the `platform` environment's required reviewers.
+resource "azurerm_role_assignment" "platform" {
+  for_each = {
+    contributor = "Contributor"
+    rbac        = "Role Based Access Control Administrator"
+  }
+  scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+  role_definition_name = each.value
+  principal_id         = module.platform.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+resource "azurerm_role_assignment" "platform_plan_reader" {
+  scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+  role_definition_name = "Reader"
+  principal_id         = module.platform_plan.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+# ------------------------------------------------------------------ Entra app registrations (token audiences)
+# Service-to-service calls use Entra access tokens from workload identities. A token needs an audience,
+# which must be an app registration exposing an identifier URI. v2 tokens: aud = the app's client ID.
+resource "azuread_application" "audience" {
+  for_each         = toset(["backstage", "discovery", "orchestrator"])
+  display_name     = "sportify-${each.key}-${var.environment}"
+  identifier_uris  = ["api://sportify-${each.key}-${var.environment}"]
+  sign_in_audience = "AzureADMyOrg"
+  owners           = [data.azuread_client_config.current.object_id]
+
+  api {
+    requested_access_token_version = 2
+  }
+}
+
+resource "azuread_service_principal" "audience" {
+  for_each  = azuread_application.audience
+  client_id = each.value.client_id
+  owners    = [data.azuread_client_config.current.object_id]
+}
+
+output "service_auth" {
+  description = "Per service: the Entra audience to validate (aud) and the scope callers request."
+  value = {
+    for k, app in azuread_application.audience : k => {
+      audience = app.client_id
+      scope    = "api://sportify-${k}-${var.environment}/.default"
+    }
+  }
 }
 
 # ------------------------------------------------------------------ outputs (IDs only, no secrets)

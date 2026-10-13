@@ -56,7 +56,7 @@ Notes:
 | Protection | Soft delete (90 days) and **purge protection** enabled |
 | Network | Model project: public endpoint with Entra-only access, plus firewall rules for the AKS egress IP and named operators. Production: **private endpoint** with public access disabled |
 | Logging | Diagnostic settings send `AuditEvent` logs to Log Analytics. Alerts fire on access-denied spikes and on secret reads by unexpected identities |
-| Managed by | Terraform `iac/platform/10-identities` creates the vault, **placeholder secrets** (value `set-out-of-band`, changes ignored) so access can be granted per secret, and the role assignments. **Real secret values are never managed by Terraform** (see §6) |
+| Managed by | Terraform `iac/platform/10-identities` creates the vault and, once the secrets exist (`secrets_created = true`), the per-secret role assignments. **Secrets themselves are not Terraform resources**: a managed `azurerm_key_vault_secret` would read the real value back into state on every refresh. They are created with `scripts/create-platform-secrets.sh` (§6.1) |
 
 ### Access matrix (RBAC at secret scope)
 
@@ -66,7 +66,7 @@ Notes:
 | `id-sportify-orchestrator` | Key Vault Secrets User | S4, S5 |
 | App Routing add-on identity | Key Vault Certificate User | S6 |
 | Platform operators (Entra group, through PIM) | Key Vault Secrets Officer | Vault, **just-in-time** for rotation only |
-| Terraform platform identity | Key Vault Secrets Officer (creates the placeholder secret *names*; never reads or sets real values) | Platform vault only |
+| Terraform platform identity | None on secrets (it manages the vault and role assignments through ARM only) | — |
 | Everyone else, including discovery, provisioning, deployment and app identities | — | No access |
 
 ## 5. Delivery to workloads
@@ -100,6 +100,8 @@ Secret values are created **outside Terraform**, so they never enter Terraform s
 1. Generate the value at its source: a GitHub App key in GitHub's App settings, a random value from `openssl rand -base64 48` for S3 and S5.
 2. An operator with just-in-time *Secrets Officer* access runs `az keyvault secret set --vault-name … --name … --file …`. The value goes from a local temporary file, which is then securely deleted, straight to Key Vault. It is never pasted into a chat, ticket or shell history.
 3. Set `contentType`, `expires` and the tags `owner` and `rotation-days` on the secret.
+
+`scripts/create-platform-secrets.sh <vault> <dir>` does steps 2–3 for all platform secrets, generating S3 and S5 when absent. Then set `secrets_created = true` in `iac/platform/10-identities` and re-apply, which grants each service *Key Vault Secrets User* on its own secrets only.
 
 ### 6.2 Rotation procedures
 
