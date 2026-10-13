@@ -17,10 +17,9 @@ backend:
           subject: local-orchestrator
         accessRestrictions:
           - plugin: notifications
+          # One entry per plugin: Backstage rejects a plugin declared twice, so permissions are a list.
           - plugin: catalog
-            permission: catalog.entity.read
-          - plugin: catalog
-            permission: catalog.entity.delete
+            permission: [catalog.entity.read, catalog.entity.delete]
 techdocs:
   # Lightweight image serves prebuilt docs; the optional full override enables generation.
   builder: external
