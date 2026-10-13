@@ -1,0 +1,7 @@
+# Copy to iac/platform/<stack>/backend.hcl and set the key per stack. State location only - no credentials.
+resource_group_name  = "rg-sportify-tfstate-dev"
+storage_account_name = "stsportifytfstatedev"
+container_name       = "platform"
+key                  = "platform/20-shared-dev.tfstate"
+use_azuread_auth     = true
+use_oidc             = true

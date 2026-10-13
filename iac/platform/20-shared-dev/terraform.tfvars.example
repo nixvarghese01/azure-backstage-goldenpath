@@ -1,0 +1,25 @@
+# Free-subscription demo sizing (docs/operations/demo-environment.md)
+environment            = "dev"
+location               = "uksouth"
+admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]
+
+aks = {
+  name     = "aks-sportify-shared-dev"
+  sku_tier = "Free"
+  system_pool = {
+    vm_size    = "Standard_D2s_v5"
+    node_count = 1
+  }
+  # Uncomment for HA-eligible clusters (needs quota for 3 more vCPU x nodes):
+  # user_pool = { vm_size = "Standard_D2s_v5", node_count = 3, zones = ["1", "2", "3"] }
+}
+
+acr = {
+  name = "acrsportifydev"
+  sku  = "Basic"
+}
+
+postgres_name        = "psql-sportify-dev"
+postgres_allowed_ips = {} # e.g. { aks-egress = "20.0.0.1" } once the cluster exists
+dns_zone_name        = null
+shared_storage_name  = "stsportifyshareddev"

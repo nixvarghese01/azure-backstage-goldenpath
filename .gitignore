@@ -52,3 +52,9 @@ htmlcov/
 Thumbs.db
 .idea/
 *.swp
+
+# --- Platform stack inputs (your IDs; examples are committed instead) ---
+iac/platform/**/terraform.tfvars
+iac/platform/**/backend.hcl
+iac/platform/**/backend.tf
+!iac/platform/**/backend.tf.example
