@@ -1,4 +1,4 @@
-import { plainToInstance, Transform } from 'class-transformer';
+import { plainToInstance, Transform, Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, Min, validateSync } from 'class-validator';
 
 /**
@@ -6,6 +6,9 @@ import { IsIn, IsInt, IsOptional, IsString, Matches, Max, Min, validateSync } fr
  * Azure access uses Workload Identity (DefaultAzureCredential), never keys or connection strings.
  */
 export class AppConfig {
+  // Explicit: TypeScript 6 no longer emits design:type for unannotated properties, which
+  // implicit conversion relied on to turn the PORT string from the environment into a number.
+  @Type(() => Number)
   @IsOptional()
   @IsInt()
   @Min(1)
