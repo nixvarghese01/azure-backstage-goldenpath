@@ -2,7 +2,7 @@
 # From portal/:
 #   yarn install --immutable && yarn tsc && yarn build:backend
 #   docker build -f packages/backend/Dockerfile .
-FROM node:24-bookworm-slim
+FROM node:25-bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv make g++ libsqlite3-dev git ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
