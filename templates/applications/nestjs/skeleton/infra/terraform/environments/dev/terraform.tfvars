@@ -38,6 +38,6 @@ runtime_capability = {
 }
 
 deployment_identity = {
-  name           = "id-sportify-deployment-${{ values.environment }}"
-  resource_group = "rg-sportify-identities-${{ values.environment }}"
+  name           = "id-idp-deployment-${{ values.environment }}"
+  resource_group = "rg-idp-identities-${{ values.environment }}"
 }

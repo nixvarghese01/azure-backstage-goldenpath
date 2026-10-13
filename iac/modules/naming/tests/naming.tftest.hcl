@@ -9,7 +9,7 @@ run "tags_and_names" {
   command = plan
 
   assert {
-    condition     = output.tags["managed-by"] == "sportify-platform" && output.tags["request-id"] != ""
+    condition     = output.tags["managed-by"] == "idp-platform" && output.tags["request-id"] != ""
     error_message = "standard tags missing"
   }
   assert {

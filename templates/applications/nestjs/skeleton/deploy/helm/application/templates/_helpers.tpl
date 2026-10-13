@@ -11,7 +11,7 @@ app.kubernetes.io/name: {{ include "app.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-sportify.io/availability-tier: {{ .Values.availability.tier }}
+idp.io/availability-tier: {{ .Values.availability.tier }}
 {{- end -}}
 
 {{- define "app.selectorLabels" -}}

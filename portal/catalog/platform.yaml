@@ -1,8 +1,8 @@
 apiVersion: backstage.io/v1alpha1
 kind: System
 metadata:
-  name: sportify-platform
-  description: Sportify Azure Backstage internal developer platform
+  name: idp-platform
+  description: Internal Developer Portal internal developer platform
 spec:
   owner: group:default/platform-team
 ---
@@ -10,12 +10,12 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: backstage
-  description: Developer portal (catalog, scaffolder, TechDocs) with the Sportify bridge
+  description: Developer portal (catalog, scaffolder, TechDocs) with the IDP bridge
 spec:
   type: website
   lifecycle: production
   owner: group:default/platform-team
-  system: sportify-platform
+  system: idp-platform
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
@@ -26,7 +26,7 @@ spec:
   type: service
   lifecycle: production
   owner: group:default/platform-team
-  system: sportify-platform
+  system: idp-platform
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
@@ -37,4 +37,4 @@ spec:
   type: service
   lifecycle: production
   owner: group:default/platform-team
-  system: sportify-platform
+  system: idp-platform

@@ -40,11 +40,11 @@ resource "kubernetes_namespace_v1" "this" {
   metadata {
     name = var.name
     labels = merge(var.labels, {
-      "sportify.io/owner"                  = var.owner
-      "sportify.io/gateway-access"         = "true"
+      "idp.io/owner"                       = var.owner
+      "idp.io/gateway-access"              = "true"
       "pod-security.kubernetes.io/enforce" = "restricted"
       "pod-security.kubernetes.io/audit"   = "restricted"
-      "app.kubernetes.io/managed-by"       = "sportify-platform"
+      "app.kubernetes.io/managed-by"       = "idp-platform"
     })
   }
 }
@@ -81,7 +81,7 @@ resource "kubernetes_role_binding_v1" "deployer" {
   role_ref {
     api_group = "rbac.authorization.k8s.io"
     kind      = "ClusterRole"
-    name      = "sportify-app-deployer"
+    name      = "idp-app-deployer"
   }
   subject {
     # AKS with Entra integration maps a managed identity to its object ID.

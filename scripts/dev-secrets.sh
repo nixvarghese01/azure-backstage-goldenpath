@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Fetch DEV GitHub App credentials from a dev Key Vault into ~/.config/sportify (outside the repo, 0600).
+# Fetch DEV GitHub App credentials from a dev Key Vault into ~/.config/idp (outside the repo, 0600).
 # Uses your own `az login`; nothing is printed. See docs/security/secret-management.md §9.
 # Usage: scripts/dev-secrets.sh <dev-key-vault-name>
 set -euo pipefail
 VAULT="${1:?usage: dev-secrets.sh <dev-key-vault-name>}"
-DIR="${HOME}/.config/sportify"
+DIR="${HOME}/.config/idp"
 umask 077
 mkdir -p "${DIR}"
 

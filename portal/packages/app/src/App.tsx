@@ -10,12 +10,12 @@ import { SignalsDisplay } from '@backstage/plugin-signals';
 import { TechDocsIndexPage, TechDocsReaderPage, techdocsPlugin } from '@backstage/plugin-techdocs';
 import { UserSettingsPage } from '@backstage/plugin-user-settings';
 import {
-  SportifyApprovalsPage,
-  SportifyAvailabilityPickerExtension,
-  SportifyAzureResourcePickerExtension,
-  SportifyStackPickerExtension,
-  SportifyEndpointHostPickerExtension,
-} from '@internal/plugin-sportify-platform';
+  IdpApprovalsPage,
+  IdpAvailabilityPickerExtension,
+  IdpAzureResourcePickerExtension,
+  IdpStackPickerExtension,
+  IdpEndpointHostPickerExtension,
+} from '@internal/plugin-idp-platform';
 import React from 'react';
 import { Navigate, Route } from 'react-router-dom';
 import { apis } from './apis';
@@ -25,7 +25,7 @@ import { Root } from './components/Root';
 function PlatformSignInPage(props: SignInPageProps) {
   const config = useApi(configApiRef);
   if (config.getString('auth.environment') === 'local-docker') {
-    return <SignInPage {...props} providers={['guest']} />;
+    return <SignInPage {...props} providers={['guest']} title="powered by Backstage" align="center" />;
   }
   return (
     <SignInPage {...props} auto
@@ -54,15 +54,15 @@ const routes = (
     </Route>
     <Route path="/create" element={<ScaffolderPage />}>
       <ScaffolderFieldExtensions>
-        <SportifyAzureResourcePickerExtension />
-        <SportifyAvailabilityPickerExtension />
-        <SportifyStackPickerExtension />
-        <SportifyEndpointHostPickerExtension />
+        <IdpAzureResourcePickerExtension />
+        <IdpAvailabilityPickerExtension />
+        <IdpStackPickerExtension />
+        <IdpEndpointHostPickerExtension />
       </ScaffolderFieldExtensions>
     </Route>
     <Route path="/docs" element={<TechDocsIndexPage />} />
     <Route path="/docs/:namespace/:kind/:name/*" element={<TechDocsReaderPage />} />
-    <Route path="/sportify/approvals" element={<SportifyApprovalsPage />} />
+    <Route path="/idp/approvals" element={<IdpApprovalsPage />} />
     <Route path="/notifications" element={<NotificationsPage />} />
     <Route path="/settings" element={<UserSettingsPage />} />
   </FlatRoutes>

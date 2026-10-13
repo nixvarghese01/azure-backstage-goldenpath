@@ -71,7 +71,7 @@ Applications are named `<name>.dev.xycorp.local` (the cluster's `gateway.base_do
 - **Pipelines need nothing.** The deploy smoke test reads the shared Gateway's IP and calls the app with
   `curl --resolve <host>:80:<gateway-ip>`, so the name never has to resolve.
 - **Your browser** needs one hosts entry per application. Find the IP with
-  `kubectl get gateway sportify-gateway -n sportify-gateway -o jsonpath='{.status.addresses[0].value}'`,
+  `kubectl get gateway idp-gateway -n idp-gateway -o jsonpath='{.status.addresses[0].value}'`,
   then add `<gateway-ip>  orders-api.dev.xycorp.local` to `/etc/hosts` or
   `C:\Windows\System32\drivers\etc\hosts`.
 - **No hosts file at all:** set `base_domain` to `<gateway-ip>.nip.io`. Public wildcard DNS then resolves

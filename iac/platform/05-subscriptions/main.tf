@@ -49,7 +49,7 @@ module "subscription" {
   management_group_id = var.management_group_id
   workload            = try(each.value.environment, "dev") == "prod" ? "Production" : "DevTest"
   tags = {
-    "managed-by"   = "sportify-platform"
+    "managed-by"   = "idp-platform"
     "lifecycle"    = "platform"
     "environment"  = try(each.value.environment, "dev")
     "request-id"   = try(each.value.request_id, "")

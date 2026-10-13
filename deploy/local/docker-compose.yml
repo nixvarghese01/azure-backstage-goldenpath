@@ -1,5 +1,5 @@
 # Local microservice stack: mock Azure/GitHub, no cloud provisioning or publication.
-name: sportify-platform
+name: idp-platform
 
 x-logging: &logging
   driver: json-file
@@ -8,7 +8,7 @@ x-logging: &logging
     max-file: "2"
 
 x-orchestrator: &orchestrator
-  image: sportify/provisioning-orchestrator:local
+  image: idp/provisioning-orchestrator:local
   build:
     context: ../..
     dockerfile: services/provisioning-orchestrator/Dockerfile
@@ -22,8 +22,8 @@ x-orchestrator: &orchestrator
   security_opt: [no-new-privileges:true]
   networks: [platform]
   environment:
-    SPORTIFY_AUTH_MODE: static
-    SPORTIFY_DEV_SERVICE_TOKEN: ${SPORTIFY_DEV_SERVICE_TOKEN:-dev-only-change-me}
+    IDP_AUTH_MODE: static
+    IDP_DEV_SERVICE_TOKEN: ${IDP_DEV_SERVICE_TOKEN:-dev-only-change-me}
     ORCHESTRATOR_DATABASE_URL: postgresql+psycopg://orchestrator:dev-only-not-a-secret@postgres:5432/orchestrator
     ORCHESTRATOR_DATABASE_ENTRA_AUTH: "false"
     ORCHESTRATOR_GITHUB_MODE: mock
@@ -60,7 +60,7 @@ services:
       retries: 10
 
   azure-discovery:
-    image: sportify/azure-discovery:local
+    image: idp/azure-discovery:local
     build:
       context: ../..
       dockerfile: services/azure-discovery/Dockerfile
@@ -68,18 +68,21 @@ services:
     init: true
     cpus: ${DISCOVERY_CPUS:-0.5}
     mem_limit: ${DISCOVERY_MEMORY:-256m}
+    # Loopback only, for the Swagger UI at http://localhost:8001/docs during local development.
+    ports:
+      - "127.0.0.1:8001:8001"
     logging: *logging
     read_only: true
     tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     environment:
-      SPORTIFY_AUTH_MODE: static
-      SPORTIFY_DEV_SERVICE_TOKEN: ${SPORTIFY_DEV_SERVICE_TOKEN:-dev-only-change-me}
+      IDP_AUTH_MODE: static
+      IDP_DEV_SERVICE_TOKEN: ${IDP_DEV_SERVICE_TOKEN:-dev-only-change-me}
       DISCOVERY_AZURE_MODE: mock
-      DISCOVERY_POLICY_FILE: /etc/sportify/allowlist.yaml
+      DISCOVERY_POLICY_FILE: /etc/idp/allowlist.yaml
     volumes:
-      - ../../policies/allowlist.yaml:/etc/sportify/allowlist.yaml:ro
+      - ../../policies/allowlist.yaml:/etc/idp/allowlist.yaml:ro
     expose: ["8001"]
     networks: [platform]
 
@@ -97,6 +100,9 @@ services:
     <<: *orchestrator
     restart: unless-stopped
     expose: ["8002"]
+    # Loopback only, for the Swagger UI at http://localhost:8002/docs during local development.
+    ports:
+      - "127.0.0.1:8002:8002"
     depends_on:
       orchestrator-migrate:
         condition: service_completed_successfully
@@ -118,7 +124,7 @@ services:
         condition: service_healthy
 
   backstage:
-    image: sportify/backstage:local
+    image: idp/backstage:local
     build:
       context: ../..
       dockerfile: portal/Dockerfile
@@ -134,8 +140,8 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     environment:
-      SPORTIFY_LOCAL_GUEST_AUTH: "true"
-      SPORTIFY_DEV_SERVICE_TOKEN: ${SPORTIFY_DEV_SERVICE_TOKEN:-dev-only-change-me}
+      IDP_LOCAL_GUEST_AUTH: "true"
+      IDP_DEV_SERVICE_TOKEN: ${IDP_DEV_SERVICE_TOKEN:-dev-only-change-me}
       ORCHESTRATOR_GITHUB_ORG: ${ORCHESTRATOR_GITHUB_ORG:-nixvarghese01}
       NODE_OPTIONS: ${BACKSTAGE_NODE_OPTIONS:---no-node-snapshot --max-old-space-size=512}
     ports:

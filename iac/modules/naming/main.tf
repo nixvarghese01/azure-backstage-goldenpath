@@ -58,7 +58,7 @@ locals {
 
   tags = merge(
     {
-      "managed-by"        = "sportify-platform"
+      "managed-by"        = "idp-platform"
       "application"       = var.application
       "owner"             = var.owner
       "environment"       = var.environment

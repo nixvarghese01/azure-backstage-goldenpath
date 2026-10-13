@@ -24,13 +24,13 @@ SUB = "00000000-0000-0000-0000-000000000000"
 DEV = "dev-token"
 REQUESTER = {
     "Authorization": f"Bearer {DEV}",
-    "X-Sportify-User": "user:default/alex",
-    "X-Sportify-Groups": "group:default/team-orders",
+    "X-IDP-User": "user:default/alex",
+    "X-IDP-Groups": "group:default/team-orders",
 }
 APPROVER = {
     "Authorization": f"Bearer {DEV}",
-    "X-Sportify-User": "user:default/sam",
-    "X-Sportify-Groups": "group:default/platform-approvers",
+    "X-IDP-User": "user:default/sam",
+    "X-IDP-Groups": "group:default/platform-approvers",
 }
 SERVICE = {"Authorization": f"Bearer {DEV}"}
 WEBHOOK_SECRET = "test-webhook-secret"  # noqa: S105 - test value
@@ -54,8 +54,8 @@ class FakeDiscovery:
 
 @pytest.fixture(autouse=True)
 def _env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("SPORTIFY_AUTH_MODE", "static")
-    monkeypatch.setenv("SPORTIFY_DEV_SERVICE_TOKEN", DEV)
+    monkeypatch.setenv("IDP_AUTH_MODE", "static")
+    monkeypatch.setenv("IDP_DEV_SERVICE_TOKEN", DEV)
     secret = tmp_path / "webhook-secret"
     secret.write_text(WEBHOOK_SECRET)
     monkeypatch.setenv("ORCHESTRATOR_GITHUB_WEBHOOK_SECRET_FILE", str(secret))
@@ -131,11 +131,11 @@ def submission(**overrides: Any) -> dict[str, Any]:
         "region": "uksouth",
         "stack": "nestjs",
         "subscription": {"mode": "existing", "id": SUB},
-        "resource_group": {"mode": "existing", "name": "rg-sportify-apps-dev"},
-        "aks_cluster": {"mode": "existing", "name": "aks-sportify-shared-dev"},
-        "container_registry": {"mode": "existing", "name": "acrsportifydev"},
+        "resource_group": {"mode": "existing", "name": "rg-idp-apps-dev"},
+        "aks_cluster": {"mode": "existing", "name": "aks-idp-shared-dev"},
+        "container_registry": {"mode": "existing", "name": "acridpdev"},
         "namespace": {"mode": "new", "name": "orders-api"},
-        "runtime_capability": {"type": "storage", "mode": "existing", "name": "stsportifyshareddev"},
+        "runtime_capability": {"type": "storage", "mode": "existing", "name": "stidpshareddev"},
         "availability": {"tier": "standard"},
         "endpoint_host": "orders-api.dev.xycorp.local",
     }

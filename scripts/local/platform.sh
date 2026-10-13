@@ -41,9 +41,11 @@ urls() {
   cat <<'EOF'
 
 Local platform is up (mock Azure and GitHub, guest sign-in):
-  Backstage    http://localhost:7007   (Create -> Application starter)
-  PostgreSQL   localhost:5432
-Discovery and the orchestrator are internal to the Compose network; reach them through Backstage.
+  Backstage      http://localhost:7007        (Create -> Application starter)
+  Discovery API  http://localhost:8001/docs   (Swagger UI)
+  Orchestrator   http://localhost:8002/docs   (Swagger UI)
+  PostgreSQL     localhost:5432
+All ports listen on loopback only. API calls need: Authorization: Bearer dev-only-change-me
 Stop it with: make down   (Windows: .\scripts\local\platform.ps1 down)
 EOF
 }
@@ -54,7 +56,7 @@ case "${1:-}" in
     build=(); [ "${2:-}" = "--build" ] && build=(--build)
     "${COMPOSE[@]}" up -d "${build[@]}"
     wait_healthy 900
-    "${COMPOSE[@]}" ps --format 'table {{.Service}}\t{{.State}}\t{{.Health}}'
+    "${COMPOSE[@]}" ps --format 'table {{.Service}}\t{{.Status}}'
     urls ;;
   down)
     "${COMPOSE[@]}" down ;;
@@ -62,7 +64,7 @@ case "${1:-}" in
     "$0" down; "$0" up "${@:2}" ;;
   status)
     need_docker
-    "${COMPOSE[@]}" ps -a --format 'table {{.Service}}\t{{.State}}\t{{.Health}}\t{{.Ports}}'
+    "${COMPOSE[@]}" ps -a --format 'table {{.Service}}\t{{.Status}}\t{{.Ports}}'
     printf '  %-28s %s\n' "localhost:7007/healthcheck" "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:7007/healthcheck || true)" ;;
   logs)
     "${COMPOSE[@]}" logs -f --tail 100 ${2:+"$2"} ;;

@@ -1,18 +1,18 @@
 image:
-  repository: acrsportifydev.azurecr.io/sportify/backstage
+  repository: acridpdev.azurecr.io/idp/backstage
   tag: latest
 replicas: 2
 workloadIdentity:
-  clientId: ""             # id-sportify-backstage-<env>
+  clientId: ""             # id-idp-backstage-<env>
 keyVault:
-  name: kv-sportify-plat-dev
+  name: kv-idp-plat-dev
   tenantId: ""
 host: backstage.dev.xycorp.local
-gateway: { name: sportify-gateway, namespace: sportify-gateway }
+gateway: { name: idp-gateway, namespace: idp-gateway }
 env:
   BACKSTAGE_BASE_URL: http://backstage.dev.xycorp.local
   POSTGRES_HOST: ""
-  POSTGRES_USER: id-sportify-backstage-dev
+  POSTGRES_USER: id-idp-backstage-dev
   AZURE_TENANT_ID: ""
   GITHUB_ORG: nixvarghese01
   GITHUB_APP_BACKSTAGE_ID: ""

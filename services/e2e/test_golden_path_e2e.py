@@ -10,11 +10,11 @@ from e2e.conftest import AUTH
 
 SUB = "00000000-0000-0000-0000-000000000000"
 PLAN_HASH = "c" * 64
-REQUESTER = {**AUTH, "X-Sportify-User": "user:default/alex", "X-Sportify-Groups": "group:default/team-orders"}
+REQUESTER = {**AUTH, "X-IDP-User": "user:default/alex", "X-IDP-Groups": "group:default/team-orders"}
 APPROVER = {
     **AUTH,
-    "X-Sportify-User": "user:default/sam",
-    "X-Sportify-Groups": "group:default/platform-approvers",
+    "X-IDP-User": "user:default/sam",
+    "X-IDP-Groups": "group:default/platform-approvers",
 }
 
 
@@ -28,11 +28,11 @@ def submission(**overrides):
         "region": "uksouth",
         "stack": "nestjs",
         "subscription": {"mode": "existing", "id": SUB},
-        "resource_group": {"mode": "existing", "name": "rg-sportify-apps-dev"},
-        "aks_cluster": {"mode": "existing", "name": "aks-sportify-shared-dev"},
-        "container_registry": {"mode": "existing", "name": "acrsportifydev"},
+        "resource_group": {"mode": "existing", "name": "rg-idp-apps-dev"},
+        "aks_cluster": {"mode": "existing", "name": "aks-idp-shared-dev"},
+        "container_registry": {"mode": "existing", "name": "acridpdev"},
         "namespace": {"mode": "new", "name": "orders-api"},
-        "runtime_capability": {"type": "storage", "mode": "existing", "name": "stsportifyshareddev"},
+        "runtime_capability": {"type": "storage", "mode": "existing", "name": "stidpshareddev"},
         "availability": {"tier": "standard"},
         "endpoint_host": "orders-api.dev.xycorp.local",
     }
@@ -96,7 +96,7 @@ def get(api, rid):
         ("fastapi", "app/main.py"),
         ("go", "main.go"),
         ("dotnet", "StarterApi.cs"),
-        ("springboot", "src/main/java/com/sportify/starter/Starter.java"),
+        ("springboot", "src/main/java/com/idp/starter/Starter.java"),
         ("nextjs", "app/page.jsx"),
         ("react", "src/App.tsx"),
         ("vue", "src/App.vue"),
@@ -165,15 +165,15 @@ def test_golden_path_end_to_end(system, discovery, stack, entrypoint) -> None:
             "outputs": {
                 "identity_client_id": "11111111-2222-3333-4444-555555555555",
                 "namespace": "orders-api",
-                "acr_login_server": "acrsportifydev.azurecr.io",
-                "storage_account_name": "stsportifyshareddev",
+                "acr_login_server": "acridpdev.azurecr.io",
+                "storage_account_name": "stidpshareddev",
             }
         },
     )
     drain(worker)
 
     # The application PR is rendered from the real stack template with the real outputs.
-    files = github.files[f"sportify/app-{rid}"]
+    files = github.files[f"idp/app-{rid}"]
     for expected in (
         entrypoint,
         "Dockerfile",
@@ -191,7 +191,7 @@ def test_golden_path_end_to_end(system, discovery, stack, entrypoint) -> None:
     assert "orders-api" in files["Dockerfile"]
     values = files["deploy/helm/application/values-dev.yaml"]
     assert "11111111-2222-3333-4444-555555555555" in values
-    assert "acrsportifydev.azurecr.io/orders-api" in values
+    assert "acridpdev.azurecr.io/orders-api" in values
     assert "host: orders-api.dev.xycorp.local" in values
     assert "[[" not in "".join(files.values()), "unrendered template expression"
 
@@ -206,13 +206,13 @@ def test_golden_path_end_to_end(system, discovery, stack, entrypoint) -> None:
                 "id": 9,
                 "conclusion": "success",
                 "event": "pull_request",
-                "head_branch": f"sportify/app-{rid}",
+                "head_branch": f"idp/app-{rid}",
                 "name": "application-ci",
             },
         },
     )
     drain(worker)
-    callback(api, rid, "ci", "success", 4, {"image": "acrsportifydev.azurecr.io/orders-api:abc"})
+    callback(api, rid, "ci", "success", 4, {"image": "acridpdev.azurecr.io/orders-api:abc"})
     callback(api, rid, "deploy", "started", 5)
     callback(api, rid, "deploy", "success", 5, {"endpoint": "orders-api.dev.xycorp.local", "pods": "1/1"})
     drain(worker)

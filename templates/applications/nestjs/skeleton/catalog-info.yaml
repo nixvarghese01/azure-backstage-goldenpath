@@ -6,9 +6,9 @@ metadata:
   annotations:
     github.com/project-slug: ${{ values.org }}/${{ values.name }}
     backstage.io/techdocs-ref: dir:.
-    sportify.io/request-id: ${{ values.requestId }}
-    sportify.io/environment: ${{ values.environment }}
-    sportify.io/availability-tier: ${{ values.availabilityTier }}
+    idp.io/request-id: ${{ values.requestId }}
+    idp.io/environment: ${{ values.environment }}
+    idp.io/availability-tier: ${{ values.availabilityTier }}
   tags: [nestjs, typescript, golden-path]
   links:
     - url: https://${{ values.endpointHost }}

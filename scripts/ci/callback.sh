@@ -5,8 +5,8 @@
 set -uo pipefail
 
 STAGE="$1"; STATUS="$2"; DATA_FILE="${3:-}"
-: "${SPORTIFY_REQUEST_ID:?}" "${SPORTIFY_CALLBACK_URL:?}"
-AUDIENCE="${SPORTIFY_CALLBACK_AUDIENCE:-sportify-orchestrator}"
+: "${IDP_REQUEST_ID:?}" "${IDP_CALLBACK_URL:?}"
+AUDIENCE="${IDP_CALLBACK_AUDIENCE:-idp-orchestrator}"
 
 if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]]; then
   echo "::warning::id-token permission missing; callback skipped (the orchestrator will reconcile)"
@@ -20,14 +20,14 @@ echo "::add-mask::${TOKEN}"
 DATA='{}'
 if [[ -n "${DATA_FILE}" && -s "${DATA_FILE}" ]]; then DATA="$(cat "${DATA_FILE}")"; fi
 
-BODY="$(jq -n --arg r "${SPORTIFY_REQUEST_ID}" --arg s "${STAGE}" --arg st "${STATUS}" \
+BODY="$(jq -n --arg r "${IDP_REQUEST_ID}" --arg s "${STAGE}" --arg st "${STATUS}" \
   --argjson id "${GITHUB_RUN_ID}" \
   --arg url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
   --argjson data "${DATA}" \
   '{request_id:$r, stage:$s, status:$st, run_id:$id, run_url:$url, data:$data}')"
 
 for attempt in 1 2 3; do
-  if curl -fsS -X POST "${SPORTIFY_CALLBACK_URL}/v1/callbacks/actions" \
+  if curl -fsS -X POST "${IDP_CALLBACK_URL}/v1/callbacks/actions" \
       -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" -d "${BODY}" >/dev/null; then
     echo "reported ${STAGE}=${STATUS}"
     exit 0

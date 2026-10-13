@@ -5,7 +5,7 @@
 
 ## Context
 
-Sportify Azure Backstage is a public portfolio project that demonstrates Backstage platform engineering on Azure. It needs:
+Internal Developer Portal is a public portfolio project that demonstrates Backstage platform engineering on Azure. It needs:
 
 - a developer portal with a catalog, templates, docs, sign-in and permissions
 - read-only Azure discovery to fill the **Create new / Select existing** pickers

@@ -149,7 +149,7 @@ These were checked on 2026-10-10. The full matrix and its reasons are in [COMPAT
 | Item | Decision |
 |---|---|
 | Backend | `azurerm`, with `use_azuread_auth = true` and `use_oidc = true`. Storage account keys are disabled (`shared_access_key_enabled = false`) |
-| Account | One per environment: `stsportifytfstate<env>` in `rg-sportify-tfstate-<env>` |
+| Account | One per environment: `stidptfstate<env>` in `rg-idp-tfstate-<env>` |
 | Containers | `platform` (platform stacks) and `apps` (application states) |
 | Keys | `platform/<stack>.tfstate`, `apps/<application>/<env>.tfstate` |
 | Access | The platform identity has `Storage Blob Data Contributor` on `platform` only. The provisioning identity has it on `apps` only. Nobody else has write access |
@@ -165,7 +165,7 @@ The `naming` module produces every name and the standard tags, and all modules t
 
 | Tag | Example |
 |---|---|
-| `managed-by` | `sportify-platform` |
+| `managed-by` | `idp-platform` |
 | `application` | `orders-api` |
 | `owner` | `team-orders` |
 | `environment` | `dev` |
@@ -180,7 +180,7 @@ Cleanup relies on `managed-by` and `request-id` to find only the resources the p
 
 - The application's **namespace, ResourceQuota, LimitRange and deployer RoleBinding** are managed by Terraform (`app-namespace`), because they are infrastructure that has to exist before deployment.
 - **Workloads** (Deployment, Service, ServiceAccount, HTTPRoute, HPA) are managed by **Helm**, not Terraform.
-- The provisioning identity has a narrow cluster role, `sportify-namespace-provisioner`, limited to namespaces, quotas, limit ranges and role bindings. The deployment identity is bound only inside its application's namespace.
+- The provisioning identity has a narrow cluster role, `idp-namespace-provisioner`, limited to namespaces, quotas, limit ranges and role bindings. The deployment identity is bound only inside its application's namespace.
 - The `kubernetes` provider is only ever used against an *existing* cluster, never one created in the same configuration.
 
 ### 10. Checks in CI
@@ -198,7 +198,7 @@ Cleanup relies on `managed-by` and `request-id` to find only the resources the p
 The plan policies deny:
 - regions, SKUs or resource types that aren't allowlisted
 - missing standard tags
-- any update or delete of a resource without `managed-by = sportify-platform`
+- any update or delete of a resource without `managed-by = idp-platform`
 - any role assignment outside the role allowlist
 - public network access where the module forbids it
 

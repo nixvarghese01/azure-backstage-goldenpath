@@ -21,7 +21,7 @@ provisioned and nothing was published.
 |---|---|---|
 | ci-python | `uv sync --all-packages` (Python 3.14.8, uv 0.13.0, lockfile committed) | Pass |
 | ci-python | `ruff check`, `ruff format --check`, `mypy --strict` (36 files) | Pass |
-| ci-python | Unit and API tests: sportify-common / azure-discovery / orchestrator | 10 / 23 / 46 passed |
+| ci-python | Unit and API tests: idp-common / azure-discovery / orchestrator | 10 / 23 / 46 passed |
 | ci-e2e | `pytest e2e` (golden path against mock GitHub and Azure) | 10 passed |
 | ci-iac | fmt, `init -backend=false` + `validate` for all 17 modules and stacks | Pass |
 | ci-iac | `terraform test` | 8 passed |

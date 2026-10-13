@@ -31,8 +31,8 @@ route:
   enabled: true
   host: ""
   gateway:
-    name: sportify-gateway
-    namespace: sportify-gateway
+    name: idp-gateway
+    namespace: idp-gateway
 
 containerPort: 3000
 

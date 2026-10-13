@@ -4,9 +4,9 @@ The platform has three service boundaries and four long-running application proc
 
 | Process | Image / Dockerfile | Owns | Reachability |
 |---|---|---|---|
-| Backstage | `sportify/backstage:local`, [`portal/Dockerfile`](../../portal/Dockerfile) | Portal UI, catalog, auth, scaffolder, bridge | Browser: `http://localhost:7007` |
-| Azure discovery | `sportify/azure-discovery:local`, [`Dockerfile`](../../services/azure-discovery/Dockerfile) | Read-only inventory and selection validation | Compose network, port 8001 |
-| Orchestrator API | `sportify/provisioning-orchestrator:local`, [`Dockerfile`](../../services/provisioning-orchestrator/Dockerfile) | Requests, approvals, callbacks | Compose network, port 8002 |
+| Backstage | `idp/backstage:local`, [`portal/Dockerfile`](../../portal/Dockerfile) | Portal UI, catalog, auth, scaffolder, bridge | Browser: `http://localhost:7007` |
+| Azure discovery | `idp/azure-discovery:local`, [`Dockerfile`](../../services/azure-discovery/Dockerfile) | Read-only inventory and selection validation | Compose network, port 8001 |
+| Orchestrator API | `idp/provisioning-orchestrator:local`, [`Dockerfile`](../../services/provisioning-orchestrator/Dockerfile) | Requests, approvals, callbacks | Compose network, port 8002 |
 | Orchestrator worker | Same orchestrator image; command `orchestrator-worker` | Durable jobs, GitHub interaction, notification outbox | Compose network; no listening port |
 
 PostgreSQL has separate `backstage` and `orchestrator` databases and login roles. The one-shot
@@ -29,7 +29,7 @@ flowchart LR
 
 The platform runs in Ubuntu (WSL2) with Docker Engine; Docker Desktop isn't needed. It is
 independent of other projects in the same Ubuntu: it uses only Docker Engine, its own Compose
-project (`sportify-platform`), volumes and host ports (7007, 5432), and never touches k3s.
+project (`idp-platform`), volumes and host ports (7007, 5432), and never touches k3s.
 
 From Windows (PowerShell, in the repository root):
 
@@ -58,7 +58,7 @@ token, organization, resource limits or PostgreSQL administrator password, copy 
 Changing a password in an environment variable does not rotate a role in an existing database volume.
 
 The local portal signs in as catalog user `alex`, a member of `team-orders`. Guest authentication
-requires both `SPORTIFY_LOCAL_GUEST_AUTH=true` and `app-config.docker.yaml`. The normal image command
+requires both `IDP_LOCAL_GUEST_AUTH=true` and `app-config.docker.yaml`. The normal image command
 loads the production config, where GitHub sign-in and Entra service authentication are used.
 Only Backstage and PostgreSQL are published to host loopback; Python APIs remain inside the network.
 
@@ -77,9 +77,9 @@ the local guest, static-token or webhook settings for a hosted deployment.
 Build any image independently from the repository root:
 
 ```bash
-docker build -f portal/Dockerfile --target runtime-lite -t sportify/backstage:local .
-docker build -f services/azure-discovery/Dockerfile -t sportify/azure-discovery:local .
-docker build -f services/provisioning-orchestrator/Dockerfile -t sportify/provisioning-orchestrator:local .
+docker build -f portal/Dockerfile --target runtime-lite -t idp/backstage:local .
+docker build -f services/azure-discovery/Dockerfile -t idp/azure-discovery:local .
+docker build -f services/provisioning-orchestrator/Dockerfile -t idp/provisioning-orchestrator:local .
 ```
 
 The Backstage Dockerfile builds the backend/frontend bundle inside the build stage and focuses

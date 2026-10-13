@@ -50,7 +50,7 @@ variable "aks" {
     { vm_size = "Standard_D2s_v5", node_count = 1 })
     user_pool = optional(object({ vm_size = string, node_count = number, zones = list(string) }), null)
   })
-  default = { name = "aks-sportify-shared-dev" }
+  default = { name = "aks-idp-shared-dev" }
 }
 
 variable "acr" {
@@ -58,12 +58,12 @@ variable "acr" {
     name = string
     sku  = optional(string, "Basic")
   })
-  default = { name = "acrsportifydev" }
+  default = { name = "acridpdev" }
 }
 
 variable "postgres_name" {
   type    = string
-  default = "psql-sportify-dev"
+  default = "psql-idp-dev"
 }
 
 variable "postgres_allowed_ips" {
@@ -85,20 +85,20 @@ variable "dns_zone_name" {
 variable "shared_storage_name" {
   description = "Shared demo storage account that apps can reuse (Select existing)."
   type        = string
-  default     = "stsportifyshareddev"
+  default     = "stidpshareddev"
 }
 
 variable "identity_resource_group" {
   type    = string
-  default = "rg-sportify-identities-dev"
+  default = "rg-idp-identities-dev"
 }
 
 locals {
   tags = {
-    "managed-by"  = "sportify-platform"
+    "managed-by"  = "idp-platform"
     "environment" = var.environment
     "lifecycle"   = "platform"
-    "application" = "sportify-platform"
+    "application" = "idp-platform"
     "owner"       = "platform-team"
   }
   extra_clusters = {
@@ -114,19 +114,19 @@ locals {
 # ------------------------------------------------------------------ identities from 10-identities
 data "azurerm_user_assigned_identity" "id" {
   for_each            = toset(["platform", "platform-deploy", "provisioning", "deployment", "backstage", "orchestrator"])
-  name                = "id-sportify-${each.key}-${var.environment}"
+  name                = "id-idp-${each.key}-${var.environment}"
   resource_group_name = var.identity_resource_group
 }
 
 # ------------------------------------------------------------------ resource groups
 resource "azurerm_resource_group" "platform" {
-  name     = "rg-sportify-platform-${var.environment}"
+  name     = "rg-idp-platform-${var.environment}"
   location = var.location
   tags     = local.tags
 }
 
 resource "azurerm_resource_group" "apps" {
-  name     = "rg-sportify-apps-${var.environment}"
+  name     = "rg-idp-apps-${var.environment}"
   location = var.location
   tags     = merge(local.tags, { "lifecycle" = "application" })
 }
@@ -254,9 +254,9 @@ locals {
 
 # Narrow custom role for application infrastructure (create-new RG, identities, storage, key vault).
 resource "azurerm_role_definition" "app_provisioner" {
-  name        = "Sportify App Provisioner (${var.environment})"
+  name        = "IDP App Provisioner (${var.environment})"
   scope       = data.azurerm_subscription.current.id
-  description = "Creates application infrastructure for the Sportify golden path. No compute, network or RBAC beyond the conditioned assignment role."
+  description = "Creates application infrastructure for the IDP golden path. No compute, network or RBAC beyond the conditioned assignment role."
   permissions {
     actions = [
       "*/read",

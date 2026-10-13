@@ -22,5 +22,5 @@ test_compute_denied_in_app_repo if {
 
 test_only_deployer_role_binding if {
 	some msg in app.deny with input as rc("kubernetes_role_binding_v1", {"role_ref": [{"name": "cluster-admin"}]}) with data.roles.assignable as []
-	contains(msg, "sportify-app-deployer")
+	contains(msg, "idp-app-deployer")
 }

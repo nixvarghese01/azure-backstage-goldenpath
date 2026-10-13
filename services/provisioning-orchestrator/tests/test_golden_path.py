@@ -99,7 +99,7 @@ def test_golden_path_reaches_succeeded(client, worker, github) -> None:
                 "id": 9,
                 "conclusion": "success",
                 "event": "pull_request",
-                "head_branch": f"sportify/app-{rid}",
+                "head_branch": f"idp/app-{rid}",
                 "name": "application-ci",
             },
         },
@@ -107,7 +107,7 @@ def test_golden_path_reaches_succeeded(client, worker, github) -> None:
     drain(worker)
     assert any(c[0] == "merge" for c in github.calls)
 
-    callback(client, rid, "ci", "success", 4, {"image": "acrsportifydev.azurecr.io/orders-api:abc123"})
+    callback(client, rid, "ci", "success", 4, {"image": "acridpdev.azurecr.io/orders-api:abc123"})
     callback(client, rid, "deploy", "started", 5)
     callback(client, rid, "deploy", "success", 5, {"endpoint": "orders-api.dev.xycorp.local", "pods": "1/1"})
     drain(worker)
@@ -139,7 +139,7 @@ def test_replayed_callback_is_ignored(client, worker, github) -> None:
 
 def test_requester_cannot_approve_own_request(client, worker, github) -> None:
     rid = _to_awaiting_approval(client, worker, github)
-    headers = {**REQUESTER, "X-Sportify-Groups": "group:default/team-orders,group:default/platform-approvers"}
+    headers = {**REQUESTER, "X-IDP-Groups": "group:default/team-orders,group:default/platform-approvers"}
     res = client.post(
         f"/v1/requests/{rid}/approval", headers=headers, json={"decision": "approve", "plan_hash": PLAN_HASH}
     )
@@ -233,7 +233,7 @@ def test_platform_resources_go_through_platform_pr(client, worker, github, disco
         {
             "action": "closed",
             "repository": {"name": "azure-backstage-goldenpath"},
-            "pull_request": {"merged": True, "head": {"ref": f"sportify/platform-{rid}"}},
+            "pull_request": {"merged": True, "head": {"ref": f"idp/platform-{rid}"}},
         },
     )
     drain(worker)

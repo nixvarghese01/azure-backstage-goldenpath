@@ -1,6 +1,6 @@
 # Platform microservices architecture
 
-How Sportify Azure Backstage is split into services: what each one owns, how they communicate, how they authenticate to each other, and how they are deployed, scaled and observed.
+How Internal Developer Portal is split into services: what each one owns, how they communicate, how they authenticate to each other, and how they are deployed, scaled and observed.
 
 > **Status:** milestone 1 service code and container definitions written; builds and runtime validation pending. The AKS topology below remains the deployment target. Related documents: [README](../../README.md), [ADR-0001](../adr/0001-python-platform-services.md), [ADR-0006](../adr/0006-container-delivery.md), [local container setup](../../deploy/local/README.md), [COMPATIBILITY.md](../../COMPATIBILITY.md).
 
@@ -10,7 +10,7 @@ How Sportify Azure Backstage is split into services: what each one owns, how the
 
 | Service | Runtime | Responsibility | State | Deployable units |
 |---|---|---|---|---|
-| **`backstage`** | Node.js 24, Backstage 1.55 | Developer portal: catalog, scaffolder, TechDocs, sign-in, permissions, notifications. Serves the frontend bundle. Hosts the thin `sportify-platform-backend` bridge and the `sportify-platform` frontend plugin | PostgreSQL database `backstage` | 1 Deployment |
+| **`backstage`** | Node.js 24, Backstage 1.55 | Developer portal: catalog, scaffolder, TechDocs, sign-in, permissions, notifications. Serves the frontend bundle. Hosts the thin `idp-platform-backend` bridge and the `idp-platform` frontend plugin | PostgreSQL database `backstage` | 1 Deployment |
 | **`azure-discovery`** | Python 3.14, FastAPI | Read-only Azure discovery and eligibility validation against the allowlists | **Stateless** (short in-memory cache only) | 1 Deployment |
 | **`provisioning-orchestrator`** | Python 3.14, FastAPI | Request lifecycle: validation, state machine, approvals, GitHub orchestration, audit, cleanup | PostgreSQL database `orchestrator` | 2 Deployments from one image: **`-api`** and **`-worker`** |
 
@@ -30,7 +30,7 @@ External systems: **GitHub** (API, Actions, webhooks), **Azure Resource Manager 
 flowchart LR
     Dev([Developer / Approver<br/>browser])
 
-    subgraph AKS["AKS · namespace sportify-platform"]
+    subgraph AKS["AKS · namespace idp-platform"]
         BS["backstage<br/>(portal + bridge)"]
         DISC["azure-discovery<br/>(stateless)"]
         OAPI["orchestrator-api"]
@@ -64,11 +64,11 @@ flowchart LR
 ### 3.1 `backstage`
 
 - **Owns:** the catalog entities, scaffolder tasks, user sessions, permission policy, notifications and TechDocs.
-- **Exposes:** the portal UI and `/api/*`, including `/api/sportify/*` from the bridge plugin.
+- **Exposes:** the portal UI and `/api/*`, including `/api/idp/*` from the bridge plugin.
 - **Bridge responsibilities** (no business logic):
   - Translate portal calls into calls to the Python services. Attach a service token, plus user context taken from the **verified** Backstage user token, never from fields in the browser request.
-  - Evaluate Backstage permissions (for example `sportify.request.approve`) before forwarding a decision.
-  - Provide the scaffolder actions `sportify:request:submit` and `sportify:request:repository-created`.
+  - Evaluate Backstage permissions (for example `idp.request.approve`) before forwarding a decision.
+  - Provide the scaffolder actions `idp:request:submit` and `idp:request:repository-created`.
 - **Does not:** call Azure, decide policy, or hold workflow state.
 
 ### 3.2 `azure-discovery`
@@ -131,9 +131,9 @@ Only these two paths are exposed publicly, through an `HTTPRoute` on a separate 
 
 | Service | Workload identity (Entra) | Azure RBAC | Other credentials |
 |---|---|---|---|
-| `backstage` | `id-sportify-backstage` | None on Azure resources. `Key Vault Secrets User` on its own secrets only (per-secret scope) | GitHub App #1 key and client secret, session secret (Key Vault through CSI) |
-| `azure-discovery` | `id-sportify-discovery` | `Reader` on the approved subscriptions | — |
-| `provisioning-orchestrator` (api + worker) | `id-sportify-orchestrator` | None on Azure resources. `Key Vault Secrets User` on its own secrets only (per-secret scope) | GitHub App #2 key and webhook secret (Key Vault through CSI) |
+| `backstage` | `id-idp-backstage` | None on Azure resources. `Key Vault Secrets User` on its own secrets only (per-secret scope) | GitHub App #1 key and client secret, session secret (Key Vault through CSI) |
+| `azure-discovery` | `id-idp-discovery` | `Reader` on the approved subscriptions | — |
+| `provisioning-orchestrator` (api + worker) | `id-idp-orchestrator` | None on Azure resources. `Key Vault Secrets User` on its own secrets only (per-secret scope) | GitHub App #2 key and webhook secret (Key Vault through CSI) |
 | PostgreSQL logins | Entra authentication mapped to the identities above | Per-database roles | No passwords |
 
 **Trust rules:**
@@ -159,10 +159,10 @@ Most credentials are replaced by Workload Identity and OIDC. The few secrets tha
 
 ```mermaid
 flowchart TB
-    subgraph GWNS["namespace: sportify-gateway"]
+    subgraph GWNS["namespace: idp-gateway"]
         GW["Gateway (approuting-istio)"]
     end
-    subgraph NS["namespace: sportify-platform"]
+    subgraph NS["namespace: idp-platform"]
         R1["HTTPRoute backstage.dev.xycorp.local"] --> SBS[Service backstage]
         R2["HTTPRoute platform-hooks.dev.xycorp.local<br/>/v1/webhooks/github · /v1/callbacks/actions"] --> SOA[Service orchestrator-api]
         SBS --> PBS["Deployment backstage ×2"]
@@ -183,7 +183,7 @@ flowchart TB
 
 All pods run with the same hardened defaults as generated applications: non-root, read-only root filesystem, all capabilities dropped, the `RuntimeDefault` seccomp profile, and resource requests and limits.
 
-**Network policies** (default deny in `sportify-platform`):
+**Network policies** (default deny in `idp-platform`):
 
 | Allow | From → To |
 |---|---|
@@ -225,10 +225,10 @@ All pods run with the same hardened defaults as generated applications: non-root
 
 | Service | Path | Image |
 |---|---|---|
-| `backstage` | `portal/packages/app`, `portal/packages/backend`, `portal/plugins/sportify-platform*` | `acr…/sportify/backstage:<sha>` |
-| `azure-discovery` | `services/azure-discovery` | `acr…/sportify/azure-discovery:<sha>` |
-| `provisioning-orchestrator` | `services/provisioning-orchestrator` | `acr…/sportify/provisioning-orchestrator:<sha>` (api and worker differ only in the start command) |
-| Shared Python code | `services/libs/sportify-common` (auth verification, logging, OTel setup) | Packaged into each service by the uv workspace |
+| `backstage` | `portal/packages/app`, `portal/packages/backend`, `portal/plugins/idp-platform*` | `acr…/idp/backstage:<sha>` |
+| `azure-discovery` | `services/azure-discovery` | `acr…/idp/azure-discovery:<sha>` |
+| `provisioning-orchestrator` | `services/provisioning-orchestrator` | `acr…/idp/provisioning-orchestrator:<sha>` (api and worker differ only in the start command) |
+| Shared Python code | `services/libs/idp-common` (auth verification, logging, OTel setup) | Packaged into each service by the uv workspace |
 | Helm charts | `deploy/charts/{backstage,azure-discovery,provisioning-orchestrator}` | — |
 
 Each service has its own CI path filter, tests, image and Helm release, so it can be built and deployed independently.

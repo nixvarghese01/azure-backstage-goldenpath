@@ -56,8 +56,8 @@ class InProcessDiscovery:
 
 @pytest.fixture(autouse=True)
 def _env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("SPORTIFY_AUTH_MODE", "static")
-    monkeypatch.setenv("SPORTIFY_DEV_SERVICE_TOKEN", TOKEN)
+    monkeypatch.setenv("IDP_AUTH_MODE", "static")
+    monkeypatch.setenv("IDP_DEV_SERVICE_TOKEN", TOKEN)
     secret = tmp_path / "webhook"
     secret.write_text("e2e-webhook-secret")
     monkeypatch.setenv("ORCHESTRATOR_GITHUB_WEBHOOK_SECRET_FILE", str(secret))

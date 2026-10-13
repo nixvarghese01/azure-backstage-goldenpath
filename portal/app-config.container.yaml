@@ -1,9 +1,9 @@
 # Shared container settings. Load a local Docker or production override after this file.
 app:
-  title: Sportify Azure Backstage
+  title: Internal Developer Portal
   baseUrl: http://localhost:7007
 organization:
-  name: Sportify
+  name: IDP
 backend:
   baseUrl: http://localhost:7007
   listen:
@@ -41,9 +41,9 @@ techdocs:
       publishDirectory: /tmp/techdocs
 scaffolder:
   defaultAuthor:
-    name: Sportify Platform
+    name: IDP Platform
     email: platform@xycorp.local
-sportify:
+idp:
   approverGroup: group:default/platform-approvers
   submitTimeoutMinutes: 360
   stacks:

@@ -30,7 +30,7 @@ class HttpBackstageClient:
                 "description": description,
                 "link": link,
                 "severity": severity,
-                "topic": "sportify-provisioning",
+                "topic": "idp-provisioning",
             },
         }
         res = httpx.post(

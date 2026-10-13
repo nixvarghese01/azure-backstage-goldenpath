@@ -2,12 +2,12 @@ mock_provider "azurerm" {}
 
 variables {
   name                = "id-orders-api-dev"
-  resource_group_name = "rg-sportify-apps-dev"
+  resource_group_name = "rg-idp-apps-dev"
   location            = "uksouth"
   oidc_issuer_url     = "https://uksouth.oic.prod-aks.azure.com/tenant/cluster/"
   namespace           = "orders-api"
   service_account     = "orders-api"
-  tags                = { "managed-by" = "sportify-platform" }
+  tags                = { "managed-by" = "idp-platform" }
 }
 
 run "federated_subject_matches_service_account" {

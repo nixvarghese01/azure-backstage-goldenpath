@@ -42,8 +42,8 @@ env:
   ARM_CLIENT_ID: ${{ vars.PROVISIONING_CLIENT_ID }}
   ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-  SPORTIFY_REQUEST_ID: ${{ inputs.request_id }}
-  SPORTIFY_CALLBACK_URL: ${{ vars.SPORTIFY_CALLBACK_URL }}
+  IDP_REQUEST_ID: ${{ inputs.request_id }}
+  IDP_CALLBACK_URL: ${{ vars.IDP_CALLBACK_URL }}
   TF_DIR: infra/terraform
   PLATFORM: .platform
   ENVIRONMENT: ${{ inputs.environment }}

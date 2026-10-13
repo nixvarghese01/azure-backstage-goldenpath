@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve Sportify Azure Backstage. This is a model project, so changes should keep the design consistent and documented.
+Thanks for helping improve Internal Developer Portal. This is a model project, so changes should keep the design consistent and documented.
 
 ## Branching model
 
@@ -69,6 +69,6 @@ marking the change verified. Do not push or create a pull request without author
 ## Adding a new stack
 
 1. Add `templates/applications/<stack>/application/` (rendered by the orchestrator with `[[ ]]` delimiters). Common assets come from `templates/applications/_shared/`; stack files override them.
-2. Add the stack to `policies/allowlist.yaml` and to `sportify.stacks` in `portal/app-config.yaml`, initially with `enabled: false`.
+2. Add the stack to `policies/allowlist.yaml` and to `idp.stacks` in `portal/app-config.yaml`, initially with `enabled: false`.
 3. Use the existing reusable CI runtime input (`node`, `python`, `go`, `dotnet`, `java`). Non-Node templates must provide a `verify` Docker target, keeping OIDC trust on the existing workflow.
 4. Extend `ci-templates.yml` to render and test it, then enable it.

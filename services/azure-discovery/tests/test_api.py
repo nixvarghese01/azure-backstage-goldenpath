@@ -15,7 +15,7 @@ def test_lists_only_allowlisted_subscriptions(client) -> None:
 
 def test_resource_groups_filtered_by_allowlist_and_region(client) -> None:
     res = client.get(f"/v1/subscriptions/{SUB}/resource-groups?environment=dev", headers=AUTH)
-    assert [g["name"] for g in res.json()] == ["rg-sportify-apps-dev"]
+    assert [g["name"] for g in res.json()] == ["rg-idp-apps-dev"]
 
 
 def test_unknown_subscription_is_not_found(client) -> None:
@@ -26,7 +26,7 @@ def test_unknown_subscription_is_not_found(client) -> None:
 def test_aks_clusters_report_ha_eligibility(client) -> None:
     res = client.get(f"/v1/subscriptions/{SUB}/aks-clusters", headers=AUTH)
     cluster = res.json()[0]
-    assert cluster["name"] == "aks-sportify-shared-dev"
+    assert cluster["name"] == "aks-idp-shared-dev"
     assert cluster["ha_eligible"] is False
     # Lets the form prefill the endpoint host as <name>.<base_domain>.
     assert cluster["base_domain"] == "dev.xycorp.local"
@@ -34,7 +34,7 @@ def test_aks_clusters_report_ha_eligibility(client) -> None:
 
 def test_storage_resources(client) -> None:
     res = client.get(f"/v1/subscriptions/{SUB}/resources?type=storage", headers=AUTH)
-    assert [d["name"] for d in res.json()] == ["stsportifyshareddev"]
+    assert [d["name"] for d in res.json()] == ["stidpshareddev"]
 
 
 def test_capabilities_free_subscription(client) -> None:

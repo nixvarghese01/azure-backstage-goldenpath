@@ -14,10 +14,10 @@
 # Paths to CSI-mounted secret files (values never in env): secret-management.md §5
 - { name: ORCHESTRATOR_GITHUB_APP_PRIVATE_KEY_FILE, value: /mnt/secrets/gh-app-orchestrator-key }
 - { name: ORCHESTRATOR_GITHUB_WEBHOOK_SECRET_FILE, value: /mnt/secrets/gh-app-orchestrator-webhook-secret }
-- { name: SPORTIFY_AUTH_MODE, value: entra }
-- { name: SPORTIFY_ENTRA_TENANT_ID, value: {{ .Values.auth.tenantId | quote }} }
-- { name: SPORTIFY_ENTRA_AUDIENCE, value: {{ .Values.auth.audience | quote }} }
-- { name: SPORTIFY_ALLOWED_CALLERS, value: {{ .Values.auth.allowedCallers | quote }} }
+- { name: IDP_AUTH_MODE, value: entra }
+- { name: IDP_ENTRA_TENANT_ID, value: {{ .Values.auth.tenantId | quote }} }
+- { name: IDP_ENTRA_AUDIENCE, value: {{ .Values.auth.audience | quote }} }
+- { name: IDP_ALLOWED_CALLERS, value: {{ .Values.auth.allowedCallers | quote }} }
 {{- end -}}
 
 {{- define "orch.pod" -}}

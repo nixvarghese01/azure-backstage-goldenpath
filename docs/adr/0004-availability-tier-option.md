@@ -44,7 +44,7 @@ The justification is only required when **deviating from the default**. This kee
 | New Storage account | `Standard_LRS` | `Standard_ZRS` (where the region supports it) |
 | Existing Storage or Key Vault | Unchanged | **Unchanged.** Validation adds a *warning* if existing storage is LRS, and the warning is shown to the approver |
 | Tags | `availability-tier = standard` | `availability-tier = ha` |
-| Catalog annotations | `sportify.io/availability-tier: standard` | `…: ha`, plus `sportify.io/slo-target` |
+| Catalog annotations | `idp.io/availability-tier: standard` | `…: ha`, plus `idp.io/slo-target` |
 
 ### 4. Server-side validation (orchestrator + discovery)
 

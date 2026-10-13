@@ -13,8 +13,8 @@ FROM python:3.14-slim
 RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
 WORKDIR /app
 COPY --from=build /opt/venv /opt/venv
-COPY policies/allowlist.yaml /etc/sportify/allowlist.yaml
-ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 DISCOVERY_POLICY_FILE=/etc/sportify/allowlist.yaml
+COPY policies/allowlist.yaml /etc/idp/allowlist.yaml
+ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 DISCOVERY_POLICY_FILE=/etc/idp/allowlist.yaml
 USER 10001
 EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \

@@ -28,17 +28,17 @@ variable "environment" {
 
 variable "cluster_name" {
   type    = string
-  default = "aks-sportify-shared-dev"
+  default = "aks-idp-shared-dev"
 }
 
 variable "cluster_resource_group" {
   type    = string
-  default = "rg-sportify-platform-dev"
+  default = "rg-idp-platform-dev"
 }
 
 variable "identity_resource_group" {
   type    = string
-  default = "rg-sportify-identities-dev"
+  default = "rg-idp-identities-dev"
 }
 
 variable "kubelogin_mode" {
@@ -77,7 +77,7 @@ provider "kubernetes" {
 
 data "azurerm_user_assigned_identity" "id" {
   for_each            = toset(["provisioning", "deployment", "platform-deploy", "backstage", "discovery", "orchestrator"])
-  name                = "id-sportify-${each.key}-${var.environment}"
+  name                = "id-idp-${each.key}-${var.environment}"
   resource_group_name = var.identity_resource_group
 }
 
@@ -85,22 +85,22 @@ locals {
   restricted = {
     "pod-security.kubernetes.io/enforce" = "restricted"
     "pod-security.kubernetes.io/audit"   = "restricted"
-    "app.kubernetes.io/managed-by"       = "sportify-platform"
+    "app.kubernetes.io/managed-by"       = "idp-platform"
   }
 }
 
 # ------------------------------------------------------------------ namespaces
 resource "kubernetes_namespace_v1" "gateway" {
   metadata {
-    name   = "sportify-gateway"
+    name   = "idp-gateway"
     labels = local.restricted
   }
 }
 
 resource "kubernetes_namespace_v1" "platform" {
   metadata {
-    name   = "sportify-platform"
-    labels = merge(local.restricted, { "sportify.io/gateway-access" = "true" })
+    name   = "idp-platform"
+    labels = merge(local.restricted, { "idp.io/gateway-access" = "true" })
   }
 }
 
@@ -110,7 +110,7 @@ resource "kubernetes_manifest" "gateway" {
     apiVersion = "gateway.networking.k8s.io/v1"
     kind       = "Gateway"
     metadata = {
-      name      = "sportify-gateway"
+      name      = "idp-gateway"
       namespace = kubernetes_namespace_v1.gateway.metadata[0].name
     }
     spec = {
@@ -122,7 +122,7 @@ resource "kubernetes_manifest" "gateway" {
           protocol = "HTTP"
           hostname = var.gateway_hostname
           allowedRoutes = { namespaces = { from = "Selector", selector = {
-          matchLabels = { "sportify.io/gateway-access" = "true" } } } }
+          matchLabels = { "idp.io/gateway-access" = "true" } } } }
         }],
         var.gateway_tls_secret == null ? [] : [{
           name     = "https"
@@ -131,7 +131,7 @@ resource "kubernetes_manifest" "gateway" {
           hostname = var.gateway_hostname
           tls      = { mode = "Terminate", certificateRefs = [{ kind = "Secret", name = var.gateway_tls_secret }] }
           allowedRoutes = { namespaces = { from = "Selector", selector = {
-          matchLabels = { "sportify.io/gateway-access" = "true" } } } }
+          matchLabels = { "idp.io/gateway-access" = "true" } } } }
         }],
       )
     }
@@ -141,7 +141,7 @@ resource "kubernetes_manifest" "gateway" {
 # ------------------------------------------------------------------ RBAC
 resource "kubernetes_cluster_role_v1" "app_deployer" {
   metadata {
-    name = "sportify-app-deployer"
+    name = "idp-app-deployer"
   }
   rule {
     api_groups = ["", "apps"]
@@ -163,7 +163,7 @@ resource "kubernetes_cluster_role_v1" "app_deployer" {
 
 resource "kubernetes_cluster_role_v1" "namespace_provisioner" {
   metadata {
-    name = "sportify-namespace-provisioner"
+    name = "idp-namespace-provisioner"
   }
   rule {
     api_groups = [""]
@@ -191,7 +191,7 @@ resource "kubernetes_cluster_role_v1" "namespace_provisioner" {
 
 resource "kubernetes_cluster_role_binding_v1" "provisioner" {
   metadata {
-    name = "sportify-namespace-provisioner"
+    name = "idp-namespace-provisioner"
   }
   role_ref {
     api_group = "rbac.authorization.k8s.io"
@@ -225,13 +225,13 @@ resource "kubernetes_role_binding_v1" "platform_deployer" {
 # ------------------------------------------------------------------ Workload Identity for platform services
 resource "azurerm_federated_identity_credential" "service" {
   for_each                  = toset(["backstage", "discovery", "orchestrator"])
-  name                      = "k8s-sportify-platform-${each.key}"
+  name                      = "k8s-idp-platform-${each.key}"
   user_assigned_identity_id = data.azurerm_user_assigned_identity.id[each.key].id
   issuer                    = data.azurerm_kubernetes_cluster.this.oidc_issuer_url
-  subject                   = "system:serviceaccount:sportify-platform:${each.key == "discovery" ? "azure-discovery" : each.key == "orchestrator" ? "provisioning-orchestrator" : each.key}"
+  subject                   = "system:serviceaccount:idp-platform:${each.key == "discovery" ? "azure-discovery" : each.key == "orchestrator" ? "provisioning-orchestrator" : each.key}"
   audience                  = ["api://AzureADTokenExchange"]
 }
 
 output "gateway" {
-  value = { name = "sportify-gateway", namespace = "sportify-gateway" }
+  value = { name = "idp-gateway", namespace = "idp-gateway" }
 }

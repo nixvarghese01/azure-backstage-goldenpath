@@ -40,8 +40,8 @@ deny contains msg if {
 	some action in rc.change.actions
 	action in {"update", "delete"}
 	is_object(rc.change.before.tags)
-	object.get(rc.change.before.tags, "managed-by", "") != "sportify-platform"
-	msg := sprintf("%s: %s of a resource not managed by sportify-platform", [rc.address, action])
+	object.get(rc.change.before.tags, "managed-by", "") != "idp-platform"
+	msg := sprintf("%s: %s of a resource not managed by idp-platform", [rc.address, action])
 }
 
 deny contains msg if {

@@ -6,7 +6,7 @@ How to remove what the golden path created, for example after recording a demo. 
 
 ## Rules
 
-- The platform deletes **only resources it created** for the request. These are identified by the tag `managed-by: sportify-platform` and the `request-id` tag.
+- The platform deletes **only resources it created** for the request. These are identified by the tag `managed-by: idp-platform` and the `request-id` tag.
 - Resources selected through **Select existing** are never deleted. Only the role assignments the platform added to them are removed.
 - Shared platform infrastructure (AKS, ACR, PostgreSQL, Key Vault, state storage) is never removed by an application cleanup. It has its own teardown below.
 
@@ -47,8 +47,8 @@ Only do this when no applications remain on the cluster. Destroy the stacks in `
 ## 3. Verify nothing is left running
 
 ```bash
-az resource list --tag managed-by=sportify-platform -o table
-az group list --query "[?tags.\"managed-by\"=='sportify-platform']" -o table
+az resource list --tag managed-by=idp-platform -o table
+az group list --query "[?tags.\"managed-by\"=='idp-platform']" -o table
 ```
 
 Also check the subscription's **Cost Management** view a day later to confirm no charges remain.
