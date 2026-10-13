@@ -368,6 +368,9 @@ def process_inbox_event(ctx: Context, session: Session, ev: InboxEvent) -> None:
 
 def deliver_outbox_message(ctx: Context, msg: OutboxMessage) -> None:
     p = msg.payload
+    if msg.kind == "catalog_unregister":
+        ctx.backstage.unregister_component(p["application"])
+        return
     if p.get("audience") == "approvers":
         recipients = [ctx.settings.approver_group]
         link = "/sportify/approvals"

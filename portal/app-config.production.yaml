@@ -33,6 +33,11 @@ backend:
           subjectPrefix: orchestrator
         accessRestrictions:
           - plugin: notifications
+          # Cleanup removes the application's entity (CLEANED_UP): read + delete only.
+          - plugin: catalog
+            permission: catalog.entity.read
+          - plugin: catalog
+            permission: catalog.entity.delete
 
 integrations:
   github:

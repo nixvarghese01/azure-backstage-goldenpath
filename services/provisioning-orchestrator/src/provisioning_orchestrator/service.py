@@ -40,6 +40,8 @@ def transition(
         req.error = error
     audit(session, req.id, actor, "state_changed", **{"from": current.value, "to": target.value,
                                                       "reason": reason})
+    if target == State.CLEANED_UP and req.repository.get("name"):
+        session.add(OutboxMessage(kind="catalog_unregister", payload={"application": req.application_name}))
     if target in _NOTIFY:
         audience, title = _NOTIFY[target]
         session.add(OutboxMessage(kind="notification", payload={

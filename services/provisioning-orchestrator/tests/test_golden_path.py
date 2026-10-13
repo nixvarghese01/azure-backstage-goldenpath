@@ -157,3 +157,40 @@ def test_platform_resources_go_through_platform_pr(client, worker, github, disco
     callback(client, rid, "platform_apply", "success", 11)
     drain(worker)
     assert _get(client, rid)["ready_for_repository"] is True
+
+
+def test_cleanup_destroys_with_approval_and_unregisters(client, worker, github, ctx) -> None:
+    rid = _to_awaiting_approval(client, worker, github)
+    client.post(f"/v1/requests/{rid}/approval", headers=APPROVER, json={"decision": "approve", "plan_hash": PLAN_HASH})
+    drain(worker)
+    callback(client, rid, "apply", "success", 3, {"outputs": {"identity_client_id": "x"}})
+    drain(worker)
+    callback(client, rid, "ci", "success", 4, {"image": "acr/orders-api:1"})
+    callback(client, rid, "deploy", "started", 5)
+    callback(client, rid, "deploy", "success", 5, {"endpoint": "orders-api.dev.sportify.example"})
+    drain(worker)
+    assert _get(client, rid)["state"] == "SUCCEEDED"
+
+    # Cleanup: uninstall -> destroy plan -> approval (held rule) -> destroy apply -> CLEANED_UP.
+    res = client.post(f"/v1/requests/{rid}/cleanup", headers=REQUESTER)
+    assert res.json()["state"] == "CLEANUP_PENDING"
+    drain(worker)
+    assert any(c[0] == "dispatch" and c[1]["inputs"].get("action") == "uninstall" for c in github.calls)
+    callback(client, rid, "uninstall", "success", 6)
+    drain(worker)
+    destroy_hash = "d" * 64
+    callback(client, rid, "plan", "success", 7, {"plan_hash": destroy_hash, "summary": {"destroy": 7}})
+    drain(worker)
+    webhook(client, "deployment_protection_rule", f"dpr-destroy-{rid}", {
+        "action": "requested", "environment": "dev-infra",
+        "deployment_callback_url": "https://api.github.com/callback/2", "repository": {"name": "orders-api"}})
+    drain(worker)
+    assert _get(client, rid)["cleanup"]["stage"] == "awaiting_approval"
+    ok = client.post(f"/v1/requests/{rid}/approval", headers=APPROVER,
+                     json={"decision": "approve", "plan_hash": destroy_hash})
+    assert ok.status_code == 200, ok.text
+    drain(worker)
+    callback(client, rid, "apply", "success", 8)
+    drain(worker)
+    assert _get(client, rid)["state"] == "CLEANED_UP"
+    assert {"unregistered": "component:default/orders-api"} in ctx.backstage.sent

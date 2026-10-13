@@ -12,6 +12,8 @@ from provisioning_orchestrator.clients.tokens import bearer_for
 class BackstageClient(Protocol):
     def notify(self, recipients: list[str], title: str, description: str, link: str, severity: str) -> None: ...
 
+    def unregister_component(self, name: str, namespace: str = "default") -> None: ...
+
 
 class HttpBackstageClient:
     def __init__(self, base_url: str, scope: str | None) -> None:
@@ -32,6 +34,19 @@ class HttpBackstageClient:
         )
         res.raise_for_status()
 
+    def unregister_component(self, name: str, namespace: str = "default") -> None:
+        """Remove a cleaned-up application's entity from the catalog (idempotent: 404 is fine)."""
+        headers = {"Authorization": f"Bearer {bearer_for(self.scope)}"}
+        res = httpx.get(f"{self.base_url}/api/catalog/entities/by-name/component/{namespace}/{name}",
+                        headers=headers, timeout=5.0)
+        if res.status_code == 404:
+            return
+        res.raise_for_status()
+        uid = res.json()["metadata"]["uid"]
+        res = httpx.delete(f"{self.base_url}/api/catalog/entities/by-uid/{uid}", headers=headers, timeout=5.0)
+        if res.status_code not in (204, 404):
+            res.raise_for_status()
+
 
 class NullBackstageClient:
     """Used when Backstage notifications aren't configured (e.g. tests)."""
@@ -42,3 +57,6 @@ class NullBackstageClient:
     def notify(self, recipients: list[str], title: str, description: str, link: str, severity: str) -> None:
         self.sent.append({"recipients": recipients, "title": title, "description": description,
                           "link": link, "severity": severity})
+
+    def unregister_component(self, name: str, namespace: str = "default") -> None:
+        self.sent.append({"unregistered": f"component:{namespace}/{name}"})
