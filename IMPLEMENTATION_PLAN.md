@@ -115,16 +115,16 @@ All workflows pin Actions to SHAs, declare least-privilege `permissions:` at the
 |---|---|---|---|---|
 | `ci-backstage.yml` | PR, push to `develop`/`main` (paths `packages/`, `plugins/`) | install (Yarn 4.13, Node 24) → `tsc` → lint → unit tests → build | `contents: read` | — |
 | `ci-python.yml` | PR, push (paths `services/`) | `uv sync` → ruff → mypy → pytest (unit) → pytest (PostgreSQL integration via Testcontainers) | `contents: read` | — |
-| `ci-iac.yml` | PR, push (paths `iac/`, `policies/`) | `fmt -check` → `validate` → TFLint → `terraform test` (mock providers) → Checkov → Conftest unit tests for Rego | `contents: read` | — |
+| `ci-iac.yml` | PR, push (paths `iac/`, `policies/`, `deploy/charts/`) | `fmt -check` → `validate` → TFLint → `terraform test` (mock providers) → Checkov (waivers are inline `checkov:skip` with reasons) → Conftest unit tests for Rego; platform charts: `helm lint` → render → Conftest → Trivy config | `contents: read` | — |
 | `ci-templates.yml` | PR, push (paths `templates/`) | Render the NestJS template with fixture values, then run the generated repository's checks offline: `terraform validate`, `helm lint` and `helm template`, `npm test`, `docker build`, kind install | `contents: read` | — |
 | `ci-e2e.yml` | PR to `main`, nightly | Full golden path with **mocked** Azure and GitHub adapters: submit → … → `SUCCEEDED`, plus failure scenarios | `contents: read` | — |
 | `release-modules.yml` | Tag `iac/modules/<name>/vX.Y.Z` | Validate and test that module, publish release notes | `contents: write` | — |
-| `platform-plan.yml` | PR touching `iac/platform/**` (including orchestrator-raised platform requests), manual dispatch | Plan each changed stack with `-lock=false`, upload the plan, comment the summary | OIDC: **platform plan identity** (Reader on Azure, Storage Blob Data Reader on the `platform` state container) | `platform-plan` |
-| `platform-apply.yml` | Manual dispatch after merge | Apply the saved plan for one stack | OIDC: **platform identity** | `platform` (GitHub required reviewers) |
+| `platform-plan.yml` | PR touching `iac/platform/**` (including orchestrator-raised platform requests), manual dispatch | Per changed stack: static gate (fmt, validate, TFLint, Checkov) → plan with `-lock=false` → Conftest and Checkov on the plan JSON → comment the summary | OIDC: **platform plan identity** (Reader on Azure, Storage Blob Data Reader on the `platform` state container) | `platform-plan` |
+| `platform-apply.yml` | Manual dispatch after merge | Static gate → plan → Conftest and Checkov on the plan → apply that saved plan | OIDC: **platform identity** | `platform` (GitHub required reviewers) |
 | `images.yml` | Push to `main` | Build, scan and push the images for Backstage, `azure-discovery` and `provisioning-orchestrator` | OIDC: **deployment identity (platform)**, `acrPush` | — |
 | `deploy-platform.yml` | After `images.yml`, manual | Helm deploy into the `sportify-platform` namespace, then smoke tests | OIDC: **deployment identity (platform)** | `platform` |
-| `codeql.yml` / dependency review | PR | Static analysis and dependency review | `security-events: write` | — |
-| `ci-secrets.yml` | PR, push | gitleaks over the diff and history | `contents: read` | — |
+| `codeql.yml` / dependency review | PR, push, weekly | CodeQL (Python, TypeScript, Actions, and the Go, C# and Java starters) and dependency review | `security-events: write` | — |
+| `ci-security.yml` | PR, push, weekly | gitleaks over the full history; actionlint and zizmor on workflows; Trivy for lockfile vulnerabilities, secrets and Dockerfile misconfiguration (SARIF to code scanning) | `contents: read`, `security-events: write` | — |
 
 Platform infrastructure is approved through **GitHub environment reviewers**, not Backstage. The portal must not be the only way to approve changes to its own infrastructure.
 
@@ -134,10 +134,10 @@ Platform infrastructure is approved through **GitHub environment reviewers**, no
 
 | Workflow | Trigger | Jobs | Permissions / identity | Environment | Reports to orchestrator |
 |---|---|---|---|---|---|
-| `terraform-validate.yml` | PR touching `infra/` or `deploy/`; dispatch | `fmt -check`, `init -backend=false`, `validate`, TFLint, Checkov, `helm lint` and `helm template`, Conftest on the rendered chart, gitleaks | `contents: read` (no Azure) | — | `workflow_run` result |
-| `terraform-plan.yml` | Dispatch (orchestrator) | `init` (backend), `plan -out`, `show -json` → Conftest, summary, **SHA-256 of the plan file**, upload artifact | `contents: read`, `id-token: write`; OIDC **provisioning identity** | `dev-infra-plan` | Summary and hash (signed callback using the job's OIDC token) |
+| `terraform-validate.yml` | PR touching `infra/` or `deploy/`; dispatch | `fmt -check`, `init -backend=false`, `validate`, TFLint, Checkov, `helm lint` and `helm template`, Conftest and Trivy config on the rendered chart, gitleaks | `contents: read` (no Azure) | — | `workflow_run` result |
+| `terraform-plan.yml` | Dispatch (orchestrator) | The validate checks as a gate, then `init` (backend), `plan -out`, `show -json` → Conftest and Checkov, summary, **SHA-256 of the plan file**, upload artifact | `contents: read`, `id-token: write`; OIDC **provisioning identity** | `dev-infra-plan` | Summary and hash (signed callback using the job's OIDC token) |
 | `terraform-apply.yml` | Dispatch (orchestrator) | Download the plan → **check the hash matches the approved hash** → `apply` → readiness checks → outputs | `contents: read`, `id-token: write`; OIDC **provisioning identity** | `dev-infra` (custom protection rule = approval in Backstage) | Result and non-sensitive outputs |
-| `application-ci.yml` | PR; push to `main` | lint → unit and integration tests → `docker build` → Trivy (image and dependencies) → push (only on `main`, as `:<sha>`) | PR: `contents: read`. Main: plus `id-token: write`; OIDC **deployment identity** (`AcrPush`) | — | Image tag and scan summary |
+| `application-ci.yml` | PR; push to `main` | lint → unit and integration tests → CodeQL → gitleaks, Trivy (dependencies, Dockerfile, image) → SBOM → push (only on `main`, as `:<sha>`) → build provenance attestation | PR: `contents: read`. Main: plus `id-token: write`; OIDC **deployment identity** (`AcrPush`) | — | Image tag and scan summary |
 | `application-deploy.yml` | `workflow_run` of CI on `main`; dispatch | `kubelogin` → `helm upgrade --install --atomic --wait` → `kubectl rollout status` → smoke test (`/health/ready`, `/v1/orders`) | `id-token: write`; OIDC **deployment identity** (namespace-scoped) | `dev` | Deployment status and endpoint |
 
 **Workflow security controls:**

@@ -1,6 +1,7 @@
 # Reusable deploy / uninstall for generated applications on the shared AKS cluster.
 # The deployment identity is bound only inside the application's namespace (sportify-app-deployer).
 # Helm stores release state in ConfigMaps (HELM_DRIVER=configmap): no Kubernetes Secret objects (ADR-0005).
+# The exact manifests being deployed are checked against the Helm policies before the upgrade.
 name: reusable-application-deploy
 
 on:
@@ -32,6 +33,11 @@ env:
   HELM_DRIVER: configmap
   PLATFORM: .platform
   CHART: deploy/helm/application
+  ENVIRONMENT: ${{ inputs.environment }}
+  ACTION: ${{ inputs.action }}
+  RELEASE: ${{ inputs.release }}
+  NAMESPACE: ${{ inputs.namespace }}
+  IMAGE_TAG: ${{ inputs.image_tag || github.sha }}
 
 jobs:
   deploy:
@@ -44,25 +50,47 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Validate inputs
+        run: |
+          [[ "$ACTION" == "deploy" || "$ACTION" == "uninstall" ]] || { echo "::error::invalid action"; exit 1; }
+          for v in "$ENVIRONMENT" "$RELEASE" "$NAMESPACE"; do
+            [[ "$v" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] || { echo "::error::invalid name: $v"; exit 1; }
+          done
+          [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || { echo "::error::invalid image tag"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository_owner }}/sportify-azure-backstage
           path: ${{ env.PLATFORM }}
-          sparse-checkout: scripts/ci
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/ci
+            policies
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: v4.3.0
+      - name: Install verified tools
+        run: bash "$PLATFORM/scripts/ci/install-tools.sh" kubelogin conftest
+      - name: Policy check of the exact release manifests
+        if: inputs.action == 'deploy'
+        run: |
+          helm template "$RELEASE" "$CHART" --namespace "$NAMESPACE" \
+            --values "$CHART/values.yaml" --values "$CHART/values-${ENVIRONMENT}.yaml" \
+            --set image.tag="$IMAGE_TAG" > "$RUNNER_TEMP/release.yaml"
+          conftest test "$RUNNER_TEMP/release.yaml" -p "$PLATFORM/policies/helm"
       - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ vars.DEPLOYMENT_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Install verified tools
-        run: bash "$PLATFORM/scripts/ci/install-tools.sh" kubelogin
       - name: Cluster credentials (Entra, no local accounts)
+        env:
+          AKS_RESOURCE_GROUP: ${{ vars.AKS_RESOURCE_GROUP }}
+          AKS_NAME: ${{ vars.AKS_NAME }}
         run: |
-          az aks get-credentials --resource-group "${{ vars.AKS_RESOURCE_GROUP }}" --name "${{ vars.AKS_NAME }}" --overwrite-existing
+          az aks get-credentials --resource-group "$AKS_RESOURCE_GROUP" --name "$AKS_NAME" --overwrite-existing
           kubelogin convert-kubeconfig -l azurecli
       - name: Report start
         if: inputs.action == 'deploy' && env.SPORTIFY_REQUEST_ID != ''
@@ -70,34 +98,36 @@ jobs:
       - name: Helm upgrade --install
         if: inputs.action == 'deploy'
         run: |
-          helm upgrade --install "${{ inputs.release }}" "$CHART" \
-            --namespace "${{ inputs.namespace }}" \
-            --values "$CHART/values.yaml" --values "$CHART/values-${{ inputs.environment }}.yaml" \
-            --set image.tag="${{ inputs.image_tag || github.sha }}" \
+          helm upgrade --install "$RELEASE" "$CHART" \
+            --namespace "$NAMESPACE" \
+            --values "$CHART/values.yaml" --values "$CHART/values-${ENVIRONMENT}.yaml" \
+            --set image.tag="$IMAGE_TAG" \
             --atomic --wait --timeout 10m
-          kubectl rollout status deployment/"${{ inputs.release }}" -n "${{ inputs.namespace }}" --timeout 5m
+          kubectl rollout status deployment/"$RELEASE" -n "$NAMESPACE" --timeout 5m
       - name: Smoke test through the shared Gateway
         if: inputs.action == 'deploy'
         id: smoke
         run: |
-          host="$(yq '.route.host' "$CHART/values-${{ inputs.environment }}.yaml")"
+          host="$(yq '.route.host' "$CHART/values-${ENVIRONMENT}.yaml")"
           ip="$(kubectl get gateway sportify-gateway -n sportify-gateway -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)"
           resolve=(); [[ -n "$ip" ]] && resolve=(--resolve "${host}:80:${ip}")
-          for i in $(seq 1 20); do
+          for _ in $(seq 1 20); do
             if curl -fsS "${resolve[@]}" "http://${host}/health/ready" > "$RUNNER_TEMP/ready.json"; then break; fi
             sleep 6
           done
           curl -fsS "${resolve[@]}" "http://${host}/health/ready" > "$RUNNER_TEMP/ready.json"
           curl -fsS "${resolve[@]}" "http://${host}/v1/orders" > /dev/null
-          ready="$(kubectl get deployment "${{ inputs.release }}" -n "${{ inputs.namespace }}" -o jsonpath='{.status.readyReplicas}/{.spec.replicas}')"
+          ready="$(kubectl get deployment "$RELEASE" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}/{.spec.replicas}')"
           jq -n --arg e "$host" --arg p "$ready" --slurpfile h "$RUNNER_TEMP/ready.json" \
             '{endpoint:$e, pods:$p, health:$h[0]}' > "$RUNNER_TEMP/deploy.json"
       - name: Helm uninstall
         if: inputs.action == 'uninstall'
-        run: helm uninstall "${{ inputs.release }}" --namespace "${{ inputs.namespace }}" --wait --ignore-not-found
+        run: helm uninstall "$RELEASE" --namespace "$NAMESPACE" --wait --ignore-not-found
       - name: Report
         if: always() && env.SPORTIFY_REQUEST_ID != ''
+        env:
+          JOB_STATUS: ${{ job.status }}
         run: |
-          stage=deploy; [[ "${{ inputs.action }}" == "uninstall" ]] && stage=uninstall
+          stage=deploy; [[ "$ACTION" == "uninstall" ]] && stage=uninstall
           [[ -f "$RUNNER_TEMP/deploy.json" ]] || echo '{"message":"deployment or smoke test failed; Helm rolled back (--atomic)"}' > "$RUNNER_TEMP/deploy.json"
-          bash "$PLATFORM/scripts/ci/callback.sh" "$stage" "${{ job.status }}" "$RUNNER_TEMP/deploy.json"
+          bash "$PLATFORM/scripts/ci/callback.sh" "$stage" "$JOB_STATUS" "$RUNNER_TEMP/deploy.json"

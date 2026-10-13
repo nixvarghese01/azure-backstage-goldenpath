@@ -19,8 +19,12 @@ jobs:
       fail-fast: false
       matrix:
         stack: [nestjs, fastapi, go, dotnet, springboot, nextjs, react, vue]
+    env:
+      STACK: ${{ matrix.stack }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           python-version: "3.14"
@@ -34,11 +38,14 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - run: bash scripts/ci/install-tools.sh conftest
+      - run: bash scripts/ci/install-tools.sh conftest trivy actionlint
       - name: Render skeleton + application with fixture values
         run: |
           cd services && uv sync --package provisioning-orchestrator
-          uv run python ../templates/applications/nestjs/render_fixture.py "$RUNNER_TEMP/orders-api" --stack "${{ matrix.stack }}"
+          uv run python ../templates/applications/nestjs/render_fixture.py "$RUNNER_TEMP/orders-api" --stack "$STACK"
+      - name: Checkov on the generated Terraform (as terraform-validate runs it, before sources are rewritten)
+        working-directory: ${{ runner.temp }}/orders-api
+        run: pipx run checkov==3.3.26 -d infra/terraform --framework terraform --skip-check CKV_TF_1 --quiet --compact
       - name: Generated developer checkout configuration
         working-directory: ${{ runner.temp }}/orders-api
         run: docker compose config --quiet
@@ -46,7 +53,7 @@ jobs:
         working-directory: ${{ runner.temp }}/orders-api/infra/terraform
         run: |
           # Point module sources at this checkout instead of the published tags.
-          sed -i -E "s#git::https://github.com/[^/]+/sportify-azure-backstage.git//(iac/modules/[a-z-]+)\?ref=[^\"]+#$GITHUB_WORKSPACE/\1#" *.tf
+          sed -i -E "s#git::https://github.com/[^/]+/sportify-azure-backstage.git//(iac/modules/[a-z-]+)\?ref=[^\"]+#$GITHUB_WORKSPACE/\1#" ./*.tf
           terraform fmt -check -recursive
           terraform init -backend=false
           terraform validate
@@ -59,6 +66,13 @@ jobs:
           helm template app deploy/helm/application -f deploy/helm/application/values.yaml \
             -f deploy/helm/application/values-dev.yaml --set availability.tier=ha > rendered-ha.yaml
           conftest test rendered-ha.yaml -p "$GITHUB_WORKSPACE/policies/helm"
+          mkdir -p "$RUNNER_TEMP/rendered" && cp rendered.yaml rendered-ha.yaml "$RUNNER_TEMP/rendered/"
+          trivy config --severity HIGH,CRITICAL --exit-code 1 "$RUNNER_TEMP/rendered"
+      - name: Generated workflows and Dockerfile scans (what the generated repo's CI runs)
+        working-directory: ${{ runner.temp }}/orders-api
+        run: |
+          actionlint -shellcheck= .github/workflows/*.yml
+          trivy config --severity HIGH,CRITICAL --exit-code 1 --skip-dirs infra --skip-dirs deploy .
       - name: Application (generated repo)
         if: contains(fromJSON('["nestjs", "nextjs", "react", "vue"]'), matrix.stack)
         working-directory: ${{ runner.temp }}/orders-api
@@ -96,7 +110,7 @@ jobs:
           kubectl -n orders-api port-forward svc/orders-api 8080:80 & sleep 3
           curl -fsS http://localhost:8080/health/ready
           curl -fsS http://localhost:8080/v1/orders
-          if [[ "${{ matrix.stack }}" == "nestjs" ]]; then
+          if [[ "$STACK" == "nestjs" ]]; then
             curl -fsS -X POST http://localhost:8080/v1/orders -H 'Content-Type: application/json' \
               -d '{"customerId":"cust-001","currency":"GBP","items":[{"sku":"SKU-1","quantity":1,"unitPrice":5}]}'
           fi

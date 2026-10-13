@@ -1,20 +1,24 @@
+# Static checks for all infrastructure code: Terraform modules and platform stacks, policies, and the
+# platform Helm charts. No cloud credentials. Plans run in platform-plan.yml.
 name: ci-iac
 
 on:
   pull_request:
-    paths: ["iac/**", "policies/**", ".github/workflows/ci-iac.yml"]
+    paths: ["iac/**", "policies/**", "deploy/charts/**", ".github/workflows/ci-iac.yml"]
   push:
     branches: [develop, main]
-    paths: ["iac/**", "policies/**"]
+    paths: ["iac/**", "policies/**", "deploy/charts/**"]
 
 permissions:
   contents: read
 
 jobs:
-  modules:
+  terraform:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.16.5
@@ -31,6 +35,33 @@ jobs:
             echo "::endgroup::"
           done
       - run: tflint --init && tflint --recursive --chdir iac
-      - run: pipx run checkov==3.3.26 -d iac --framework terraform --quiet --compact
+      - name: Checkov (waivers are inline checkov:skip comments with reasons)
+        run: pipx run checkov==3.3.26 -d iac --framework terraform --quiet --compact
       - name: Policy unit tests
-        run: conftest verify -p policies/terraform
+        run: |
+          conftest verify -p policies/terraform
+          conftest verify -p policies/helm
+
+  platform-charts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+      - run: bash scripts/ci/install-tools.sh conftest trivy
+      - name: Lint, render, policy and misconfiguration scan
+        run: |
+          # Placeholder identifiers; the release pipeline supplies real ones.
+          common=(--set-string workloadIdentity.clientId=00000000-0000-0000-0000-000000000000
+                  --set database.url=postgresql://db.example/app --set image.repository=acr.example/app --set image.tag=ci)
+          mkdir -p "$RUNNER_TEMP/rendered"
+          for chart in azure-discovery provisioning-orchestrator backstage; do
+            extra=(); [[ "$chart" == "azure-discovery" ]] && extra=(--set-file allowlist=policies/allowlist.yaml)
+            helm lint "deploy/charts/$chart" "${common[@]}" "${extra[@]}"
+            helm template "$chart" "deploy/charts/$chart" "${common[@]}" "${extra[@]}" > "$RUNNER_TEMP/rendered/$chart.yaml"
+            conftest test "$RUNNER_TEMP/rendered/$chart.yaml" -p policies/helm
+          done
+          trivy config --severity HIGH,CRITICAL --exit-code 1 "$RUNNER_TEMP/rendered"

@@ -11,7 +11,10 @@ jobs:
     uses: [[ values.org ]]/sportify-azure-backstage/.github/workflows/reusable-application-ci.yml@main
     permissions:
       contents: read
-      id-token: write
+      id-token: write          # push job: Azure federation and provenance signing
+      actions: read            # CodeQL
+      security-events: write   # CodeQL results
+      attestations: write      # build provenance
     with:
       environment: [[ values.environment ]]
       image_name: [[ values.app ]]

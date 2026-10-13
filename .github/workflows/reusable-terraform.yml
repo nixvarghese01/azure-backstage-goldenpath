@@ -1,6 +1,10 @@
 # Reusable Terraform workflow for generated application repositories (ADR-0005).
 # The provisioning identity's federated credentials trust ONLY this workflow (job_workflow_ref) in the
 # dev-infra-plan / dev-infra environments, so a generated repo can't assume it with its own workflow.
+#
+# validate: secrets, fmt, validate, TFLint, Checkov, Helm lint/policy/misconfiguration (no Azure access)
+# plan:     validate gate, then plan + Conftest plan policy + Checkov on the plan
+# apply:    applies only the approved saved plan, verified by hash
 name: reusable-terraform
 
 on:
@@ -42,20 +46,30 @@ env:
   SPORTIFY_CALLBACK_URL: ${{ vars.SPORTIFY_CALLBACK_URL }}
   TF_DIR: infra/terraform
   PLATFORM: .platform
+  ENVIRONMENT: ${{ inputs.environment }}
+  MODE: ${{ inputs.mode }}
 
 jobs:
   validate:
-    if: inputs.operation == 'validate'
+    if: inputs.operation == 'validate' || inputs.operation == 'plan'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write   # only for the orchestrator callback token; no Azure access in this job
     steps:
+      - name: Check inputs
+        run: |
+          [[ "$ENVIRONMENT" =~ ^[a-z0-9-]+$ ]] || { echo "::error::invalid environment"; exit 1; }
+          [[ "$MODE" == "apply" || "$MODE" == "destroy" ]] || { echo "::error::invalid mode"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # full history for the secret scan
+          persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository_owner }}/sportify-azure-backstage
           path: ${{ env.PLATFORM }}
+          persist-credentials: false
           sparse-checkout: |
             scripts/ci
             policies
@@ -67,7 +81,7 @@ jobs:
         with:
           version: v4.3.0
       - name: Install verified tools
-        run: bash "$PLATFORM/scripts/ci/install-tools.sh" tflint conftest gitleaks
+        run: bash "$PLATFORM/scripts/ci/install-tools.sh" tflint conftest gitleaks trivy
       - name: Secret scan
         run: gitleaks detect --no-banner --redact --source .
       - name: terraform fmt / init / validate
@@ -80,20 +94,32 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         run: tflint --init && tflint --recursive
       - name: Checkov
-        run: pipx run checkov==3.3.26 -d "$TF_DIR" --framework terraform --quiet --compact
-      - name: Helm lint, render and policy
+        # CKV_TF_1 wants commit-hash module sources; platform modules are first-party and pinned to
+        # protected release tags (<module>/vX.Y.Z), which CKV_TF_2 still enforces.
+        run: pipx run checkov==3.3.26 -d "$TF_DIR" --framework terraform --skip-check CKV_TF_1 --quiet --compact
+      - name: Helm lint, render, policy and misconfiguration scan
         run: |
           helm lint deploy/helm/application
           args=(--values deploy/helm/application/values.yaml)
-          env_values="deploy/helm/application/values-${{ inputs.environment }}.yaml"
+          env_values="deploy/helm/application/values-${ENVIRONMENT}.yaml"
           [[ -f "$env_values" ]] && args+=(--values "$env_values")
-          helm template app deploy/helm/application "${args[@]}" > rendered.yaml
-          conftest test rendered.yaml -p "$PLATFORM/policies/helm"
+          mkdir -p "$RUNNER_TEMP/rendered"
+          helm template app deploy/helm/application "${args[@]}" > "$RUNNER_TEMP/rendered/app.yaml"
+          conftest test "$RUNNER_TEMP/rendered/app.yaml" -p "$PLATFORM/policies/helm"
+          trivy config --severity HIGH,CRITICAL --exit-code 1 "$RUNNER_TEMP/rendered"
       - name: Report
-        if: always() && inputs.request_id != ''
-        run: bash "$PLATFORM/scripts/ci/callback.sh" validate "${{ job.status }}"
+        if: always() && inputs.request_id != '' && inputs.operation == 'validate'
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: bash "$PLATFORM/scripts/ci/callback.sh" validate "$JOB_STATUS"
+      - name: Report a failed gate during plan
+        if: failure() && inputs.request_id != '' && inputs.operation == 'plan'
+        run: |
+          echo '{"message":"static checks failed before planning; see the run log"}' > "$RUNNER_TEMP/err.json"
+          bash "$PLATFORM/scripts/ci/callback.sh" plan failure "$RUNNER_TEMP/err.json"
 
   plan:
+    needs: validate
     if: inputs.operation == 'plan'
     runs-on: ubuntu-24.04
     environment: ${{ inputs.environment }}-infra-plan
@@ -102,10 +128,13 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository_owner }}/sportify-azure-backstage
           path: ${{ env.PLATFORM }}
+          persist-credentials: false
           sparse-checkout: |
             scripts/ci
             policies
@@ -123,18 +152,23 @@ jobs:
       - name: terraform plan
         working-directory: ${{ env.TF_DIR }}
         run: |
-          terraform init -backend-config=environments/${{ inputs.environment }}/backend.hcl
-          args=(-var-file=environments/${{ inputs.environment }}/terraform.tfvars -out=plan.bin)
-          [[ "${{ inputs.mode }}" == "destroy" ]] && args+=(-destroy)
+          terraform init -backend-config="environments/${ENVIRONMENT}/backend.hcl"
+          args=(-var-file="environments/${ENVIRONMENT}/terraform.tfvars" -out=plan.bin)
+          [[ "$MODE" == "destroy" ]] && args+=(-destroy)
           terraform plan "${args[@]}" > /dev/null
           terraform show -json plan.bin > plan.json
-      - name: Plan policy
+      - name: Plan policy (Conftest)
         working-directory: ${{ env.TF_DIR }}
         run: |
           ns=(--namespace main)
-          [[ "${{ inputs.mode }}" == "apply" ]] && ns+=(--namespace app)
+          [[ "$MODE" == "apply" ]] && ns+=(--namespace app)
           conftest test plan.json -p "$GITHUB_WORKSPACE/$PLATFORM/policies/terraform" \
             -d "$GITHUB_WORKSPACE/$PLATFORM/policies/allowlist.yaml" "${ns[@]}"
+      - name: Plan misconfiguration scan (Checkov, resolved values)
+        if: inputs.mode == 'apply'
+        working-directory: ${{ env.TF_DIR }}
+        # Enrichment from the downloaded platform modules applies their documented checkov:skip waivers.
+        run: pipx run checkov==3.3.26 -f plan.json --framework terraform_plan --repo-root-for-plan-enrichment .terraform/modules --quiet --compact
       - name: Summarise (counts and addresses only)
         working-directory: ${{ env.TF_DIR }}
         run: |
@@ -148,12 +182,14 @@ jobs:
           retention-days: 1
       - name: Report
         if: always() && inputs.request_id != ''
+        env:
+          JOB_STATUS: ${{ job.status }}
         run: |
-          if [[ "${{ job.status }}" == "success" ]]; then
+          if [[ "$JOB_STATUS" == "success" ]]; then
             bash "$PLATFORM/scripts/ci/callback.sh" plan success "$RUNNER_TEMP/summary.json"
           else
-            echo '{"message":"terraform plan or plan policy failed; see the run log"}' > "$RUNNER_TEMP/err.json"
-            bash "$PLATFORM/scripts/ci/callback.sh" plan "${{ job.status }}" "$RUNNER_TEMP/err.json"
+            echo '{"message":"terraform plan, plan policy or plan scan failed; see the run log"}' > "$RUNNER_TEMP/err.json"
+            bash "$PLATFORM/scripts/ci/callback.sh" plan "$JOB_STATUS" "$RUNNER_TEMP/err.json"
           fi
 
   apply:
@@ -165,12 +201,17 @@ jobs:
       contents: read
       id-token: write
       actions: read     # download the plan artifact from the plan run
+    env:
+      EXPECTED_PLAN_HASH: ${{ inputs.expected_plan_hash }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository_owner }}/sportify-azure-backstage
           path: ${{ env.PLATFORM }}
+          persist-credentials: false
           sparse-checkout: scripts/ci
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
@@ -186,8 +227,8 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         run: |
           actual="$(sha256sum plan.bin | cut -d' ' -f1)"
-          if [[ "$actual" != "${{ inputs.expected_plan_hash }}" ]]; then
-            echo "::error::plan hash mismatch: approved ${{ inputs.expected_plan_hash }}, got $actual"
+          if [[ "$actual" != "$EXPECTED_PLAN_HASH" ]]; then
+            echo "::error::plan hash mismatch: approved ${EXPECTED_PLAN_HASH}, got $actual"
             exit 1
           fi
       - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
@@ -200,7 +241,7 @@ jobs:
       - name: terraform apply (saved plan only, never re-plans)
         working-directory: ${{ env.TF_DIR }}
         run: |
-          terraform init -backend-config=environments/${{ inputs.environment }}/backend.hcl
+          terraform init -backend-config="environments/${ENVIRONMENT}/backend.hcl"
           terraform apply plan.bin
       - name: Collect non-sensitive outputs and check readiness
         if: inputs.mode == 'apply'
@@ -211,11 +252,13 @@ jobs:
           az identity list --query "[?clientId=='${client_id}'] | length(@)" -o tsv | grep -qx 1
       - name: Report
         if: always() && inputs.request_id != ''
+        env:
+          JOB_STATUS: ${{ job.status }}
         run: |
-          if [[ "${{ job.status }}" == "success" ]]; then
+          if [[ "$JOB_STATUS" == "success" ]]; then
             bash "$PLATFORM/scripts/ci/callback.sh" apply success "$RUNNER_TEMP/outputs.json"
           else
             # Report what exists so partial failures are visible and recoverable.
             (cd "$TF_DIR" && terraform state list 2>/dev/null | jq -R . | jq -s '{message:"terraform apply failed; see the run log", created_resources: .}') > "$RUNNER_TEMP/err.json" || echo '{}' > "$RUNNER_TEMP/err.json"
-            bash "$PLATFORM/scripts/ci/callback.sh" apply "${{ job.status }}" "$RUNNER_TEMP/err.json"
+            bash "$PLATFORM/scripts/ci/callback.sh" apply "$JOB_STATUS" "$RUNNER_TEMP/err.json"
           fi

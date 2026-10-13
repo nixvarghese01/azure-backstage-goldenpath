@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install pinned CI tools into $HOME/.local/bin, verifying each download against the release's
 # published checksums (COMPATIBILITY.md risk 3: never install Trivy or other scanners by mutable tag).
-# Usage: install-tools.sh tflint conftest trivy gitleaks kubelogin
+# Usage: install-tools.sh tflint conftest trivy gitleaks kubelogin kind actionlint
 set -euo pipefail
 
 BIN="${HOME}/.local/bin"
@@ -16,6 +16,7 @@ TRIVY_VERSION="0.75.0"
 GITLEAKS_VERSION="8.30.1"
 KUBELOGIN_VERSION="0.2.21"
 KIND_VERSION="0.33.0"
+ACTIONLINT_VERSION="1.7.12"
 
 fetch_verified() { # url checksums_url filename
   local url="$1" sums_url="$2" file="$3"
@@ -57,6 +58,11 @@ for tool in "$@"; do
       fetch_verified "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/${f}" \
         "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/${f}.sha256sum" "${f}"
       install -m 0755 "${WORK}/${f}" "${BIN}/kind" ;;
+    actionlint)
+      f="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+      fetch_verified "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${f}" \
+        "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_checksums.txt" "${f}"
+      tar -xzf "${WORK}/${f}" -C "${BIN}" actionlint ;;
     *) echo "unknown tool: ${tool}" >&2; exit 2 ;;
   esac
   echo "installed ${tool}"

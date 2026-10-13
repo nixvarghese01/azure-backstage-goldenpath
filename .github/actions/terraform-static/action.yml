@@ -1,0 +1,32 @@
+# Static Terraform gate shared by the platform plan and apply pipelines: format, validate, lint and
+# misconfiguration scan. Needs Terraform on PATH and the repository checked out.
+name: terraform-static
+description: terraform fmt/validate, TFLint and Checkov for one Terraform root
+
+inputs:
+  working-directory:
+    description: Terraform root to check
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install verified tools
+      shell: bash
+      run: bash "$GITHUB_WORKSPACE/scripts/ci/install-tools.sh" tflint
+    - name: terraform fmt and validate
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        terraform fmt -check -recursive
+        terraform init -backend=false -input=false > /dev/null
+        terraform validate
+    - name: TFLint
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: tflint --init && tflint --recursive
+    - name: Checkov
+      shell: bash
+      env:
+        TF_ROOT: ${{ inputs.working-directory }}
+      run: pipx run checkov==3.3.26 -d "$TF_ROOT" --framework terraform --quiet --compact

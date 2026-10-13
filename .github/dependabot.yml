@@ -1,22 +1,26 @@
 # Keeps pinned versions current. Review every update: GitHub Action SHA bumps must be checked against
-# the upstream release tag before merging (COMPATIBILITY.md risks 3-4).
+# the upstream release tag before merging (COMPATIBILITY.md risks 3-4). A 7-day cooldown keeps freshly
+# published (possibly compromised) releases out until the ecosystem has had time to react.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
     groups:
       actions: { patterns: ["*"] }
 
   - package-ecosystem: uv
     directory: /services
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
     groups:
       python-minor: { update-types: [minor, patch] }
 
   - package-ecosystem: npm
     directory: /portal
     schedule: { interval: monthly }   # Backstage itself is upgraded with `backstage-cli versions:bump`
+    cooldown: { default-days: 7 }
     ignore:
       - dependency-name: "@backstage/*"
     groups:
@@ -28,6 +32,7 @@ updates:
       - /iac/platform/*
       - /templates/applications/nestjs/skeleton/infra/terraform
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
     groups:
       terraform: { patterns: ["*"] }
 
@@ -38,3 +43,4 @@ updates:
       - /portal/packages/backend
       - /templates/applications/nestjs/application
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }

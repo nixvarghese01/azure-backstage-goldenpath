@@ -1,9 +1,11 @@
 # Plans changed platform stacks on pull requests (including orchestrator-raised platform requests).
+# Each stack passes the static gate (fmt, validate, TFLint, Checkov) before it is planned; the plan
+# itself is then checked with the Conftest plan policies and Checkov.
 name: platform-plan
 
 on:
   pull_request:
-    paths: ["iac/platform/**", "iac/modules/**"]
+    paths: ["iac/platform/**", "iac/modules/**", "policies/**", ".github/actions/terraform-static/**"]
   workflow_dispatch:
     inputs:
       stack:
@@ -12,7 +14,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 env:
   ARM_USE_OIDC: "true"
@@ -30,33 +31,62 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - id: s
+        env:
+          INPUT_STACK: ${{ inputs.stack }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          if [[ -n "${{ inputs.stack }}" ]]; then
-            echo "stacks=[\"${{ inputs.stack }}\"]" >> "$GITHUB_OUTPUT"; exit 0
+          if [[ -n "$INPUT_STACK" ]]; then
+            [[ "$INPUT_STACK" =~ ^[0-9]{2}-[a-z0-9-]+$ && -d "iac/platform/$INPUT_STACK" ]] || { echo "::error::unknown stack"; exit 1; }
+            jq -cn --arg s "$INPUT_STACK" '[$s]' > stacks.json
+          else
+            git diff --name-only "origin/${BASE_REF}...HEAD" -- iac/platform \
+              | cut -d/ -f3 | sort -u | grep -E '^[0-9]{2}-' | jq -R . | jq -sc . > stacks.json
           fi
-          git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- iac/platform \
-            | cut -d/ -f3 | sort -u | grep -E '^[0-9]{2}-' | jq -R . | jq -sc . > stacks.json
           echo "stacks=$(cat stacks.json)" >> "$GITHUB_OUTPUT"
 
-  plan:
+  static:
     needs: detect
     if: needs.detect.outputs.stacks != '[]'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: ${{ fromJson(needs.detect.outputs.stacks) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - uses: ./.github/actions/terraform-static
+        with:
+          working-directory: iac/platform/${{ matrix.stack }}
+
+  plan:
+    needs: [detect, static]
     runs-on: ubuntu-24.04
     environment: platform-plan
     permissions:
       contents: read
       id-token: write
-      pull-requests: write
+      pull-requests: write   # plan summary comment
     strategy:
       max-parallel: 1
       matrix:
         stack: ${{ fromJson(needs.detect.outputs.stacks) }}
+    env:
+      STACK: ${{ matrix.stack }}
     defaults:
       run:
         working-directory: iac/platform/${{ matrix.stack }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.16.5
@@ -73,22 +103,26 @@ jobs:
           PLATFORM_TFVARS_JSON: ${{ vars.PLATFORM_TFVARS_JSON }}
         run: |
           # PLATFORM_TFVARS_JSON = {"<stack>": "<tfvars file content>", ...}; IDs only, no secrets.
-          echo "$PLATFORM_BACKEND_HCL" | sed "s#__STACK__#${{ matrix.stack }}#" > backend.hcl
-          jq -er --arg s "${{ matrix.stack }}" '.[$s]' <<< "$PLATFORM_TFVARS_JSON" > terraform.tfvars
+          printf '%s\n' "${PLATFORM_BACKEND_HCL//__STACK__/$STACK}" > backend.hcl
+          jq -er --arg s "$STACK" '.[$s]' <<< "$PLATFORM_TFVARS_JSON" > terraform.tfvars
       - name: Plan (read-only, no state lock)
         run: |
           terraform init -backend-config=backend.hcl
           terraform plan -lock=false -var-file=terraform.tfvars -out=plan.bin -no-color > plan.txt
           terraform show -json plan.bin > plan.json
-          conftest test plan.json -p "$GITHUB_WORKSPACE/policies/terraform" -d "$GITHUB_WORKSPACE/policies/allowlist.yaml" --namespace main
+      - name: Plan policy (Conftest)
+        run: conftest test plan.json -p "$GITHUB_WORKSPACE/policies/terraform" -d "$GITHUB_WORKSPACE/policies/allowlist.yaml" --namespace main
+      - name: Plan misconfiguration scan (Checkov, resolved values)
+        run: pipx run checkov==3.3.26 -f plan.json --framework terraform_plan --repo-root-for-plan-enrichment "$GITHUB_WORKSPACE" --quiet --compact
       - name: Comment summary on the PR
         if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           {
-            echo "### Plan: \`${{ matrix.stack }}\`"
+            echo "### Plan: \`${STACK}\`"
             bash "$GITHUB_WORKSPACE/scripts/ci/plan-summary.sh" plan.json plan.bin \
               | jq -r '"+\(.summary.add) ~\(.summary.change) -\(.summary.destroy)\n\n" + ([.summary.resources[] | "- `\(.address)` \(.actions|join(","))"] | join("\n"))'
           } > comment.md
-          gh pr comment "${{ github.event.pull_request.number }}" --body-file comment.md
+          gh pr comment "$PR_NUMBER" --body-file comment.md
