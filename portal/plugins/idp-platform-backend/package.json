@@ -29,7 +29,7 @@
     "@backstage/plugin-permission-common": "backstage:^",
     "@backstage/plugin-scaffolder-node": "backstage:^",
     "@internal/plugin-idp-platform-common": "workspace:^",
-    "@octokit/rest": "^21.0.0",
+    "@octokit/rest": "^22.0.1",
     "express": "^4.21.0",
     "express-promise-router": "^4.1.0"
   },
