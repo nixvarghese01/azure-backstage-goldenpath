@@ -1,0 +1,90 @@
+# Build, scan and push the platform images, then deploy them to the sportify-platform namespace.
+name: platform-release
+
+on:
+  push:
+    branches: [main]
+    paths: ["portal/**", "services/**", "templates/applications/**", "deploy/charts/**", "policies/allowlist.yaml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        include:
+          - name: backstage
+            context: portal
+            dockerfile: portal/packages/backend/Dockerfile
+          - name: azure-discovery
+            context: services
+            dockerfile: services/azure-discovery/Dockerfile
+          - name: provisioning-orchestrator
+            context: .
+            dockerfile: services/provisioning-orchestrator/Dockerfile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: bash scripts/ci/install-tools.sh trivy
+      - name: Build and scan (no credentials in this job)
+        run: |
+          docker build -f "${{ matrix.dockerfile }}" -t "sportify/${{ matrix.name }}:${{ github.sha }}" "${{ matrix.context }}"
+          trivy image --severity CRITICAL --exit-code 1 --ignore-unfixed "sportify/${{ matrix.name }}:${{ github.sha }}"
+          docker save "sportify/${{ matrix.name }}:${{ github.sha }}" | gzip > "$RUNNER_TEMP/${{ matrix.name }}.tar.gz"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-${{ matrix.name }}
+          path: ${{ runner.temp }}/${{ matrix.name }}.tar.gz
+          retention-days: 1
+
+  push-and-deploy:
+    needs: images
+    runs-on: ubuntu-24.04
+    environment: platform-deploy
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      HELM_DRIVER: configmap
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: image-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/images
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.PLATFORM_DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - run: bash scripts/ci/install-tools.sh kubelogin
+      - name: Push images
+        run: |
+          az acr login --name "${{ vars.ACR_NAME }}"
+          for f in "$RUNNER_TEMP"/images/*.tar.gz; do
+            name="$(basename "$f" .tar.gz)"
+            gunzip -c "$f" | docker load
+            target="${{ vars.ACR_NAME }}.azurecr.io/sportify/${name}:${{ github.sha }}"
+            docker tag "sportify/${name}:${{ github.sha }}" "$target" && docker push "$target"
+          done
+      - name: Deploy charts
+        run: |
+          az aks get-credentials -g "${{ vars.AKS_RESOURCE_GROUP }}" -n "${{ vars.AKS_NAME }}" --overwrite-existing
+          kubelogin convert-kubeconfig -l azurecli
+          deploy() { # <chart> <workload identity client id>
+            helm upgrade --install "$1" "deploy/charts/$1" -n sportify-platform \
+              -f "deploy/charts/$1/values.yaml" \
+              --set image.repository="${{ vars.ACR_NAME }}.azurecr.io/sportify/$1" \
+              --set image.tag="${{ github.sha }}" \
+              --set-string workloadIdentity.clientId="$2" \
+              --atomic --wait --timeout 10m
+          }
+          deploy azure-discovery "${{ vars.DISCOVERY_CLIENT_ID }}"
+          deploy provisioning-orchestrator "${{ vars.ORCHESTRATOR_CLIENT_ID }}"
+          deploy backstage "${{ vars.BACKSTAGE_CLIENT_ID }}"

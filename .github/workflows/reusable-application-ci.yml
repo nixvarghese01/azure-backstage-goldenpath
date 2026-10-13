@@ -1,0 +1,102 @@
+# Reusable CI for generated Node.js (NestJS) applications: test, build, scan, push (main only).
+# Pushing uses the deployment identity, whose credential trusts only this workflow in <env>-build.
+name: reusable-application-ci
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        default: dev
+      image_name:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  SPORTIFY_REQUEST_ID: ${{ vars.SPORTIFY_REQUEST_ID }}
+  SPORTIFY_CALLBACK_URL: ${{ vars.SPORTIFY_CALLBACK_URL }}
+  PLATFORM: .platform
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  image:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/sportify-azure-backstage
+          path: ${{ env.PLATFORM }}
+          sparse-checkout: scripts/ci
+      - name: Build image
+        run: docker build --pull -t "${{ inputs.image_name }}:${{ github.sha }}" .
+      - name: Install verified scanner
+        run: bash "$PLATFORM/scripts/ci/install-tools.sh" trivy gitleaks
+      - name: Scan (no credentials in this job)
+        run: |
+          gitleaks detect --no-banner --redact --source .
+          trivy fs --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed .
+          trivy image --severity CRITICAL --exit-code 1 --ignore-unfixed "${{ inputs.image_name }}:${{ github.sha }}"
+          trivy image --format json --output "$RUNNER_TEMP/scan.json" "${{ inputs.image_name }}:${{ github.sha }}"
+      - name: Save image for the push job
+        run: docker save "${{ inputs.image_name }}:${{ github.sha }}" | gzip > "$RUNNER_TEMP/image.tar.gz"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image
+          path: ${{ runner.temp }}/image.tar.gz
+          retention-days: 1
+
+  push:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: image
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}-build
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/sportify-azure-backstage
+          path: ${{ env.PLATFORM }}
+          sparse-checkout: scripts/ci
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: image
+          path: ${{ runner.temp }}
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.DEPLOYMENT_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Push to ACR
+        id: push
+        run: |
+          gunzip -c "$RUNNER_TEMP/image.tar.gz" | docker load
+          az acr login --name "${{ vars.ACR_NAME }}"
+          target="${{ vars.ACR_NAME }}.azurecr.io/${{ inputs.image_name }}:${{ github.sha }}"
+          docker tag "${{ inputs.image_name }}:${{ github.sha }}" "$target"
+          docker push "$target"
+          echo "image=$target" >> "$GITHUB_OUTPUT"
+          jq -n --arg i "$target" '{image:$i, scan:"passed (no CRITICAL)"}' > "$RUNNER_TEMP/ci.json"
+      - name: Report
+        if: always() && env.SPORTIFY_REQUEST_ID != ''
+        run: |
+          [[ -f "$RUNNER_TEMP/ci.json" ]] || echo '{"message":"build, scan or push failed"}' > "$RUNNER_TEMP/ci.json"
+          bash "$PLATFORM/scripts/ci/callback.sh" ci "${{ job.status }}" "$RUNNER_TEMP/ci.json"

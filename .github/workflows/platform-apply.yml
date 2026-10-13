@@ -1,0 +1,77 @@
+# Applies one platform stack, behind the `platform` environment's required reviewers.
+# The orchestrator dispatches this after a platform request PR merges (PLATFORM_PROVISIONING).
+name: platform-apply
+run-name: "platform-apply ${{ inputs.stack }} ${{ inputs.request_id }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        required: true
+      request_id:
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-apply-${{ inputs.stack }}
+  cancel-in-progress: false
+
+env:
+  ARM_USE_OIDC: "true"
+  ARM_USE_AZUREAD: "true"
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  SPORTIFY_REQUEST_ID: ${{ inputs.request_id }}
+  SPORTIFY_CALLBACK_URL: ${{ vars.SPORTIFY_CALLBACK_URL }}
+
+jobs:
+  apply:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.stack == '05-subscriptions' && 'platform-vending' || 'platform' }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: iac/platform/${{ inputs.stack }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - name: Select identity
+        run: |
+          if [[ "${{ inputs.stack }}" == "05-subscriptions" ]]; then
+            echo "ARM_CLIENT_ID=${{ vars.VENDING_CLIENT_ID }}" >> "$GITHUB_ENV"
+          else
+            echo "ARM_CLIENT_ID=${{ vars.PLATFORM_CLIENT_ID }}" >> "$GITHUB_ENV"
+          fi
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ env.ARM_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - run: bash "$GITHUB_WORKSPACE/scripts/ci/install-tools.sh" conftest kubelogin
+      - name: Plan, check policy, apply that exact plan
+        env:
+          PLATFORM_BACKEND_HCL: ${{ vars.PLATFORM_BACKEND_HCL }}
+          PLATFORM_TFVARS_JSON: ${{ vars.PLATFORM_TFVARS_JSON }}
+          STACK: ${{ inputs.stack }}
+        run: |
+          echo "$PLATFORM_BACKEND_HCL" | sed "s#__STACK__#$STACK#" > backend.hcl
+          jq -er --arg s "$STACK" '.[$s]' <<< "$PLATFORM_TFVARS_JSON" > terraform.tfvars
+          terraform init -backend-config=backend.hcl
+          extra=(); [[ "${{ inputs.stack }}" == "30-cluster-config" ]] && extra=(-var=kubelogin_mode=azurecli)
+          terraform plan -var-file=terraform.tfvars "${extra[@]}" -out=plan.bin -no-color > /dev/null
+          terraform show -json plan.bin > plan.json
+          conftest test plan.json -p "$GITHUB_WORKSPACE/policies/terraform" -d "$GITHUB_WORKSPACE/policies/allowlist.yaml" --namespace main
+          terraform apply plan.bin
+      - name: Report to orchestrator
+        if: always() && inputs.request_id != ''
+        working-directory: .
+        run: bash scripts/ci/callback.sh platform_apply "${{ job.status }}"

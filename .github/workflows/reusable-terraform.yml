@@ -1,0 +1,221 @@
+# Reusable Terraform workflow for generated application repositories (ADR-0005).
+# The provisioning identity's federated credentials trust ONLY this workflow (job_workflow_ref) in the
+# dev-infra-plan / dev-infra environments, so a generated repo can't assume it with its own workflow.
+name: reusable-terraform
+
+on:
+  workflow_call:
+    inputs:
+      operation:
+        description: validate | plan | apply
+        type: string
+        required: true
+      request_id:
+        type: string
+        default: ""
+      mode:
+        description: apply | destroy
+        type: string
+        default: apply
+      environment:
+        type: string
+        default: dev
+      plan_run_id:
+        type: string
+        default: ""
+      expected_plan_hash:
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  ARM_USE_OIDC: "true"
+  ARM_USE_AZUREAD: "true"
+  ARM_CLIENT_ID: ${{ vars.PROVISIONING_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  SPORTIFY_REQUEST_ID: ${{ inputs.request_id }}
+  SPORTIFY_CALLBACK_URL: ${{ vars.SPORTIFY_CALLBACK_URL }}
+  TF_DIR: infra/terraform
+  PLATFORM: .platform
+
+jobs:
+  validate:
+    if: inputs.operation == 'validate'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write   # only for the orchestrator callback token; no Azure access in this job
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/sportify-azure-backstage
+          path: ${{ env.PLATFORM }}
+          sparse-checkout: |
+            scripts/ci
+            policies
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+      - name: Install verified tools
+        run: bash "$PLATFORM/scripts/ci/install-tools.sh" tflint conftest gitleaks
+      - name: Secret scan
+        run: gitleaks detect --no-banner --redact --source .
+      - name: terraform fmt / init / validate
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false
+          terraform validate
+      - name: TFLint
+        working-directory: ${{ env.TF_DIR }}
+        run: tflint --init && tflint --recursive
+      - name: Checkov
+        run: pipx run checkov==3.3.26 -d "$TF_DIR" --framework terraform --quiet --compact
+      - name: Helm lint, render and policy
+        run: |
+          helm lint deploy/helm/application
+          args=(--values deploy/helm/application/values.yaml)
+          env_values="deploy/helm/application/values-${{ inputs.environment }}.yaml"
+          [[ -f "$env_values" ]] && args+=(--values "$env_values")
+          helm template app deploy/helm/application "${args[@]}" > rendered.yaml
+          conftest test rendered.yaml -p "$PLATFORM/policies/helm"
+      - name: Report
+        if: always() && inputs.request_id != ''
+        run: bash "$PLATFORM/scripts/ci/callback.sh" validate "${{ job.status }}"
+
+  plan:
+    if: inputs.operation == 'plan'
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}-infra-plan
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/sportify-azure-backstage
+          path: ${{ env.PLATFORM }}
+          sparse-checkout: |
+            scripts/ci
+            policies
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.PROVISIONING_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Install verified tools
+        run: bash "$PLATFORM/scripts/ci/install-tools.sh" conftest kubelogin
+      - name: terraform plan
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          terraform init -backend-config=environments/${{ inputs.environment }}/backend.hcl
+          args=(-var-file=environments/${{ inputs.environment }}/terraform.tfvars -out=plan.bin)
+          [[ "${{ inputs.mode }}" == "destroy" ]] && args+=(-destroy)
+          terraform plan "${args[@]}" > /dev/null
+          terraform show -json plan.bin > plan.json
+      - name: Plan policy
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          ns=(--namespace main)
+          [[ "${{ inputs.mode }}" == "apply" ]] && ns+=(--namespace app)
+          conftest test plan.json -p "$GITHUB_WORKSPACE/$PLATFORM/policies/terraform" \
+            -d "$GITHUB_WORKSPACE/$PLATFORM/policies/allowlist.yaml" "${ns[@]}"
+      - name: Summarise (counts and addresses only)
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          bash "$GITHUB_WORKSPACE/$PLATFORM/scripts/ci/plan-summary.sh" plan.json plan.bin > "$RUNNER_TEMP/summary.json"
+          jq -r '"Plan \(.plan_hash[0:12]): +\(.summary.add) ~\(.summary.change) -\(.summary.destroy)"' "$RUNNER_TEMP/summary.json" >> "$GITHUB_STEP_SUMMARY"
+          rm -f plan.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tfplan
+          path: ${{ env.TF_DIR }}/plan.bin
+          retention-days: 1
+      - name: Report
+        if: always() && inputs.request_id != ''
+        run: |
+          if [[ "${{ job.status }}" == "success" ]]; then
+            bash "$PLATFORM/scripts/ci/callback.sh" plan success "$RUNNER_TEMP/summary.json"
+          else
+            echo '{"message":"terraform plan or plan policy failed; see the run log"}' > "$RUNNER_TEMP/err.json"
+            bash "$PLATFORM/scripts/ci/callback.sh" plan "${{ job.status }}" "$RUNNER_TEMP/err.json"
+          fi
+
+  apply:
+    if: inputs.operation == 'apply'
+    runs-on: ubuntu-24.04
+    # Held by the orchestrator's custom deployment protection rule until approved in Backstage.
+    environment: ${{ inputs.environment }}-infra
+    permissions:
+      contents: read
+      id-token: write
+      actions: read     # download the plan artifact from the plan run
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/sportify-azure-backstage
+          path: ${{ env.PLATFORM }}
+          sparse-checkout: scripts/ci
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: tfplan
+          path: ${{ env.TF_DIR }}
+          run-id: ${{ inputs.plan_run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify the plan is exactly the approved one
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          actual="$(sha256sum plan.bin | cut -d' ' -f1)"
+          if [[ "$actual" != "${{ inputs.expected_plan_hash }}" ]]; then
+            echo "::error::plan hash mismatch: approved ${{ inputs.expected_plan_hash }}, got $actual"
+            exit 1
+          fi
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.PROVISIONING_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Install verified tools
+        run: bash "$PLATFORM/scripts/ci/install-tools.sh" kubelogin
+      - name: terraform apply (saved plan only, never re-plans)
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          terraform init -backend-config=environments/${{ inputs.environment }}/backend.hcl
+          terraform apply plan.bin
+      - name: Collect non-sensitive outputs and check readiness
+        if: inputs.mode == 'apply'
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          terraform output -json | jq '{outputs: (with_entries(select(.value.sensitive == false)) | map_values(.value))}' > "$RUNNER_TEMP/outputs.json"
+          client_id="$(jq -r '.outputs.identity_client_id' "$RUNNER_TEMP/outputs.json")"
+          az identity list --query "[?clientId=='${client_id}'] | length(@)" -o tsv | grep -qx 1
+      - name: Report
+        if: always() && inputs.request_id != ''
+        run: |
+          if [[ "${{ job.status }}" == "success" ]]; then
+            bash "$PLATFORM/scripts/ci/callback.sh" apply success "$RUNNER_TEMP/outputs.json"
+          else
+            # Report what exists so partial failures are visible and recoverable.
+            (cd "$TF_DIR" && terraform state list 2>/dev/null | jq -R . | jq -s '{message:"terraform apply failed; see the run log", created_resources: .}') > "$RUNNER_TEMP/err.json" || echo '{}' > "$RUNNER_TEMP/err.json"
+            bash "$PLATFORM/scripts/ci/callback.sh" apply "${{ job.status }}" "$RUNNER_TEMP/err.json"
+          fi

@@ -1,0 +1,36 @@
+name: ci-iac
+
+on:
+  pull_request:
+    paths: ["iac/**", "policies/**", ".github/workflows/ci-iac.yml"]
+  push:
+    branches: [develop, main]
+    paths: ["iac/**", "policies/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  modules:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - run: bash scripts/ci/install-tools.sh tflint conftest
+      - run: terraform fmt -check -recursive iac
+      - name: Validate and test every module and stack (no backend, mock providers)
+        run: |
+          for dir in iac/modules/* iac/platform/*/; do
+            [[ -n "$(ls "$dir"/*.tf 2>/dev/null)" ]] || continue
+            echo "::group::$dir"
+            (cd "$dir" && terraform init -backend=false -input=false >/dev/null && terraform validate)
+            if [[ -d "$dir/tests" ]]; then (cd "$dir" && terraform test); fi
+            echo "::endgroup::"
+          done
+      - run: tflint --init && tflint --recursive --chdir iac
+      - run: pipx run checkov==3.3.26 -d iac --framework terraform --quiet --compact
+      - name: Policy unit tests
+        run: conftest verify -p policies/terraform

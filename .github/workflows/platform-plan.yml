@@ -1,0 +1,94 @@
+# Plans changed platform stacks on pull requests (including orchestrator-raised platform requests).
+name: platform-plan
+
+on:
+  pull_request:
+    paths: ["iac/platform/**", "iac/modules/**"]
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: Stack directory under iac/platform
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  ARM_USE_OIDC: "true"
+  ARM_USE_AZUREAD: "true"
+  ARM_CLIENT_ID: ${{ vars.PLATFORM_PLAN_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  detect:
+    runs-on: ubuntu-24.04
+    outputs:
+      stacks: ${{ steps.s.outputs.stacks }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: s
+        run: |
+          if [[ -n "${{ inputs.stack }}" ]]; then
+            echo "stacks=[\"${{ inputs.stack }}\"]" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- iac/platform \
+            | cut -d/ -f3 | sort -u | grep -E '^[0-9]{2}-' | jq -R . | jq -sc . > stacks.json
+          echo "stacks=$(cat stacks.json)" >> "$GITHUB_OUTPUT"
+
+  plan:
+    needs: detect
+    if: needs.detect.outputs.stacks != '[]'
+    runs-on: ubuntu-24.04
+    environment: platform-plan
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    strategy:
+      max-parallel: 1
+      matrix:
+        stack: ${{ fromJson(needs.detect.outputs.stacks) }}
+    defaults:
+      run:
+        working-directory: iac/platform/${{ matrix.stack }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.PLATFORM_PLAN_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - run: bash "$GITHUB_WORKSPACE/scripts/ci/install-tools.sh" conftest kubelogin
+      - name: Write stack inputs from repository variables (IDs only)
+        env:
+          PLATFORM_BACKEND_HCL: ${{ vars.PLATFORM_BACKEND_HCL }}
+          PLATFORM_TFVARS_JSON: ${{ vars.PLATFORM_TFVARS_JSON }}
+        run: |
+          # PLATFORM_TFVARS_JSON = {"<stack>": "<tfvars file content>", ...}; IDs only, no secrets.
+          echo "$PLATFORM_BACKEND_HCL" | sed "s#__STACK__#${{ matrix.stack }}#" > backend.hcl
+          jq -er --arg s "${{ matrix.stack }}" '.[$s]' <<< "$PLATFORM_TFVARS_JSON" > terraform.tfvars
+      - name: Plan (read-only, no state lock)
+        run: |
+          terraform init -backend-config=backend.hcl
+          terraform plan -lock=false -var-file=terraform.tfvars -out=plan.bin -no-color > plan.txt
+          terraform show -json plan.bin > plan.json
+          conftest test plan.json -p "$GITHUB_WORKSPACE/policies/terraform" -d "$GITHUB_WORKSPACE/policies/allowlist.yaml" --namespace main
+      - name: Comment summary on the PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "### Plan: \`${{ matrix.stack }}\`"
+            bash "$GITHUB_WORKSPACE/scripts/ci/plan-summary.sh" plan.json plan.bin \
+              | jq -r '"+\(.summary.add) ~\(.summary.change) -\(.summary.destroy)\n\n" + ([.summary.resources[] | "- `\(.address)` \(.actions|join(","))"] | join("\n"))'
+          } > comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file comment.md
