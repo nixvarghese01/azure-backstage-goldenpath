@@ -23,6 +23,10 @@ updates:
     cooldown: { default-days: 7 }
     ignore:
       - dependency-name: "@backstage/*"
+      # Backstage pins React, react-router, rjsf, Express and Octokit majors itself; they move together
+      # with `backstage-cli versions:bump` (CONTRIBUTING.md), never one package at a time.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       portal-minor: { update-types: [minor, patch] }
 
@@ -40,7 +44,13 @@ updates:
     directories:
       - /services/azure-discovery
       - /services/provisioning-orchestrator
+      - /portal
       - /portal/packages/backend
       - /templates/applications/nestjs/application
     schedule: { interval: weekly }
     cooldown: { default-days: 7 }
+    ignore:
+      # Node base images stay on the LTS line Backstage supports (COMPATIBILITY.md); a Node major moves
+      # portal, templates and base images together in one reviewed change.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
