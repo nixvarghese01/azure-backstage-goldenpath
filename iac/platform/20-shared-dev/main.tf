@@ -66,6 +66,15 @@ variable "postgres_name" {
   default = "psql-idp-dev"
 }
 
+variable "postgres" {
+  description = "PostgreSQL size and zone. Change the zone (or size) if the region is out of capacity."
+  type = object({
+    sku_name = optional(string, "B_Standard_B1ms")
+    zone     = optional(string)
+  })
+  default = {}
+}
+
 variable "postgres_allowed_ips" {
   type    = map(string)
   default = {}
@@ -200,6 +209,8 @@ locals {
 module "postgres" {
   source              = "../../modules/postgresql-flexible"
   name                = var.postgres_name
+  sku_name            = var.postgres.sku_name
+  zone                = var.postgres.zone
   resource_group_name = data.azurerm_resource_group.rg["data"].name
   location            = var.location
   tenant_id           = data.azurerm_client_config.current.tenant_id
