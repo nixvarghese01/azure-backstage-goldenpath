@@ -32,7 +32,7 @@ metadata:
   name: alex
 spec:
   profile:
-    displayName: Alex (developer)
+    displayName: Nixon (developer)
   memberOf: [team-orders]
 ---
 apiVersion: backstage.io/v1alpha1
@@ -41,5 +41,5 @@ metadata:
   name: sam
 spec:
   profile:
-    displayName: Sam (platform approver)
+    displayName: Ancy (platform approver)
   memberOf: [platform-team, platform-approvers]
