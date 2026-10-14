@@ -37,7 +37,8 @@ nothing), so the next provision reuses them.
 Two stacks run once from an admin's machine, because they create what the pipelines need: `00-bootstrap`
 creates the Terraform state storage, and `10-identities` creates the identities the pipelines sign in
 with. Everything else runs in GitHub Actions. State handling, locking and recovery are in
-[terraform-state.md](../../docs/operations/terraform-state.md).
+[terraform-state.md](../../docs/operations/terraform-state.md). What was done outside the pipeline, and how
+to undo it, is recorded in [bootstrap-record.md](../../docs/operations/bootstrap-record.md).
 
 1. Copy `terraform.tfvars.example` to `terraform.tfvars` in `10-identities`, `20-shared-dev` and
    (optionally) `30-cluster-config`, and fill in your IDs. They're git-ignored; they hold IDs, not secrets.

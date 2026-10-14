@@ -39,6 +39,8 @@ done
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLATFORM="${ROOT}/iac/platform"
 PY="$(command -v python3 || command -v python)"
+# Paths handed to Python: on Windows (Git Bash) Python needs C:/... rather than /c/...
+native() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo nixvarghese01/azure-backstage-goldenpath)"
 STATE_RG="rg-idp-tfstate-${ENVIRONMENT}"
 PROVIDERS=(Microsoft.ContainerService Microsoft.ContainerRegistry Microsoft.KeyVault Microsoft.DBforPostgreSQL
@@ -196,7 +198,10 @@ github() {
   cid() { json "d['client_ids']['value']['$1']" <<< "$out"; }
 
   echo "Repository variables on ${REPO} (identifiers only)"
-  setvar() { gh variable set "$1" --repo "$REPO" --body "$2" >/dev/null && ok "$1"; }
+  setvar() {
+    [[ -n "$2" && "$2" != "{}" ]] || { fail "$1: no value computed (see the error above)"; exit 1; }
+    gh variable set "$1" --repo "$REPO" --body "$2" >/dev/null && ok "$1"
+  }
   setvar AZURE_TENANT_ID "$tenant"
   setvar AZURE_SUBSCRIPTION_ID "$sub"
   setvar PLATFORM_CLIENT_ID "$(cid platform)"
@@ -207,22 +212,25 @@ github() {
   setvar DISCOVERY_CLIENT_ID "$(cid discovery)"
   setvar ORCHESTRATOR_CLIENT_ID "$(cid orchestrator)"
   setvar PLATFORM_BACKEND_HCL "$(backend_hcl __STACK__ oidc)"
-  setvar PLATFORM_TFVARS_JSON "$("$PY" - "$PLATFORM" <<'EOF'
+  setvar PLATFORM_TFVARS_JSON "$("$PY" - "$(native "$PLATFORM")" <<'EOF'
 import json, pathlib, sys
 root = pathlib.Path(sys.argv[1])
-print(json.dumps({s: (root / s / "terraform.tfvars").read_text(encoding="utf-8")
-                  for s in ("10-identities", "20-shared-dev", "30-cluster-config")
-                  if (root / s / "terraform.tfvars").exists()}))
+found = {s: (root / s / "terraform.tfvars").read_text(encoding="utf-8")
+         for s in ("10-identities", "20-shared-dev", "30-cluster-config")
+         if (root / s / "terraform.tfvars").exists()}
+if not {"10-identities", "20-shared-dev"} <= found.keys():
+    sys.exit(f"terraform.tfvars missing for 10-identities or 20-shared-dev under {root}")
+print(json.dumps(found))
 EOF
 )"
   local tfv="${PLATFORM}/20-shared-dev/terraform.tfvars"
   setvar ACR_NAME "$(sed -nE '/^acr *=/,/^}/ s/^ *name *= *"([^"]+)".*/\1/p' "$tfv" | head -1)"
   setvar AKS_NAME "$(sed -nE '/^aks *=/,/^}/ s/^ *name *= *"([^"]+)".*/\1/p' "$tfv" | head -1)"
   setvar AKS_RESOURCE_GROUP "rg-idp-aks-${ENVIRONMENT}"
-  local outputs; outputs="$(mktemp)"; printf '%s' "$out" > "$outputs"
-  setvar PLATFORM_CHART_VALUES_JSON "$("$PY" - "$tfv" "$ENVIRONMENT" "$outputs" <<'EOF'
-import json, re, sys
-out = json.load(open(sys.argv[3], encoding="utf-8"))
+  # Terraform outputs go through the environment: on Windows, Python can't open Git Bash's /tmp paths.
+  setvar PLATFORM_CHART_VALUES_JSON "$(TF_OUTPUTS="$out" "$PY" - "$(native "$tfv")" "$ENVIRONMENT" <<'EOF'
+import json, os, re, sys
+out = json.loads(os.environ["TF_OUTPUTS"])
 tfvars, env = open(sys.argv[1], encoding="utf-8").read(), sys.argv[2]
 pg = re.search(r'^postgres_name\s*=\s*"([^"]+)"', tfvars, re.M).group(1) + ".postgres.database.azure.com"
 auth, pid, tenant = out["service_auth"]["value"], out["principal_ids"]["value"], out["tenant_id"]["value"]
@@ -245,7 +253,6 @@ print(json.dumps({
 }))
 EOF
 )"
-  rm -f "$outputs"
 
   echo "Environments (deployments limited to develop and main)"
   local me; me="$(gh api user -q .id)"
