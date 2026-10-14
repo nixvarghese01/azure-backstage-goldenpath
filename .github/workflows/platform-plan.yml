@@ -21,9 +21,9 @@ permissions:
 env:
   ARM_USE_OIDC: "true"
   ARM_USE_AZUREAD: "true"
-  ARM_CLIENT_ID: ${{ vars.PLATFORM_PLAN_CLIENT_ID }}
-  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  ARM_CLIENT_ID: ${{ secrets.PLATFORM_PLAN_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
 jobs:
   detect:
@@ -74,13 +74,13 @@ jobs:
         with:
           working-directory: iac/platform/${{ matrix.stack }}
       - name: Note when Azure isn't configured yet
-        if: vars.PLATFORM_PLAN_CLIENT_ID == ''
-        run: echo "::warning::PLATFORM_PLAN_CLIENT_ID isn't set, so the Azure plan is skipped; static checks still ran. See IMPLEMENTATION_PLAN.md Phase 4."
+        if: vars.PLATFORM_AZURE_READY != 'true'
+        run: echo "::warning::PLATFORM_AZURE_READY isn't true, so the Azure plan is skipped; static checks still ran. See IMPLEMENTATION_PLAN.md Phase 4."
 
   plan:
     needs: [detect, static]
     # Planning needs the platform plan identity; until Azure is set up, only the static gate runs.
-    if: vars.PLATFORM_PLAN_CLIENT_ID != ''
+    if: vars.PLATFORM_AZURE_READY == 'true'
     runs-on: ubuntu-24.04
     environment: platform-plan
     permissions:
@@ -106,14 +106,14 @@ jobs:
           terraform_wrapper: false
       - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
-          client-id: ${{ vars.PLATFORM_PLAN_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.PLATFORM_PLAN_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - run: bash "$GITHUB_WORKSPACE/scripts/ci/install-tools.sh" conftest kubelogin
       - name: Write stack inputs from repository variables (IDs only)
         env:
-          PLATFORM_BACKEND_HCL: ${{ vars.PLATFORM_BACKEND_HCL }}
-          PLATFORM_TFVARS_JSON: ${{ vars.PLATFORM_TFVARS_JSON }}
+          PLATFORM_BACKEND_HCL: ${{ secrets.PLATFORM_BACKEND_HCL }}
+          PLATFORM_TFVARS_JSON: ${{ secrets.PLATFORM_TFVARS_JSON }}
         run: |
           # PLATFORM_TFVARS_JSON = {"<stack>": "<tfvars file content>", ...}; IDs only, no secrets.
           printf '%s\n' "${PLATFORM_BACKEND_HCL//__STACK__/$STACK}" > backend.hcl

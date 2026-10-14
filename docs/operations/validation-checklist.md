@@ -90,9 +90,9 @@ If APIs moved, generate a fresh app (`npx @backstage/create-app@latest`) and por
    - `PROVISIONING_CLIENT_ID`
    - `DEPLOYMENT_CLIENT_ID`
    - `IDP_CALLBACK_URL`
-5. Set platform repository variables:
-   - client IDs, `ACR_NAME`, `AKS_NAME`, `AKS_RESOURCE_GROUP`
-   - `PLATFORM_BACKEND_HCL`, `PLATFORM_TFVARS_JSON`, `PLATFORM_CHART_VALUES_JSON`
+5. Set the platform repository's secrets and variables with `scripts/bootstrap-platform.sh github`:
+   - secrets: tenant, subscription and client IDs, `PLATFORM_BACKEND_HCL`, `PLATFORM_TFVARS_JSON`, `PLATFORM_CHART_VALUES_JSON`
+   - variables: `ACR_NAME`, `AKS_NAME`, `AKS_RESOURCE_GROUP`, `PLATFORM_AZURE_READY`
 6. Create environments in the platform repository: `platform` (with required reviewers), `platform-plan`, `platform-deploy` and `platform-vending`.
 
 ## 7. Azure (free subscription, Phase 4-5)

@@ -10,6 +10,21 @@ on:
   workflow_dispatch:
   # platform-provision.yml calls this after the cluster stacks, from develop (dev) or main.
   workflow_call:
+    secrets:
+      AZURE_TENANT_ID:
+        required: false
+      AZURE_SUBSCRIPTION_ID:
+        required: false
+      PLATFORM_DEPLOY_CLIENT_ID:
+        required: false
+      BACKSTAGE_CLIENT_ID:
+        required: false
+      DISCOVERY_CLIENT_ID:
+        required: false
+      ORCHESTRATOR_CLIENT_ID:
+        required: false
+      PLATFORM_CHART_VALUES_JSON:
+        required: false
 
 permissions:
   contents: read
@@ -83,9 +98,9 @@ jobs:
           version: v4.3.0
       - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
-          client-id: ${{ vars.PLATFORM_DEPLOY_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.PLATFORM_DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - run: bash scripts/ci/install-tools.sh kubelogin
       - name: Push images
         id: push
@@ -119,12 +134,12 @@ jobs:
       - name: Deploy charts (images pinned by digest)
         env:
           # {"<chart>": "<values YAML with environment IDs>"}; identifiers only, no secrets.
-          PLATFORM_CHART_VALUES_JSON: ${{ vars.PLATFORM_CHART_VALUES_JSON }}
+          PLATFORM_CHART_VALUES_JSON: ${{ secrets.PLATFORM_CHART_VALUES_JSON }}
           AKS_RESOURCE_GROUP: ${{ vars.AKS_RESOURCE_GROUP }}
           AKS_NAME: ${{ vars.AKS_NAME }}
-          DISCOVERY_CLIENT_ID: ${{ vars.DISCOVERY_CLIENT_ID }}
-          ORCHESTRATOR_CLIENT_ID: ${{ vars.ORCHESTRATOR_CLIENT_ID }}
-          BACKSTAGE_CLIENT_ID: ${{ vars.BACKSTAGE_CLIENT_ID }}
+          DISCOVERY_CLIENT_ID: ${{ secrets.DISCOVERY_CLIENT_ID }}
+          ORCHESTRATOR_CLIENT_ID: ${{ secrets.ORCHESTRATOR_CLIENT_ID }}
+          BACKSTAGE_CLIENT_ID: ${{ secrets.BACKSTAGE_CLIENT_ID }}
           BACKSTAGE_DIGEST: ${{ steps.push.outputs.backstage_digest }}
           DISCOVERY_DIGEST: ${{ steps.push.outputs.azure_discovery_digest }}
           ORCHESTRATOR_DIGEST: ${{ steps.push.outputs.provisioning_orchestrator_digest }}

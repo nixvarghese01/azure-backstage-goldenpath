@@ -2,6 +2,7 @@ environment                = "dev"
 location                   = "uksouth"
 github_org                 = "nixvarghese01"
 github_org_id              = "000000000"
+github_repo_id             = "000000000" # gh api repos/<owner>/<repo> --jq .id (immutable OIDC subjects)
 platform_repo              = "azure-backstage-goldenpath"
 reusable_workflow_ref      = "refs/heads/main"
 discovery_subscription_ids = ["00000000-0000-0000-0000-000000000000"]

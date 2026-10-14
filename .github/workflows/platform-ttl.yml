@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   check:
-    if: vars.PLATFORM_PLAN_CLIENT_ID != ''
+    if: vars.PLATFORM_AZURE_READY == 'true'
     runs-on: ubuntu-24.04
     environment: platform-plan   # read-only identity
     permissions:
@@ -32,14 +32,14 @@ jobs:
     steps:
       - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
-          client-id: ${{ vars.PLATFORM_PLAN_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.PLATFORM_PLAN_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - name: Is the platform past its time-to-live?
         id: ttl
         env:
           GH_TOKEN: ${{ github.token }}
-          SUB: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          SUB: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           RG: rg-idp-aks-${{ vars.PLATFORM_ENVIRONMENT || 'dev' }}
         run: |
           created="$(az rest --method get \
@@ -74,6 +74,19 @@ jobs:
     needs: check
     if: needs.check.outputs.expired == 'true'
     uses: ./.github/workflows/platform-provision.yml
+    secrets:
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      BACKSTAGE_CLIENT_ID: ${{ secrets.BACKSTAGE_CLIENT_ID }}
+      DISCOVERY_CLIENT_ID: ${{ secrets.DISCOVERY_CLIENT_ID }}
+      ORCHESTRATOR_CLIENT_ID: ${{ secrets.ORCHESTRATOR_CLIENT_ID }}
+      PLATFORM_BACKEND_HCL: ${{ secrets.PLATFORM_BACKEND_HCL }}
+      PLATFORM_CHART_VALUES_JSON: ${{ secrets.PLATFORM_CHART_VALUES_JSON }}
+      PLATFORM_CLIENT_ID: ${{ secrets.PLATFORM_CLIENT_ID }}
+      PLATFORM_DEPLOY_CLIENT_ID: ${{ secrets.PLATFORM_DEPLOY_CLIENT_ID }}
+      PLATFORM_PLAN_CLIENT_ID: ${{ secrets.PLATFORM_PLAN_CLIENT_ID }}
+      PLATFORM_TFVARS_JSON: ${{ secrets.PLATFORM_TFVARS_JSON }}
+      VENDING_CLIENT_ID: ${{ secrets.VENDING_CLIENT_ID }}
     with:
       action: teardown
     permissions:

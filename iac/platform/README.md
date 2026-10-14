@@ -49,7 +49,7 @@ to undo it, is recorded in [bootstrap-record.md](../../docs/operations/bootstrap
    scripts/bootstrap-platform.sh providers    # resource providers + EncryptionAtHost
    scripts/bootstrap-platform.sh state        # 00-bootstrap, then migrate its state into itself
    scripts/bootstrap-platform.sh identities   # 10-identities
-   scripts/bootstrap-platform.sh github       # repository variables and environments (IDs only)
+   scripts/bootstrap-platform.sh github       # repository secrets (IDs, masked in logs), variables, environments
    ```
 
 3. Map the service identities to PostgreSQL roles once the server exists (`scripts/postgres-grant-identities.sql`).
