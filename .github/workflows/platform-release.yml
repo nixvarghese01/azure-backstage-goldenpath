@@ -10,6 +10,21 @@ on:
   workflow_dispatch:
   # platform-provision.yml calls this after the cluster stacks, from develop (dev) or main.
   workflow_call:
+    secrets:
+      AZURE_TENANT_ID:
+        required: false
+      AZURE_SUBSCRIPTION_ID:
+        required: false
+      PLATFORM_DEPLOY_CLIENT_ID:
+        required: false
+      BACKSTAGE_CLIENT_ID:
+        required: false
+      DISCOVERY_CLIENT_ID:
+        required: false
+      ORCHESTRATOR_CLIENT_ID:
+        required: false
+      PLATFORM_CHART_VALUES_JSON:
+        required: false
 
 permissions:
   contents: read

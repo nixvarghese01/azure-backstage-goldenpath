@@ -80,10 +80,13 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false   # the token is passed to the push only, never stored in .git
       - name: Create and push the tags on the validated commit
         env:
           MODULES: ${{ needs.validate.outputs.modules }}
           VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -92,5 +95,6 @@ jobs:
             git tag -a "$module/v$VERSION" -m "$module v$VERSION" "$GITHUB_SHA"
             tags+=("refs/tags/$module/v$VERSION")
           done
-          git push --atomic origin "${tags[@]}"
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic ${auth}" push --atomic origin "${tags[@]}"
           printf -- '- %s\n' "${tags[@]#refs/tags/}" >> "$GITHUB_STEP_SUMMARY"

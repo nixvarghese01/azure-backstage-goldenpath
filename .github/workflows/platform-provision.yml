@@ -40,6 +40,31 @@ on:
       ttl_hours:
         type: string
         default: ""
+    secrets:
+      AZURE_SUBSCRIPTION_ID:
+        required: false
+      AZURE_TENANT_ID:
+        required: false
+      BACKSTAGE_CLIENT_ID:
+        required: false
+      DISCOVERY_CLIENT_ID:
+        required: false
+      ORCHESTRATOR_CLIENT_ID:
+        required: false
+      PLATFORM_BACKEND_HCL:
+        required: false
+      PLATFORM_CHART_VALUES_JSON:
+        required: false
+      PLATFORM_CLIENT_ID:
+        required: false
+      PLATFORM_DEPLOY_CLIENT_ID:
+        required: false
+      PLATFORM_PLAN_CLIENT_ID:
+        required: false
+      PLATFORM_TFVARS_JSON:
+        required: false
+      VENDING_CLIENT_ID:
+        required: false
 
 permissions:
   contents: read
@@ -101,7 +126,13 @@ jobs:
     needs: [preflight, cost-guard]
     if: inputs.action == 'provision' && !cancelled() && needs.preflight.result == 'success' && needs.cost-guard.result != 'failure'
     uses: ./.github/workflows/platform-apply.yml
-    secrets: inherit
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      PLATFORM_CLIENT_ID: ${{ secrets.PLATFORM_CLIENT_ID }}
+      VENDING_CLIENT_ID: ${{ secrets.VENDING_CLIENT_ID }}
+      PLATFORM_BACKEND_HCL: ${{ secrets.PLATFORM_BACKEND_HCL }}
+      PLATFORM_TFVARS_JSON: ${{ secrets.PLATFORM_TFVARS_JSON }}
     with:
       stack: 20-shared-dev
     permissions:
@@ -111,7 +142,13 @@ jobs:
   cluster-config:
     needs: shared
     uses: ./.github/workflows/platform-apply.yml
-    secrets: inherit
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      PLATFORM_CLIENT_ID: ${{ secrets.PLATFORM_CLIENT_ID }}
+      VENDING_CLIENT_ID: ${{ secrets.VENDING_CLIENT_ID }}
+      PLATFORM_BACKEND_HCL: ${{ secrets.PLATFORM_BACKEND_HCL }}
+      PLATFORM_TFVARS_JSON: ${{ secrets.PLATFORM_TFVARS_JSON }}
     with:
       stack: 30-cluster-config
     permissions:
@@ -122,7 +159,14 @@ jobs:
     needs: cluster-config
     if: inputs.release
     uses: ./.github/workflows/platform-release.yml
-    secrets: inherit
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      PLATFORM_DEPLOY_CLIENT_ID: ${{ secrets.PLATFORM_DEPLOY_CLIENT_ID }}
+      BACKSTAGE_CLIENT_ID: ${{ secrets.BACKSTAGE_CLIENT_ID }}
+      DISCOVERY_CLIENT_ID: ${{ secrets.DISCOVERY_CLIENT_ID }}
+      ORCHESTRATOR_CLIENT_ID: ${{ secrets.ORCHESTRATOR_CLIENT_ID }}
+      PLATFORM_CHART_VALUES_JSON: ${{ secrets.PLATFORM_CHART_VALUES_JSON }}
     permissions:
       contents: read
       id-token: write
@@ -133,7 +177,13 @@ jobs:
     needs: preflight
     if: inputs.action == 'teardown'
     uses: ./.github/workflows/platform-apply.yml
-    secrets: inherit
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      PLATFORM_CLIENT_ID: ${{ secrets.PLATFORM_CLIENT_ID }}
+      VENDING_CLIENT_ID: ${{ secrets.VENDING_CLIENT_ID }}
+      PLATFORM_BACKEND_HCL: ${{ secrets.PLATFORM_BACKEND_HCL }}
+      PLATFORM_TFVARS_JSON: ${{ secrets.PLATFORM_TFVARS_JSON }}
     with:
       stack: 30-cluster-config
       mode: destroy
@@ -147,7 +197,13 @@ jobs:
     needs: [preflight, teardown-cluster-config]
     if: inputs.action == 'teardown' && !cancelled() && needs.preflight.result == 'success'
     uses: ./.github/workflows/platform-apply.yml
-    secrets: inherit
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      PLATFORM_CLIENT_ID: ${{ secrets.PLATFORM_CLIENT_ID }}
+      VENDING_CLIENT_ID: ${{ secrets.VENDING_CLIENT_ID }}
+      PLATFORM_BACKEND_HCL: ${{ secrets.PLATFORM_BACKEND_HCL }}
+      PLATFORM_TFVARS_JSON: ${{ secrets.PLATFORM_TFVARS_JSON }}
     with:
       stack: 20-shared-dev
       mode: destroy

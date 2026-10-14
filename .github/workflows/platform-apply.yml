@@ -32,6 +32,19 @@ on:
         type: string
         required: false
         default: apply
+    secrets:
+      AZURE_TENANT_ID:
+        required: false
+      AZURE_SUBSCRIPTION_ID:
+        required: false
+      PLATFORM_CLIENT_ID:
+        required: false
+      VENDING_CLIENT_ID:
+        required: false
+      PLATFORM_BACKEND_HCL:
+        required: false
+      PLATFORM_TFVARS_JSON:
+        required: false
 
 permissions:
   contents: read
