@@ -1,5 +1,6 @@
 """End-to-end golden path with mocked GitHub and discovery: submit -> ... -> SUCCEEDED."""
 
+from provisioning_orchestrator.config import Settings
 from provisioning_orchestrator.models import Request
 
 from tests.conftest import APPROVER, REQUESTER, SERVICE, callback, drain, submission, webhook
@@ -145,6 +146,24 @@ def test_requester_cannot_approve_own_request(client, worker, github) -> None:
     )
     assert res.status_code == 403
     assert res.json()["detail"]["code"] == "separation_of_duties"
+
+
+def test_self_approval_is_off_by_default_and_never_prod(monkeypatch) -> None:
+    monkeypatch.delenv("ORCHESTRATOR_SELF_APPROVAL_ENVIRONMENTS", raising=False)
+    assert Settings.from_env().self_approval_environments == frozenset()
+    monkeypatch.setenv("ORCHESTRATOR_SELF_APPROVAL_ENVIRONMENTS", "dev, prod")
+    assert Settings.from_env().self_approval_environments == frozenset({"dev"})
+
+
+def test_self_approval_allowed_when_dev_opts_in(client_factory, worker, github) -> None:
+    client = client_factory(self_approval_environments=frozenset({"dev"}))
+    rid = _to_awaiting_approval(client, worker, github)
+    headers = {**REQUESTER, "X-IDP-Groups": "group:default/team-orders,group:default/platform-approvers"}
+    res = client.post(
+        f"/v1/requests/{rid}/approval", headers=headers, json={"decision": "approve", "plan_hash": PLAN_HASH}
+    )
+    assert res.status_code == 200, res.json()
+    assert res.json()["approval"]["self_approved"] is True
 
 
 def test_approval_bound_to_plan_hash(client, worker, github) -> None:

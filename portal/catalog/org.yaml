@@ -33,8 +33,9 @@ metadata:
 spec:
   profile:
     displayName: Nixon (developer and platform approver)
-  # Also an approver: can approve other people's requests. Separation of duties still stops anyone
-  # approving their own request (provisioning-orchestrator), so Ancy approves Nixon's.
+  # Also an approver: can approve other people's requests. Approving your own request is blocked
+  # (separation of duties) unless ORCHESTRATOR_SELF_APPROVAL_ENVIRONMENTS includes the environment,
+  # e.g. "dev" for a single-person demo.
   memberOf: [team-orders, platform-approvers]
 ---
 apiVersion: backstage.io/v1alpha1

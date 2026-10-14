@@ -121,6 +121,12 @@ def client(settings, sessions) -> TestClient:
     return TestClient(create_app(settings, sessions))
 
 
+@pytest.fixture
+def client_factory(settings, sessions):
+    """A client whose app runs with some settings changed, e.g. client_factory(approver_group=...)."""
+    return lambda **changes: TestClient(create_app(replace(settings, **changes), sessions))
+
+
 def submission(**overrides: Any) -> dict[str, Any]:
     body = {
         "idempotency_key": "scaffolder-task-0001",

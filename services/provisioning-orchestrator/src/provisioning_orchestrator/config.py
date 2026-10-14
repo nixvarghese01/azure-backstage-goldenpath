@@ -26,6 +26,9 @@ class Settings:
     backstage_scope: str | None
     callback_audience: str
     approver_group: str
+    # Environments where an approver may approve their own request (single-person demos). Empty by
+    # default, so separation of duties applies everywhere; "prod" is always refused.
+    self_approval_environments: frozenset[str]
     stack_templates_dir: Path
     infra_environment: str  # GitHub environment holding the custom protection rule
     worker_poll_seconds: float
@@ -53,6 +56,11 @@ class Settings:
             backstage_scope=_env("BACKSTAGE_ENTRA_SCOPE"),
             callback_audience=_env("ORCHESTRATOR_CALLBACK_AUDIENCE", "idp-orchestrator") or "",
             approver_group=_env("ORCHESTRATOR_APPROVER_GROUP", "group:default/platform-approvers") or "",
+            self_approval_environments=frozenset(
+                e.strip()
+                for e in (_env("ORCHESTRATOR_SELF_APPROVAL_ENVIRONMENTS", "") or "").split(",")
+                if e.strip() and e.strip() != "prod"
+            ),
             stack_templates_dir=Path(_env("ORCHESTRATOR_STACK_TEMPLATES_DIR", "/app/stack-templates") or ""),
             infra_environment=_env("ORCHESTRATOR_INFRA_ENVIRONMENT", "dev-infra") or "dev-infra",
             worker_poll_seconds=float(_env("ORCHESTRATOR_WORKER_POLL_SECONDS", "2") or 2),

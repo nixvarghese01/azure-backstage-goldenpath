@@ -187,7 +187,7 @@ The approval decision is made in Backstage, and GitHub enforces it.
 2. The approver clicks **Approve**. The Backstage bridge forwards the decision with the approver's identity.
 3. The orchestrator checks that:
    - the approver holds the Backstage permission `idp.request.approve` for the environment
-   - the approver is **not** the requester (separation of duties)
+   - the approver is **not** the requester (separation of duties). For a single-person demo, an environment can opt out with `ORCHESTRATOR_SELF_APPROVAL_ENVIRONMENTS` (Helm: `config.selfApprovalEnvironments`); `prod` never can, and the approval is recorded as `self_approved`
    - the approval is bound to the **exact plan hash** (a new plan needs a new approval)
    - the request has not already been decided (a duplicate click or replayed request has no effect)
 4. The orchestrator approves the protection rule through the GitHub API, and the apply job runs. **Reject** rejects the rule instead: the job fails cleanly, the state becomes `CANCELLED`, and the reason is shown.
