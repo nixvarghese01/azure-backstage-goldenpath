@@ -301,6 +301,80 @@ resource "azurerm_role_assignment" "platform_plan_reader" {
   principal_type       = "ServicePrincipal"
 }
 
+# ------------------------------------------------------------------ provisioning identity scope
+# Applied by an admin with this stack (creating a role definition needs roleDefinitions/write, which
+# the pipeline identities don't have). Generated repositories use these rights through
+# reusable-terraform.yml: a narrow custom role, and RBAC Administrator limited by ABAC to three roles.
+locals {
+  # Roles the provisioning identity may hand out (ABAC condition on RBAC Administrator).
+  assignable_role_ids = [
+    "ba92f5b4-2d11-453d-a403-e96b0029c9fe", # Storage Blob Data Contributor
+    "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1", # Storage Blob Data Reader
+    "4633458b-17de-408a-b874-0445c86b69e6", # Key Vault Secrets User
+  ]
+  rbac_condition = <<-EOT
+    (
+     (
+      !(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})
+     )
+     OR
+     (
+      @Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${join(", ", local.assignable_role_ids)}}
+     )
+    )
+    AND
+    (
+     (
+      !(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})
+     )
+     OR
+     (
+      @Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${join(", ", local.assignable_role_ids)}}
+     )
+    )
+  EOT
+}
+
+# Narrow custom role for application infrastructure (create-new RG, identities, storage, key vault).
+resource "azurerm_role_definition" "app_provisioner" {
+  name        = "IDP App Provisioner (${var.environment})"
+  scope       = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+  description = "Creates application infrastructure for the IDP golden path. No compute, network or RBAC beyond the conditioned assignment role."
+  permissions {
+    actions = [
+      "*/read",
+      "Microsoft.Resources/subscriptions/resourceGroups/write",
+      "Microsoft.Resources/subscriptions/resourceGroups/delete",
+      "Microsoft.Resources/deployments/*",
+      "Microsoft.ManagedIdentity/userAssignedIdentities/*",
+      "Microsoft.Storage/storageAccounts/*",
+      "Microsoft.KeyVault/vaults/*",
+      "Microsoft.ContainerService/managedClusters/listClusterUserCredential/action",
+    ]
+    not_actions = [
+      "Microsoft.Storage/storageAccounts/listKeys/action",
+      "Microsoft.Storage/storageAccounts/regenerateKey/action",
+    ]
+  }
+  assignable_scopes = ["/subscriptions/${data.azurerm_client_config.current.subscription_id}"]
+}
+
+resource "azurerm_role_assignment" "provisioning_app_provisioner" {
+  scope              = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+  role_definition_id = azurerm_role_definition.app_provisioner.role_definition_resource_id
+  principal_id       = module.provisioning.principal_id
+  principal_type     = "ServicePrincipal"
+}
+
+resource "azurerm_role_assignment" "provisioning_rbac_admin" {
+  scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+  role_definition_name = "Role Based Access Control Administrator"
+  principal_id         = module.provisioning.principal_id
+  principal_type       = "ServicePrincipal"
+  condition_version    = "2.0"
+  condition            = local.rbac_condition
+}
+
 # ------------------------------------------------------------------ Entra app registrations (token audiences)
 # Service-to-service calls use Entra access tokens from workload identities. A token needs an audience,
 # which must be an app registration exposing an identifier URI. v2 tokens: aud = the app's client ID.

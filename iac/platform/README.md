@@ -6,7 +6,7 @@ Shared platform infrastructure, one Terraform state per stack, applied in order 
 |---|---|---|
 | `00-bootstrap` | Terraform state storage account and `platform` / `apps` containers | A platform admin, once (local state, then migrated) |
 | `05-subscriptions` | Vended subscriptions from `subscriptions.d/*.json` (EA/MCA only) | Vending identity |
-| `10-identities` | All platform identities, GitHub OIDC federation, platform Key Vault and per-secret RBAC, discovery `Reader`, state access | A platform admin the first time, then the platform identity |
+| `10-identities` | All platform identities, GitHub OIDC federation, platform Key Vault and per-secret RBAC, discovery `Reader`, state access, the `IDP App Provisioner` custom role and the provisioning identity's subscription-level assignments (role definitions need an admin) | A platform admin the first time, then the platform identity |
 | `20-shared-dev` | Platform and apps resource groups, shared AKS (+ `clusters.d/*.json`), ACR (+ `registries.d/*.json`), PostgreSQL, DNS, shared demo storage, role assignments | Platform identity |
 | `30-cluster-config` | Kubernetes namespaces, shared Gateway, ClusterRoles/bindings, Workload Identity federation for the platform services | Platform identity |
 
