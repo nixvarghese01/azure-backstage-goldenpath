@@ -160,7 +160,10 @@ resource "azurerm_kubernetes_cluster" "this" {
   }
 
   lifecycle {
-    ignore_changes = [kubernetes_version] # upgrades are deliberate, see COMPATIBILITY.md
+    ignore_changes = [
+      kubernetes_version, # upgrades are deliberate, see COMPATIBILITY.md
+      web_app_routing,    # enabled by azapi_update_resource.gateway_api (Gateway API), not by this resource
+    ]
   }
 }
 

@@ -24,6 +24,15 @@ variable "sku_name" {
   default     = "B_Standard_B1ms"
 }
 
+variable "zone" {
+  description = <<-EOT
+    Availability zone (1, 2 or 3), or null to let Azure choose. Pin one when the region reports
+    RegionalAllocationFailed for the chosen size: capacity is often short in a single zone.
+  EOT
+  type        = string
+  default     = null
+}
+
 variable "storage_mb" {
   type    = number
   default = 32768
@@ -66,6 +75,7 @@ resource "azurerm_postgresql_flexible_server" "this" {
   location                      = var.location
   version                       = "17"
   sku_name                      = var.sku_name
+  zone                          = var.zone
   storage_mb                    = var.storage_mb
   backup_retention_days         = 7
   public_network_access_enabled = var.public_network_access_enabled
