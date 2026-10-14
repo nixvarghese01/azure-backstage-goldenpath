@@ -33,7 +33,8 @@ with. Everything else runs in GitHub Actions. State handling, locking and recove
 4. **Actions → platform-provision → Run workflow** on `develop`. It applies `20-shared-dev` (AKS, ACR,
    PostgreSQL, Key Vault) and `30-cluster-config`, each after your approval of the `platform` environment,
    then runs `platform-release` to build and deploy Backstage, azure-discovery and the orchestrator into
-   AKS. Choose `teardown` to destroy 30 and 20 again (state and identities stay).
+   AKS. Pick `ttl_hours`: `platform-ttl` destroys 30 and 20 when it expires, or choose `teardown` to end
+   earlier (state and identities stay). Cost and lifecycle: [demo-environment.md](../../docs/operations/demo-environment.md#5-cost-estimate-and-lifecycle).
 
 | Pipeline | When | Identity |
 |---|---|---|
@@ -41,6 +42,7 @@ with. Everything else runs in GitHub Actions. State handling, locking and recove
 | `platform-provision` | Manually: provision or tear down the dev platform | `platform`, then `platform-deploy` |
 | `platform-apply` | One stack; called by `platform-provision` or dispatched by the orchestrator | `platform` (`vending` for 05) |
 | `platform-release` | Images and Helm releases; on `main` pushes, or called by `platform-provision` | `platform-deploy` |
+| `platform-ttl` | Hourly: tears the dev platform down when the provision's `ttl_hours` expires | `platform-plan` to check, `platform` (teardown environment) to destroy |
 
 The dev platform deploys from `develop`; `main` is for releases.
 

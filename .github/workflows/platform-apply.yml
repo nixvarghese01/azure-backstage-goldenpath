@@ -79,7 +79,8 @@ jobs:
   apply:
     needs: static
     runs-on: ubuntu-24.04
-    environment: ${{ inputs.stack == '05-subscriptions' && 'platform-vending' || 'platform' }}
+    # Destroys run in platform-teardown (no reviewers) so expiry teardown never waits for a person.
+    environment: ${{ inputs.stack == '05-subscriptions' && 'platform-vending' || (inputs.mode == 'destroy' && 'platform-teardown') || 'platform' }}
     permissions:
       contents: read
       id-token: write

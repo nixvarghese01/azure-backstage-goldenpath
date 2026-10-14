@@ -39,10 +39,12 @@ variable "admin_group_object_ids" {
 }
 
 variable "system_pool" {
+  description = "System pool. os_disk_size_gb: null = Azure's default (128 GB); 30 is the cheapest valid size."
   type = object({
-    vm_size    = string
-    node_count = number
-    zones      = optional(list(string), [])
+    vm_size         = string
+    node_count      = number
+    zones           = optional(list(string), [])
+    os_disk_size_gb = optional(number)
   })
   default = { vm_size = "Standard_D2s_v5", node_count = 1 }
 }
@@ -105,6 +107,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     vm_size                      = var.system_pool.vm_size
     node_count                   = var.system_pool.node_count
     zones                        = var.system_pool.zones
+    os_disk_size_gb              = var.system_pool.os_disk_size_gb
     only_critical_addons_enabled = var.user_pool != null
     max_pods                     = 110
     host_encryption_enabled      = true # needs the Microsoft.Compute/EncryptionAtHost feature

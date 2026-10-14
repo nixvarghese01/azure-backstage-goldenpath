@@ -13,6 +13,10 @@
 #   identities   10-identities: GitHub-federated identities, service identities, Key Vault, Entra apps
 #   github       repository variables and environments the pipelines read (IDs only, no secrets)
 #
+# Cost guard: every step that touches Azure stops unless the subscription is a Free Trial (or other
+# credit-based offer) with its spending limit on, so usage comes out of the credit and the subscription
+# is disabled, not billed, when the credit ends. Set IDP_ALLOW_BILLED_SUBSCRIPTION=true to lift it.
+#
 # Usage: scripts/bootstrap-platform.sh <step> [--env dev] [--location uksouth]
 # Needs: az, gh, terraform ~> 1.16, python3. Inputs: iac/platform/{10-identities,20-shared-dev,
 # 30-cluster-config}/terraform.tfvars, copied from the .example files with your IDs.
@@ -61,6 +65,23 @@ EOF
   return 0
 }
 
+# Spending limit and offer of the signed-in subscription (Reader is enough).
+cost_guard() {
+  local sub policies limit quota
+  sub="$(az account show --query id -o tsv)"
+  policies="$(az rest --method get --url "https://management.azure.com/subscriptions/${sub}?api-version=2022-12-01"     --query subscriptionPolicies -o json)"
+  limit="$(json "d.get('spendingLimit') or 'unknown'" <<< "$policies")"
+  quota="$(json "d.get('quotaId') or 'unknown'" <<< "$policies")"
+  if [[ "$limit" == On ]]; then
+    ok "spending limit On (${quota}): usage comes out of the credit; no charges to your card"
+  elif [[ "${IDP_ALLOW_BILLED_SUBSCRIPTION:-}" == true ]]; then
+    warn "spending limit ${limit} (${quota}): charges allowed by IDP_ALLOW_BILLED_SUBSCRIPTION"
+  else
+    fail "spending limit ${limit} (${quota}): this subscription can be billed. Use a Free Trial with the spending limit on, or set IDP_ALLOW_BILLED_SUBSCRIPTION=true"
+    exit 1
+  fi
+}
+
 preflight() {
   FAILED=0
   echo "Azure"
@@ -77,6 +98,9 @@ preflight() {
   [[ -n "$PY" ]] && ok "python $("$PY" --version 2>&1 | cut -d' ' -f2)" || fail "python3 needed"
   [[ -n "${FAILED}" && "${FAILED}" == 1 ]] && { echo "Fix the above first."; exit 1; }
 
+  echo "Cost"
+  cost_guard
+
   echo "Resource providers"
   for p in "${PROVIDERS[@]}"; do
     s="$(az provider show -n "$p" --query registrationState -o tsv 2>/dev/null || echo unknown)"
@@ -85,12 +109,20 @@ preflight() {
   s="$(az feature show --namespace Microsoft.Compute --name EncryptionAtHost --query properties.state -o tsv 2>/dev/null || echo unknown)"
   [[ "$s" == Registered ]] && ok "feature EncryptionAtHost" || warn "feature EncryptionAtHost: $s (run: $0 providers)"
 
-  echo "vCPU quota in ${LOCATION} (AKS demo node: Standard_D2s_v5 = 2 vCPU)"
+  local vm family
+  vm="$(sed -nE 's/^ *vm_size *= *"([^"]+)".*//p' "${PLATFORM}/20-shared-dev/terraform.tfvars" 2>/dev/null | head -1)"
+  vm="${vm:-Standard_D2s_v5}"
+  case "$vm" in
+    Standard_B*) family=standardBSFamily ;;
+    Standard_D*as_v5) family=standardDASv5Family ;;
+    *) family=standardDSv5Family ;;
+  esac
+  echo "vCPU quota in ${LOCATION} (AKS node: ${vm} = 2 vCPU)"
   usage="$(az vm list-usage -l "$LOCATION" -o json 2>/dev/null || echo '[]')"
   read -r used limit < <(json "' '.join(str(u[k]) for u in d if u['name']['value']=='cores' for k in ('currentValue','limit')) or '0 0'" <<< "$usage")
   if (( limit - used >= 2 )); then ok "total regional vCPUs ${used}/${limit}"; else fail "total regional vCPUs ${used}/${limit}: request a quota increase or choose another region"; fi
-  read -r used limit < <(json "' '.join(str(u[k]) for u in d if u['name']['value']=='standardDSv5Family' for k in ('currentValue','limit')) or '0 0'" <<< "$usage")
-  if (( limit - used >= 2 )); then ok "DSv5 family ${used}/${limit}"; else fail "DSv5 family ${used}/${limit}: request an increase, or set another vm_size in 20-shared-dev"; fi
+  read -r used limit < <(json "' '.join(str(u[k]) for u in d if u['name']['value']=='${family}' for k in ('currentValue','limit')) or '0 0'" <<< "$usage")
+  if (( limit - used >= 2 )); then ok "${family} ${used}/${limit}"; else fail "${family} ${used}/${limit}: request an increase, or set another vm_size in 20-shared-dev"; fi
 
   echo "Stack inputs (git-ignored; IDs only)"
   for s in 10-identities 20-shared-dev; do
@@ -105,6 +137,7 @@ preflight() {
 }
 
 providers() {
+  FAILED=0; cost_guard
   for p in "${PROVIDERS[@]}"; do az provider register -n "$p" -o none && echo "registering $p"; done
   az feature register --namespace Microsoft.Compute --name EncryptionAtHost -o none
   echo "Waiting for EncryptionAtHost (can take ~15 minutes)..."
@@ -114,6 +147,7 @@ providers() {
 }
 
 state() {
+  FAILED=0; cost_guard
   local dir="${PLATFORM}/00-bootstrap" account
   account="$(state_account)"
   [[ -n "$account" ]] || { echo "Set state_storage_account_name in 10-identities/terraform.tfvars first."; exit 1; }
@@ -141,6 +175,7 @@ state() {
 }
 
 identities() {
+  FAILED=0; cost_guard
   cd "${PLATFORM}/10-identities"
   backend_hcl 10-identities > backend.hcl
   terraform init -input=false -backend-config=backend.hcl
@@ -148,6 +183,7 @@ identities() {
 }
 
 github() {
+  FAILED=0; cost_guard
   local out tenant sub
   out="$(cd "${PLATFORM}/10-identities" && terraform output -json)"
   tenant="$(json "d['tenant_id']['value']" <<< "$out")"
@@ -206,8 +242,9 @@ EOF
 
   echo "Environments (deployments limited to develop and main)"
   local me; me="$(gh api user -q .id)"
-  for e in platform platform-deploy platform-plan; do
-    if [[ "$e" == platform-plan ]]; then
+  # platform-plan: read-only. platform-teardown: destroy-only, no reviewers, so TTL teardown never waits.
+  for e in platform platform-deploy platform-plan platform-teardown; do
+    if [[ "$e" == platform-plan || "$e" == platform-teardown ]]; then
       body='{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
     else
       body="{\"reviewers\":[{\"type\":\"User\",\"id\":${me}}],\"deployment_branch_policy\":{\"protected_branches\":false,\"custom_branch_policies\":true}}"
@@ -216,9 +253,14 @@ EOF
     for b in develop main; do
       gh api -X POST "repos/${REPO}/environments/${e}/deployment-branch-policies" -f name="$b" -f type=branch >/dev/null 2>&1 || true
     done
-    ok "$e$([[ "$e" != platform-plan ]] && echo " (you approve each run)")"
+    case "$e" in
+      platform-plan) ok "$e (read-only)" ;;
+      platform-teardown) ok "$e (destroy only, no approval)" ;;
+      *) ok "$e (you approve each run)" ;;
+    esac
   done
-  echo "Done. Next: Actions -> platform-provision -> Run workflow on develop."
+  echo "Done. Next: Actions -> platform-provision -> Run workflow on develop (pick ttl_hours)."
+  echo "platform-ttl tears the platform down when ttl_hours expires; check it hourly in Actions."
 }
 
 case "$STEP" in

@@ -1,0 +1,81 @@
+# Destroys the dev platform when its time-to-live expires, so a forgotten AKS cluster doesn't keep using
+# the subscription's credit. Hourly: if the platform resource group exists, the lifetime starts at the
+# later of its creation time and the last platform-provision run, and lasts that run's ttl_hours
+# (default 4). Expired -> platform-provision teardown (30-cluster-config, then 20-shared-dev), which runs
+# in the platform-teardown environment and needs no approval. State and identities are kept.
+name: platform-ttl
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-ttl
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: vars.PLATFORM_PLAN_CLIENT_ID != ''
+    runs-on: ubuntu-24.04
+    environment: platform-plan   # read-only identity
+    permissions:
+      contents: read
+      actions: read    # read the last platform-provision run
+      id-token: write
+    outputs:
+      expired: ${{ steps.ttl.outputs.expired }}
+    steps:
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.PLATFORM_PLAN_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Is the platform past its time-to-live?
+        id: ttl
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUB: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          RG: rg-idp-platform-${{ vars.PLATFORM_ENVIRONMENT || 'dev' }}
+        run: |
+          created="$(az rest --method get \
+            --url "https://management.azure.com/subscriptions/${SUB}/resourcegroups?api-version=2021-04-01&\$expand=createdTime" \
+            --query "value[?name=='${RG}'].createdTime | [0]" -o tsv)"
+          if [[ -z "$created" ]]; then
+            echo "No ${RG}: nothing is running." >> "$GITHUB_STEP_SUMMARY"
+            echo "expired=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          last="$(gh run list -R "$GITHUB_REPOSITORY" --workflow platform-provision.yml --limit 20 \
+            --json displayTitle,createdAt \
+            --jq '[.[] | select(.displayTitle | startswith("platform-provision provision"))][0] // {}')"
+          ttl="$(jq -r '.displayTitle // "" | capture("ttl=(?<h>[0-9]+)h").h // "4"' <<< "$last")"
+          started="$(jq -r --arg c "$created" '[$c, (.createdAt // $c)] | max' <<< "$last")"
+          expires="$(date -u -d "${started} + ${ttl} hours" +%Y-%m-%dT%H:%M:%SZ)"
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          {
+            echo "| | |"; echo "|---|---|"
+            echo "| Platform resource group | \`${RG}\` |"
+            echo "| Running since | ${started} |"
+            echo "| Time-to-live | ${ttl} h |"
+            echo "| Expires | ${expires} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$now" > "$expires" ]]; then
+            echo "Expired: tearing down." >> "$GITHUB_STEP_SUMMARY"
+            echo "expired=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "expired=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  teardown:
+    needs: check
+    if: needs.check.outputs.expired == 'true'
+    uses: ./.github/workflows/platform-provision.yml
+    with:
+      action: teardown
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
