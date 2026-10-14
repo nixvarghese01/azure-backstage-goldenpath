@@ -130,7 +130,7 @@ jobs:
           PLATFORM_TFVARS_JSON: ${{ secrets.PLATFORM_TFVARS_JSON }}
         run: |
           printf '%s\n' "${PLATFORM_BACKEND_HCL//__STACK__/$STACK}" > backend.hcl
-          jq -er --arg s "$STACK" '.[$s]' <<< "$PLATFORM_TFVARS_JSON" > terraform.tfvars
+          jq -r --arg s "$STACK" '.[$s] // ""' <<< "$PLATFORM_TFVARS_JSON" > terraform.tfvars   # no entry = the stack's defaults
       - name: Plan
         run: |
           terraform init -backend-config=backend.hcl

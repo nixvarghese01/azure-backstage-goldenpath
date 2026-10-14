@@ -117,7 +117,7 @@ jobs:
         run: |
           # PLATFORM_TFVARS_JSON = {"<stack>": "<tfvars file content>", ...}; IDs only, no secrets.
           printf '%s\n' "${PLATFORM_BACKEND_HCL//__STACK__/$STACK}" > backend.hcl
-          jq -er --arg s "$STACK" '.[$s]' <<< "$PLATFORM_TFVARS_JSON" > terraform.tfvars
+          jq -r --arg s "$STACK" '.[$s] // ""' <<< "$PLATFORM_TFVARS_JSON" > terraform.tfvars   # no entry = the stack's defaults
       - name: Plan (read-only, no state lock)
         run: |
           terraform init -backend-config=backend.hcl
