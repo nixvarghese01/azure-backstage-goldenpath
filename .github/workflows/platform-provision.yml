@@ -1,0 +1,104 @@
+# Stands up (or tears down) the shared dev platform in order: 20-shared-dev (AKS, ACR, PostgreSQL,
+# Key Vault, DNS) -> 30-cluster-config (namespaces, Gateway, Workload Identity) -> platform-release
+# (build, scan and deploy Backstage, azure-discovery and the orchestrator into AKS).
+#
+# Each stack runs through platform-apply.yml: static gate, plan, Conftest and Checkov on the plan, then
+# apply that exact plan behind the `platform` environment's required reviewers. 00-bootstrap and the
+# first 10-identities run once from an admin's machine (scripts/bootstrap-platform.sh), because they
+# create the identities this pipeline signs in with.
+name: platform-provision
+run-name: "platform-provision ${{ inputs.action }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: provision (create or update) or teardown (destroy, reverse order)
+        type: choice
+        options: [provision, teardown]
+        default: provision
+      release:
+        description: Deploy Backstage and the platform services after provisioning
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-provision
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Branch and pipeline settings
+        env:
+          REF: ${{ github.ref }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          PLATFORM_CLIENT_ID: ${{ vars.PLATFORM_CLIENT_ID }}
+          PLATFORM_DEPLOY_CLIENT_ID: ${{ vars.PLATFORM_DEPLOY_CLIENT_ID }}
+          PLATFORM_BACKEND_HCL: ${{ vars.PLATFORM_BACKEND_HCL }}
+          PLATFORM_TFVARS_JSON: ${{ vars.PLATFORM_TFVARS_JSON }}
+        run: |
+          [[ "$REF" == refs/heads/develop || "$REF" == refs/heads/main ]] \
+            || { echo "::error::Run from develop (dev platform) or main"; exit 1; }
+          missing=0
+          for v in AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID PLATFORM_CLIENT_ID PLATFORM_DEPLOY_CLIENT_ID \
+                   PLATFORM_BACKEND_HCL PLATFORM_TFVARS_JSON; do
+            [[ -n "${!v}" ]] || { echo "::error::Repository variable $v is not set; run scripts/bootstrap-platform.sh"; missing=1; }
+          done
+          exit "$missing"
+
+  # ---------------- provision: 20 -> 30 -> release ----------------
+  shared:
+    needs: preflight
+    if: inputs.action == 'provision'
+    uses: ./.github/workflows/platform-apply.yml
+    with:
+      stack: 20-shared-dev
+    permissions:
+      contents: read
+      id-token: write
+
+  cluster-config:
+    needs: shared
+    uses: ./.github/workflows/platform-apply.yml
+    with:
+      stack: 30-cluster-config
+    permissions:
+      contents: read
+      id-token: write
+
+  release:
+    needs: cluster-config
+    if: inputs.release
+    uses: ./.github/workflows/platform-release.yml
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
+  # ---------------- teardown: 30 -> 20 (00 and 10 stay; see docs/operations/cleanup.md) ----------------
+  teardown-cluster-config:
+    needs: preflight
+    if: inputs.action == 'teardown'
+    uses: ./.github/workflows/platform-apply.yml
+    with:
+      stack: 30-cluster-config
+      mode: destroy
+    permissions:
+      contents: read
+      id-token: write
+
+  teardown-shared:
+    needs: teardown-cluster-config
+    uses: ./.github/workflows/platform-apply.yml
+    with:
+      stack: 20-shared-dev
+      mode: destroy
+    permissions:
+      contents: read
+      id-token: write

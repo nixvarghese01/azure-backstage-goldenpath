@@ -1,9 +1,10 @@
-# Applies one platform stack, behind the `platform` environment's required reviewers.
-# The orchestrator dispatches this after a platform request PR merges (PLATFORM_PROVISIONING).
+# Applies (or destroys) one platform stack, behind the `platform` environment's required reviewers.
+# The orchestrator dispatches this after a platform request PR merges (PLATFORM_PROVISIONING), and
+# platform-provision.yml calls it once per stack. Runs from develop (dev environment) or main.
 # Order: static gate (fmt, validate, TFLint, Checkov) -> plan -> Conftest + Checkov on the plan ->
 # apply that exact saved plan. Reviewers approve against the plan posted on the merged PR.
 name: platform-apply
-run-name: "platform-apply ${{ inputs.stack }} ${{ inputs.request_id }}"
+run-name: "platform-apply ${{ inputs.stack }} ${{ inputs.mode }} ${{ inputs.request_id }}"
 
 on:
   workflow_dispatch:
@@ -13,6 +14,24 @@ on:
       request_id:
         required: false
         default: ""
+      mode:
+        description: apply, or destroy (teardown)
+        type: choice
+        options: [apply, destroy]
+        default: apply
+  workflow_call:
+    inputs:
+      stack:
+        type: string
+        required: true
+      request_id:
+        type: string
+        required: false
+        default: ""
+      mode:
+        type: string
+        required: false
+        default: apply
 
 permissions:
   contents: read
@@ -29,10 +48,11 @@ env:
   IDP_REQUEST_ID: ${{ inputs.request_id }}
   IDP_CALLBACK_URL: ${{ vars.IDP_CALLBACK_URL }}
   STACK: ${{ inputs.stack }}
+  MODE: ${{ inputs.mode || 'apply' }}
 
 jobs:
   static:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -41,8 +61,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Check the stack name
-        run: '[[ "$STACK" =~ ^[0-9]{2}-[a-z0-9-]+$ && -d "iac/platform/$STACK" ]] || { echo "::error::unknown stack"; exit 1; }'
+      - name: Check the stack name and mode
+        run: |
+          [[ "$STACK" =~ ^[0-9]{2}-[a-z0-9-]+$ && -d "iac/platform/$STACK" ]] || { echo "::error::unknown stack"; exit 1; }
+          [[ "$MODE" == apply || "$MODE" == destroy ]] || { echo "::error::mode must be apply or destroy"; exit 1; }
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.16.5
@@ -99,8 +121,18 @@ jobs:
         run: |
           terraform init -backend-config=backend.hcl
           extra=(); [[ "$STACK" == "30-cluster-config" ]] && extra=(-var=kubelogin_mode=azurecli)
+          [[ "$MODE" == destroy ]] && extra+=(-destroy)
           terraform plan -var-file=terraform.tfvars "${extra[@]}" -out=plan.bin -no-color > /dev/null
           terraform show -json plan.bin > plan.json
+      - name: Plan summary (resource addresses and actions only, no values)
+        run: |
+          summary="$(bash "$GITHUB_WORKSPACE/scripts/ci/plan-summary.sh" plan.json plan.bin)"
+          {
+            echo "### $STACK: $MODE"
+            jq -r '.summary | "\(.add) to add, \(.change) to change, \(.destroy) to destroy"' <<< "$summary"
+            echo
+            jq -r '.summary.resources[]? | "- \(.address): \(.actions | join("/"))"' <<< "$summary"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Plan policy (Conftest)
         run: conftest test plan.json -p "$GITHUB_WORKSPACE/policies/terraform" -d "$GITHUB_WORKSPACE/policies/allowlist.yaml" --namespace main
       - name: Plan misconfiguration scan (Checkov, resolved values)
