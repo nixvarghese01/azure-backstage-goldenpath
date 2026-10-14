@@ -32,8 +32,9 @@ metadata:
   name: nixvarghese01
 spec:
   profile:
-    displayName: Nixon (developer)
-  memberOf: [team-orders]
+    displayName: Nixon (developer and platform approver)
+  # Also an approver so a single person can run the whole demo, including approving the plan.
+  memberOf: [team-orders, platform-approvers]
 ---
 apiVersion: backstage.io/v1alpha1
 kind: User
