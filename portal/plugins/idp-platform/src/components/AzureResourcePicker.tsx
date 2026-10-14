@@ -226,7 +226,7 @@ export const AzureResourcePicker = (props: FieldExtensionComponentProps<Infrastr
   const newRg = value.resourceGroup.mode === 'new' ? 'A new resource group has no existing resources yet.' : undefined;
 
   if (tenants.loading) return <Progress />;
-  if (tenants.error) return <Alert severity="error">Couldn't load Azure tenants: {tenants.error.message}</Alert>;
+  if (tenants.error) return <Alert severity="error">Could not load Azure tenants: {tenants.error.message}</Alert>;
   if (!tenants.value?.length) {
     return <Alert severity="warning">No approved Azure tenant was found. Ask the platform team to check the allowlist.</Alert>;
   }
@@ -260,7 +260,7 @@ export const AzureResourcePicker = (props: FieldExtensionComponentProps<Infrastr
           onSelect={v => onChange({ ...value, ...belowSubscription(value), tenantId: v, managementGroup: undefined })}
           example="The directory the subscriptions belong to, e.g. XY Corp (xycorp.onmicrosoft.com). Preselected when there is only one."
         />
-        {groups.error && <Alert severity="error">Couldn't load management groups: {groups.error.message}</Alert>}
+        {groups.error && <Alert severity="error">Could not load management groups: {groups.error.message}</Alert>}
         <DefaultOrCustomSelect
           label="Management group (landing zone)"
           options={(groups.value ?? []).map(g => ({ value: g.id, label: `${'   '.repeat(g.depth)}${g.depth ? '└ ' : ''}${g.name}` }))}
@@ -269,7 +269,7 @@ export const AzureResourcePicker = (props: FieldExtensionComponentProps<Infrastr
           example={'Landing zone for this application, e.g. Landing zones / Corp for internal apps or Online for '
             + 'internet-facing ones. Groups are owned by the platform team; only groups with approved subscriptions are shown.'}
         />
-        {subs.error && <Alert severity="error">Couldn't load subscriptions: {subs.error.message}</Alert>}
+        {subs.error && <Alert severity="error">Could not load subscriptions: {subs.error.message}</Alert>}
         <ResourceSelect
           label="Subscription"
           value={value.subscription}

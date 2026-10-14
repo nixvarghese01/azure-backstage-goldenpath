@@ -32,11 +32,11 @@ class AzureUnavailableError(InventoryError):
 
 
 class AzureInventory(Protocol):
-    def list_tenants(self) -> list[Tenant]: ...
+    def list_tenants(self) -> list[Tenant]:
+        """Entra tenants the identity can see."""
 
     def list_management_groups(self) -> list[ManagementGroup]:
         """Every management group the identity can read; empty if it can't read any."""
-        ...
 
     def list_subscriptions(self) -> list[Subscription]: ...
 
