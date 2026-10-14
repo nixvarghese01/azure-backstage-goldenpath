@@ -234,7 +234,9 @@ print(json.dumps({
       "keyVault": {"name": kv, "tenantId": tenant},
       "database": {"url": f"postgresql+psycopg://id-idp-orchestrator-{env}@{pg}:5432/orchestrator?sslmode=require"},
       "auth": {"tenantId": tenant, "audience": auth["orchestrator"]["audience"], "allowedCallers": pid["backstage"]},
-      "config": {"discoveryScope": auth["discovery"]["scope"], "backstageScope": auth["backstage"]["scope"]}}),
+      # Single-person demo: the requester may approve in dev only (never prod), recorded as self_approved.
+      "config": {"discoveryScope": auth["discovery"]["scope"], "backstageScope": auth["backstage"]["scope"],
+                 "selfApprovalEnvironments": env if env != "prod" else ""}}),
 }))
 EOF
 )"
