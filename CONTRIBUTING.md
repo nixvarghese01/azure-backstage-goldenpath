@@ -66,6 +66,23 @@ marking the change verified. Do not push or create a pull request without author
 - **Docs stay in sync.** If you change behaviour described in the README or `docs/`, update them in the same pull request.
 - Changes to `.github/workflows/`, `iac/`, `policies/` and `templates/` need the maintainer's review (`CODEOWNERS`).
 
+## Dependency updates
+
+Dependabot proposes minor and patch updates, grouped per ecosystem with a 7-day cooldown. It
+ignores major versions in `/portal` and of the Node base images, because Backstage pins those majors
+itself.
+
+**Upgrading Backstage** is one change for the whole portal:
+
+1. Branch `chore/<issue>-backstage-<version>` from `develop`.
+2. `cd portal && yarn backstage-cli versions:bump`, then `yarn install`.
+3. Follow the [Backstage upgrade helper](https://backstage.github.io/upgrade-helper/) for changes to
+   the app and backend scaffolding.
+4. Run the portal checks above and update the Backstage row in [COMPATIBILITY.md](COMPATIBILITY.md).
+
+**Moving to a new Node.js major** happens only once Backstage lists it in `engines`. Portal, application
+templates and base images move together in one pull request, with an ADR (see `COMPATIBILITY.md`).
+
 ## Adding a new stack
 
 1. Add `templates/applications/<stack>/application/` (rendered by the orchestrator with `[[ ]]` delimiters). Common assets come from `templates/applications/_shared/`; stack files override them.
