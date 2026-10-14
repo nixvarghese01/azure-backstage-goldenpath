@@ -7,8 +7,10 @@ aks = {
   name     = "aks-idp-shared-dev"
   sku_tier = "Free"
   system_pool = {
-    vm_size    = "Standard_D2s_v5"
+    vm_size    = "Standard_B2s" # cheapest size AKS accepts for a system pool
     node_count = 1
+    # 30 GB P4 instead of the 128 GB default: same function, about a quarter of the disk cost.
+    os_disk_size_gb = 30
   }
   # Uncomment for HA-eligible clusters (needs quota for 3 more vCPU x nodes):
   # user_pool = { vm_size = "Standard_D2s_v5", node_count = 3, zones = ["1", "2", "3"] }

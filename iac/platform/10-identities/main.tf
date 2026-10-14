@@ -126,7 +126,12 @@ module "platform" {
   name                = "id-idp-platform-${var.environment}"
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
-  subjects            = { "platform-apply" = "repo:${local.platform_repo}:environment:platform" }
+  subjects = {
+    "platform-apply" = "repo:${local.platform_repo}:environment:platform"
+    # Destroy-only runs (platform-provision teardown, platform-ttl): no reviewers, so a forgotten
+    # dev platform is always removed on time.
+    "platform-teardown" = "repo:${local.platform_repo}:environment:platform-teardown"
+  }
   tags                = local.tags
 }
 

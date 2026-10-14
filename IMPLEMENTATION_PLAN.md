@@ -246,7 +246,7 @@ Each phase lists **tasks**, **deliverables** and **exit criteria**. Exit criteri
 
 **Tasks**
 
-- [ ] Create the **free Azure subscription** now, as late as possible so the 30-day credit covers Phases 4–6: set budget alerts, register resource providers, and check or raise the regional vCPU quota ([demo-environment.md §5](docs/operations/demo-environment.md#5-preparation-checklist)).
+- [ ] Create the **free Azure subscription** now, as late as possible so the 30-day credit covers Phases 4–6: set budget alerts, register resource providers, and check or raise the regional vCPU quota ([demo-environment.md §6](docs/operations/demo-environment.md#6-preparation-checklist)).
 - [ ] Discovery endpoints from the README, using Resource Graph (with skip-token paging), the subscriptions client, and the allowlist filter.
 - [ ] Typed errors for permission denied, not found and throttled responses; retries with backoff.
 - [ ] `POST /v1/validate` for complete selection sets, used by the orchestrator.

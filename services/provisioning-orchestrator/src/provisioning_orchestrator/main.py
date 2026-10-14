@@ -215,7 +215,8 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
         req = load(s, request_id, lock=True)
         if not user.in_group(settings.approver_group):
             raise _forbidden("not_approver", "You are not an approver for this environment.")
-        if user.user_ref == req.requested_by:
+        self_approval = user.user_ref == req.requested_by
+        if self_approval and req.environment not in settings.self_approval_environments:
             raise _forbidden("separation_of_duties", "You can't approve your own request.")
         destroy = req.state == State.CLEANUP_PENDING and req.cleanup.get("stage") == "awaiting_approval"
         if req.state != State.AWAITING_APPROVAL and not destroy:
@@ -231,6 +232,7 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
             "hash": body.plan_hash,
             "comment": body.comment,
             "mode": req.plan.get("mode", "apply"),
+            "self_approved": self_approval,
         }
         audit(
             s,
@@ -238,6 +240,7 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
             user.user_ref,
             "approval_decided",
             decision=body.decision,
+            self_approved=self_approval,
             plan_hash=body.plan_hash,
             comment=body.comment,
             summary=req.plan.get("summary"),

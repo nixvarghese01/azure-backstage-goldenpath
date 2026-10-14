@@ -24,6 +24,9 @@ config:
   discoveryScope: ""      # api://idp-discovery/.default
   backstageScope: ""      # api://idp-backstage/.default
   approverGroup: group:default/platform-approvers
+  # Comma-separated environments where approvers may approve their own request (single-person demos).
+  # Empty = separation of duties everywhere. "prod" is always ignored.
+  selfApprovalEnvironments: ""
 hooks:
   host: platform-hooks.dev.xycorp.local
   gateway: { name: idp-gateway, namespace: idp-gateway }

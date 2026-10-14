@@ -40,7 +40,7 @@ Options the subscription can't support are **disabled in the form, with the reas
 | Resource | Demo choice | Why |
 |---|---|---|
 | Region | One allowlisted region with AKS 1.36 and enough quota, for example `uksouth` | Single region keeps cost and quota simple |
-| AKS | **Free tier** control plane (no uptime SLA), **1 system node pool, 1–2 small nodes** (at least 2 vCPU / 4 GiB per node, as AKS requires for system pools), Azure CNI Overlay | Fits a small vCPU quota. The platform and the demo app share the pool |
+| AKS | **Free tier** control plane (no uptime SLA), **1 system node: `Standard_B2s`** (2 vCPU / 4 GiB, the minimum AKS accepts for a system pool) with a **30 GB OS disk**, Azure CNI Overlay | Fits a small vCPU quota. The platform and the demo app share the node; services run one replica each |
 | Ingress | App Routing Gateway API with **one** shared Gateway, so one public IP and load balancer | [ADR-0003](../adr/0003-ingress-gateway-api.md) |
 | ACR | **Basic** | Enough for a few images |
 | PostgreSQL | Azure Database for PostgreSQL flexible server, **smallest Burstable** size, no HA, minimum storage | Platform state for Backstage and the orchestrator |
@@ -49,7 +49,41 @@ Options the subscription can't support are **disabled in the form, with the reas
 | DNS | One Azure DNS zone, or the Gateway's IP address with a `nip.io`-style hostname if you don't own a domain | Avoids buying a domain for the demo |
 | Not used | NAT gateway, Azure Firewall, Application Gateway, private endpoints, Log Analytics retention beyond the default | Not needed for the demo, and they add cost |
 
-## 5. Preparation checklist
+## 5. Cost estimate and lifecycle
+
+Public retail prices for `uksouth`, checked on 2026-10-14 (USD, before any free-service allowance). They
+change; re-check with the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/)
+before relying on them.
+
+| Resource | Sizing | USD per hour |
+|---|---|---|
+| AKS control plane | Free tier | 0 |
+| AKS node | 1 × `Standard_B2s` | 0.047 |
+| Node OS disk | 30 GB Premium SSD (P4); the 128 GB default would be 0.027 | 0.007 |
+| Standard load balancer | AKS outbound and the Gateway | 0.025 |
+| Public IPs | 2 × Standard | 0.010 |
+| Container registry | Basic (0.17 per day) | 0.007 |
+| PostgreSQL | B1ms and 32 GB; may be covered by the free-services allowance | 0.025 |
+| Key Vault, storage, identities | Per operation; state is a few KB | ~0 |
+| **While running** | | **≈ 0.12 (≈ 2.90 per day)** |
+
+**Nothing is left running by accident:**
+
+1. **Time-to-live.** Every `platform-provision` run sets `ttl_hours` (2, 4, 8 or 24; default 4). The
+   hourly `platform-ttl` workflow destroys `30-cluster-config` and `20-shared-dev` once it expires. That
+   run uses the `platform-teardown` environment, which has no reviewers, so it never waits for a person.
+   A 4-hour session costs about USD 0.50 of credit.
+2. **Spending limit.** `scripts/bootstrap-platform.sh` and `platform-provision` refuse to create
+   resources unless the subscription's spending limit is on. Usage then comes out of the credit, and
+   the subscription is disabled rather than billed when the credit ends. A paid subscription needs an
+   explicit opt-in (`ALLOW_BILLED_SUBSCRIPTION=true`).
+3. **What stays after teardown:** the state storage account, identities and app registrations from
+   `00-bootstrap` and `10-identities`, costing about USD 0 per day, so the next provision takes minutes.
+   [cleanup.md](cleanup.md) removes those too.
+
+To end a session early, run `platform-provision` with `action: teardown`.
+
+## 6. Preparation checklist
 
 1. Create the free account and subscription. **Set a budget with alerts** at low thresholds (*Cost Management → Budgets*).
 2. Register the resource providers: `Microsoft.ContainerService`, `Microsoft.ContainerRegistry`, `Microsoft.KeyVault`, `Microsoft.DBforPostgreSQL`, `Microsoft.Network`, `Microsoft.Storage`, `Microsoft.ManagedIdentity`. Also register the `EncryptionAtHost` feature, which AKS node pools use for host encryption: `az feature register --namespace Microsoft.Compute --name EncryptionAtHost`, wait until `az feature show` reports `Registered`, then run `az provider register -n Microsoft.Compute`.
@@ -84,7 +118,7 @@ public `.local` zone, and macOS and many Linux desktops send `.local` lookups to
 entries are the most reliable option there. Use a domain you own (and a public zone) when applications must
 be reachable from the internet.
 
-## 6. Timing
+## 7. Timing
 
 - Plan to **build and record the demo within the 30-day credit window**. Most development (Phases 2–4) runs locally with mocked Azure adapters and uses no Azure resources at all.
 - If you need Azure after day 30, upgrade to pay-as-you-go **with the budget alerts already in place**. Keep the shared resources up only while you're actively using them.

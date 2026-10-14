@@ -6,8 +6,11 @@
 # apply that exact plan behind the `platform` environment's required reviewers. 00-bootstrap and the
 # first 10-identities run once from an admin's machine (scripts/bootstrap-platform.sh), because they
 # create the identities this pipeline signs in with.
+#
+# Every provision has a lifetime (ttl_hours). platform-ttl.yml destroys the stacks when it expires, so
+# a forgotten dev platform doesn't keep using the subscription's credit. The run name records the TTL.
 name: platform-provision
-run-name: "platform-provision ${{ inputs.action }}"
+run-name: "platform-provision ${{ inputs.action }} ttl=${{ inputs.ttl_hours || 'n/a' }}h"
 
 on:
   workflow_dispatch:
@@ -21,6 +24,22 @@ on:
         description: Deploy Backstage and the platform services after provisioning
         type: boolean
         default: true
+      ttl_hours:
+        description: Hours until platform-ttl destroys the platform again
+        type: choice
+        options: ["2", "4", "8", "24"]
+        default: "4"
+  workflow_call:   # platform-ttl.yml calls this with action=teardown
+    inputs:
+      action:
+        type: string
+        required: true
+      release:
+        type: boolean
+        default: false
+      ttl_hours:
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -52,10 +71,35 @@ jobs:
           done
           exit "$missing"
 
+  # Provisioning only: refuse a subscription that can be billed (Free Trial spending limit off).
+  # Teardown is never blocked, because removing resources only lowers cost.
+  cost-guard:
+    needs: preflight
+    if: inputs.action == 'provision' && vars.ALLOW_BILLED_SUBSCRIPTION != 'true'
+    runs-on: ubuntu-24.04
+    environment: platform-plan   # read-only identity
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.PLATFORM_PLAN_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Spending limit must be on
+        env:
+          SUB: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          policies="$(az rest --method get --url "https://management.azure.com/subscriptions/${SUB}?api-version=2022-12-01" --query subscriptionPolicies -o json)"
+          limit="$(jq -r '.spendingLimit // "unknown"' <<< "$policies")"
+          echo "Spending limit: ${limit} ($(jq -r '.quotaId // "unknown"' <<< "$policies"))" >> "$GITHUB_STEP_SUMMARY"
+          [[ "$limit" == On ]] || { echo "::error::Spending limit is ${limit}: this subscription can be billed. Set the repository variable ALLOW_BILLED_SUBSCRIPTION=true to allow it."; exit 1; }
+
   # ---------------- provision: 20 -> 30 -> release ----------------
   shared:
-    needs: preflight
-    if: inputs.action == 'provision'
+    needs: [preflight, cost-guard]
+    if: inputs.action == 'provision' && !cancelled() && needs.preflight.result == 'success' && needs.cost-guard.result != 'failure'
     uses: ./.github/workflows/platform-apply.yml
     with:
       stack: 20-shared-dev
@@ -93,8 +137,11 @@ jobs:
       contents: read
       id-token: write
 
+  # Runs even if the cluster-config destroy failed (for example the cluster was already gone): the
+  # shared stack is where the cost is.
   teardown-shared:
-    needs: teardown-cluster-config
+    needs: [preflight, teardown-cluster-config]
+    if: inputs.action == 'teardown' && !cancelled() && needs.preflight.result == 'success'
     uses: ./.github/workflows/platform-apply.yml
     with:
       stack: 20-shared-dev

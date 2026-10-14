@@ -66,7 +66,8 @@ Azure discovery and the orchestrator use mock integrations. The catalog, resourc
 platform APIs can be explored locally; the scaffolder's built-in GitHub publishing/environment
 actions still require real GitHub App configuration. This stack does not simulate GitHub Actions,
 Terraform apply or AKS deployment, and cannot complete a live golden path without those integrations.
-The guest developer cannot approve their own request.
+The guest developer cannot approve their own request, unless you set
+`ORCHESTRATOR_SELF_APPROVAL_ENVIRONMENTS=dev` in `.env` for a single-person demo.
 
 `webhook-secret.dev` is a public, throwaway local placeholder mounted as a file. Real credentials
 belong outside the repository or in the ignored `deploy/local/secrets/` directory. Do not reuse

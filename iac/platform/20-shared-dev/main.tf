@@ -46,7 +46,8 @@ variable "aks" {
   type = object({
     name     = string
     sku_tier = optional(string, "Free")
-    system_pool = optional(object({ vm_size = string, node_count = number, zones = optional(list(string), []) }),
+    system_pool = optional(object({ vm_size = string, node_count = number, zones = optional(list(string), []),
+      os_disk_size_gb = optional(number) }),
     { vm_size = "Standard_D2s_v5", node_count = 1 })
     user_pool = optional(object({ vm_size = string, node_count = number, zones = list(string) }), null)
   })
