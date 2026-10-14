@@ -33,7 +33,8 @@ metadata:
 spec:
   profile:
     displayName: Nixon (developer and platform approver)
-  # Also an approver so a single person can run the whole demo, including approving the plan.
+  # Also an approver: can approve other people's requests. Separation of duties still stops anyone
+  # approving their own request (provisioning-orchestrator), so Ancy approves Nixon's.
   memberOf: [team-orders, platform-approvers]
 ---
 apiVersion: backstage.io/v1alpha1
