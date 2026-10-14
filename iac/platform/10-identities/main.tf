@@ -441,6 +441,23 @@ resource "azuread_service_principal" "audience" {
   owners    = [data.azuread_client_config.current.object_id]
 }
 
+# ------------------------------------------------------------------ AKS admin group for automation
+# The clusters use Kubernetes RBAC with Entra ID: cluster-admin comes only from the groups in
+# admin_group_object_ids (20-shared-dev). The platform identity applies 30-cluster-config (namespaces,
+# Gateway, RBAC), so it is the only member of this group. Humans use their own break-glass group.
+resource "azuread_group" "aks_platform_admins" {
+  display_name     = "idp-aks-platform-${var.environment}"
+  description      = "Cluster-admin on the IDP's AKS clusters for the platform pipeline identity only."
+  security_enabled = true
+  owners           = [data.azuread_client_config.current.object_id]
+  members          = [module.platform.principal_id]
+}
+
+output "aks_platform_admin_group_id" {
+  description = "Add to admin_group_object_ids in 20-shared-dev."
+  value       = azuread_group.aks_platform_admins.object_id
+}
+
 output "service_auth" {
   description = "Per service: the Entra audience to validate (aud) and the scope callers request."
   value = {
