@@ -21,6 +21,9 @@
 # Needs: az, gh, terraform ~> 1.16, python3. Inputs: iac/platform/{10-identities,20-shared-dev,
 # 30-cluster-config}/terraform.tfvars, copied from the .example files with your IDs.
 set -euo pipefail
+# Git Bash rewrites arguments that look like paths (e.g. --scope /subscriptions/...) into Windows
+# paths; Azure then answers MissingSubscription. Keep them as written.
+export MSYS_NO_PATHCONV=1
 
 STEP="${1:-}"; shift || true
 ENVIRONMENT="dev"
