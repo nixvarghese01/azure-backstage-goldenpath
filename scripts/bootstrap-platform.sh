@@ -21,6 +21,9 @@
 # Needs: az, gh, terraform ~> 1.16, python3. Inputs: iac/platform/{10-identities,20-shared-dev,
 # 30-cluster-config}/terraform.tfvars, copied from the .example files with your IDs.
 set -euo pipefail
+# Git Bash rewrites arguments that look like paths (e.g. --scope /subscriptions/...) into Windows
+# paths; Azure then answers MissingSubscription. Keep them as written.
+export MSYS_NO_PATHCONV=1
 
 STEP="${1:-}"; shift || true
 ENVIRONMENT="dev"
@@ -44,7 +47,8 @@ PROVIDERS=(Microsoft.ContainerService Microsoft.ContainerRegistry Microsoft.KeyV
 ok() { printf '  \033[32mok\033[0m   %s\n' "$*"; }
 warn() { printf '  \033[33mwarn\033[0m %s\n' "$*"; }
 fail() { printf '  \033[31mfail\033[0m %s\n' "$*"; FAILED=1; }
-json() { "$PY" -c "import json,sys; d=json.load(sys.stdin); print(eval(sys.argv[1], {'d': d}))" "$1"; }
+# Strip carriage returns: Python on Windows (Git Bash) prints CRLF, which breaks arithmetic and tests.
+json() { "$PY" -c "import json,sys; d=json.load(sys.stdin); print(eval(sys.argv[1], {'d': d}))" "$1" | tr -d '\r'; }
 
 # State storage name, from 10-identities' inputs (the single place it is configured).
 state_account() {
@@ -110,9 +114,10 @@ preflight() {
   [[ "$s" == Registered ]] && ok "feature EncryptionAtHost" || warn "feature EncryptionAtHost: $s (run: $0 providers)"
 
   local vm family
-  vm="$(sed -nE 's/^ *vm_size *= *"([^"]+)".*//p' "${PLATFORM}/20-shared-dev/terraform.tfvars" 2>/dev/null | head -1)"
+  vm="$(sed -nE 's/^ *vm_size *= *"([^"]+)".*/\1/p' "${PLATFORM}/20-shared-dev/terraform.tfvars" 2>/dev/null | head -1)"
   vm="${vm:-Standard_D2s_v5}"
   case "$vm" in
+    Standard_B*_v2) family=standardBsv2Family ;;
     Standard_B*) family=standardBSFamily ;;
     Standard_D*as_v5) family=standardDASv5Family ;;
     *) family=standardDSv5Family ;;
@@ -213,7 +218,7 @@ EOF
   local tfv="${PLATFORM}/20-shared-dev/terraform.tfvars"
   setvar ACR_NAME "$(sed -nE '/^acr *=/,/^}/ s/^ *name *= *"([^"]+)".*/\1/p' "$tfv" | head -1)"
   setvar AKS_NAME "$(sed -nE '/^aks *=/,/^}/ s/^ *name *= *"([^"]+)".*/\1/p' "$tfv" | head -1)"
-  setvar AKS_RESOURCE_GROUP "rg-idp-platform-${ENVIRONMENT}"
+  setvar AKS_RESOURCE_GROUP "rg-idp-aks-${ENVIRONMENT}"
   local outputs; outputs="$(mktemp)"; printf '%s' "$out" > "$outputs"
   setvar PLATFORM_CHART_VALUES_JSON "$("$PY" - "$tfv" "$ENVIRONMENT" "$outputs" <<'EOF'
 import json, re, sys

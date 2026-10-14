@@ -94,14 +94,26 @@ variable "key_vault_name" {
   default = "kv-idp-plat-dev"
 }
 
+variable "tags" {
+  description = "Extra or overriding tags, e.g. the organisation tags a landing zone policy requires."
+  type        = map(string)
+  default     = {}
+}
+
 locals {
-  tags = {
-    "managed-by"  = "idp-platform"
-    "environment" = var.environment
-    "lifecycle"   = "platform"
-    "application" = "idp-platform"
-    "owner"       = "platform-team"
-  }
+  # CAF tagging. var.tags adds or overrides organisation tags (costCenter, criticality, ...); the
+  # landing zone may require some of them on resource groups.
+  tags = merge({
+    "managed-by"         = "idp-platform"
+    "workload"           = "idp"
+    "environment"        = var.environment
+    "lifecycle"          = "platform"
+    "application"        = "idp-platform"
+    "owner"              = "platform-team"
+    "costCenter"         = "platform"
+    "criticality"        = "low"
+    "dataClassification" = "internal"
+  }, var.tags)
   platform_repo = "${var.github_org}/${var.platform_repo}"
   reusable      = "${var.github_org}/${var.platform_repo}/.github/workflows"
   app_subject = {
@@ -120,6 +132,26 @@ resource "azurerm_resource_group" "identities" {
   tags     = local.tags
 }
 
+# Workload groups, one per function (CAF). Created here, empty, so the pipeline identities get rights
+# inside them only and never on the whole subscription, which may hold other workloads. 20-shared-dev
+# fills them; teardown empties them.
+locals {
+  workload_groups = {
+    aks      = "platform"
+    registry = "platform"
+    data     = "platform"
+    network  = "platform"
+    apps     = "application"
+  }
+}
+
+resource "azurerm_resource_group" "workload" {
+  for_each = local.workload_groups
+  name     = "rg-idp-${each.key}-${var.environment}"
+  location = var.location
+  tags     = merge(local.tags, { "lifecycle" = each.value })
+}
+
 # ------------------------------------------------------------------ GitHub-federated identities
 module "platform" {
   source              = "../../modules/github-oidc-identity"
@@ -132,7 +164,7 @@ module "platform" {
     # dev platform is always removed on time.
     "platform-teardown" = "repo:${local.platform_repo}:environment:platform-teardown"
   }
-  tags                = local.tags
+  tags = local.tags
 }
 
 module "platform_plan" {
@@ -273,11 +305,19 @@ resource "azurerm_role_assignment" "secret_reader" {
 # only usable from platform-apply.yml behind the `platform` environment's required reviewers.
 resource "azurerm_role_assignment" "platform" {
   for_each = {
-    contributor = "Contributor"
-    rbac        = "Role Based Access Control Administrator"
+    for pair in setproduct(keys(local.workload_groups), ["Contributor", "Role Based Access Control Administrator"]) :
+    "${pair[0]}-${pair[1] == "Contributor" ? "contributor" : "rbac"}" => { group = pair[0], role = pair[1] }
   }
+  scope                = azurerm_resource_group.workload[each.value.group].id
+  role_definition_name = each.value.role
+  principal_id         = module.platform.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+# Reads outside its groups (identities, the subscription's capabilities); no write anywhere else.
+resource "azurerm_role_assignment" "platform_reader" {
   scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
-  role_definition_name = each.value
+  role_definition_name = "Reader"
   principal_id         = module.platform.principal_id
   principal_type       = "ServicePrincipal"
 }
@@ -287,6 +327,82 @@ resource "azurerm_role_assignment" "platform_plan_reader" {
   role_definition_name = "Reader"
   principal_id         = module.platform_plan.principal_id
   principal_type       = "ServicePrincipal"
+}
+
+# ------------------------------------------------------------------ provisioning identity scope
+# Applied by an admin with this stack (creating a role definition needs roleDefinitions/write, which
+# the pipeline identities don't have). Generated repositories use these rights through
+# reusable-terraform.yml: a narrow custom role, and RBAC Administrator limited by ABAC to three roles.
+locals {
+  # Roles the provisioning identity may hand out (ABAC condition on RBAC Administrator).
+  assignable_role_ids = [
+    "ba92f5b4-2d11-453d-a403-e96b0029c9fe", # Storage Blob Data Contributor
+    "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1", # Storage Blob Data Reader
+    "4633458b-17de-408a-b874-0445c86b69e6", # Key Vault Secrets User
+  ]
+  rbac_condition = <<-EOT
+    (
+     (
+      !(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})
+     )
+     OR
+     (
+      @Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${join(", ", local.assignable_role_ids)}}
+     )
+    )
+    AND
+    (
+     (
+      !(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})
+     )
+     OR
+     (
+      @Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${join(", ", local.assignable_role_ids)}}
+     )
+    )
+  EOT
+}
+
+# Narrow custom role for application infrastructure (create-new RG, identities, storage, key vault).
+resource "azurerm_role_definition" "app_provisioner" {
+  name        = "IDP App Provisioner (${var.environment})"
+  scope       = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+  description = "Creates application infrastructure for the IDP golden path. No compute, network or RBAC beyond the conditioned assignment role."
+  permissions {
+    actions = [
+      "*/read",
+      "Microsoft.Resources/subscriptions/resourceGroups/write",
+      "Microsoft.Resources/subscriptions/resourceGroups/delete",
+      "Microsoft.Resources/deployments/*",
+      "Microsoft.ManagedIdentity/userAssignedIdentities/*",
+      "Microsoft.Storage/storageAccounts/*",
+      "Microsoft.KeyVault/vaults/*",
+      "Microsoft.ContainerService/managedClusters/listClusterUserCredential/action",
+    ]
+    not_actions = [
+      "Microsoft.Storage/storageAccounts/listKeys/action",
+      "Microsoft.Storage/storageAccounts/regenerateKey/action",
+    ]
+  }
+  assignable_scopes = ["/subscriptions/${data.azurerm_client_config.current.subscription_id}"]
+}
+
+# Applications land in the approved apps group: on a shared subscription the golden path can't
+# create resource groups or touch anything outside rg-idp-apps-<env>.
+resource "azurerm_role_assignment" "provisioning_app_provisioner" {
+  scope              = azurerm_resource_group.workload["apps"].id
+  role_definition_id = azurerm_role_definition.app_provisioner.role_definition_resource_id
+  principal_id       = module.provisioning.principal_id
+  principal_type     = "ServicePrincipal"
+}
+
+resource "azurerm_role_assignment" "provisioning_rbac_admin" {
+  scope                = azurerm_resource_group.workload["apps"].id
+  role_definition_name = "Role Based Access Control Administrator"
+  principal_id         = module.provisioning.principal_id
+  principal_type       = "ServicePrincipal"
+  condition_version    = "2.0"
+  condition            = local.rbac_condition
 }
 
 # ------------------------------------------------------------------ Entra app registrations (token audiences)
@@ -346,6 +462,11 @@ output "principal_ids" {
     discovery       = azurerm_user_assigned_identity.service["discovery"].principal_id
     orchestrator    = azurerm_user_assigned_identity.service["orchestrator"].principal_id
   }
+}
+
+output "resource_groups" {
+  description = "Workload resource groups the pipelines may change."
+  value       = { for k, g in azurerm_resource_group.workload : k => g.name }
 }
 
 output "key_vault_name" {

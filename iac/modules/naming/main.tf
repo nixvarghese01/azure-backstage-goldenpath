@@ -53,12 +53,23 @@ variable "lifecycle_scope" {
   }
 }
 
+variable "extra_tags" {
+  description = <<-EOT
+    Organisation tags required by the landing zone, e.g. costCenter, criticality, dataClassification
+    (Cloud Adoption Framework tagging). Applied last, so they can't remove the standard tags below.
+  EOT
+  type        = map(string)
+  default     = {}
+}
+
 locals {
   compact = replace(var.application, "-", "")
 
   tags = merge(
+    var.extra_tags,
     {
       "managed-by"        = "idp-platform"
+      "workload"          = var.application # CAF: the workload a resource belongs to
       "application"       = var.application
       "owner"             = var.owner
       "environment"       = var.environment

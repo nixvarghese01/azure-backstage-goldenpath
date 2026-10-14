@@ -59,6 +59,16 @@ variable "user_pool" {
   default = null
 }
 
+variable "node_resource_group" {
+  description = <<-EOT
+    Name of the resource group AKS creates for nodes, disks and the load balancer. null = Azure's
+    MC_<group>_<cluster>_<region>. Set it to follow the landing zone's naming; AKS copies the cluster's
+    tags onto this group, which a "require tags on resource groups" policy needs.
+  EOT
+  type        = string
+  default     = null
+}
+
 variable "api_server_authorized_ip_ranges" {
   description = "CIDRs allowed to reach the API server. Empty = public API (GitHub-hosted runners)."
   type        = list(string)
@@ -83,6 +93,7 @@ resource "azurerm_kubernetes_cluster" "this" {
   #checkov:skip=CKV_AZURE_4:Container Insights needs a Log Analytics workspace (ingestion cost); not enabled in the demo.
   name                      = var.name
   location                  = var.location
+  node_resource_group       = var.node_resource_group
   resource_group_name       = var.resource_group_name
   dns_prefix                = var.name
   kubernetes_version        = var.kubernetes_version

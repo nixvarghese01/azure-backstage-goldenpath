@@ -343,7 +343,7 @@ export const AzureResourcePicker = (props: FieldExtensionComponentProps<Infrastr
           newHelp="A new cluster is a shared platform resource: it is added through a platform pull request and approved by the platform team."
           describe={r => `in ${r.resource_group ?? '?'}, ${r.zones ?? 0} zone(s)${r.ha_eligible ? ', HA-eligible' : ''}`}
           existingDisabledReason={mustBeNew}
-          example={`Most applications use the shared cluster, e.g. aks-idp-shared-${environment} in rg-idp-platform-${environment}.`} />
+          example={`Most applications use the shared cluster, e.g. aks-idp-shared-${environment} in rg-idp-aks-${environment}.`} />
         <ResourceSelect label="Container registry (shared)" value={value.containerRegistry} onChange={s => set('containerRegistry', s)}
           options={registries.value} capability={cap('containerRegistry')} suggestedName={`acridp${environment}2`}
           newHelp="5-50 letters or digits. Added through a platform pull request."

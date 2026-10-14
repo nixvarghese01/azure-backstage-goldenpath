@@ -33,7 +33,7 @@ variable "cluster_name" {
 
 variable "cluster_resource_group" {
   type    = string
-  default = "rg-idp-platform-dev"
+  default = "rg-idp-aks-dev"
 }
 
 variable "identity_resource_group" {

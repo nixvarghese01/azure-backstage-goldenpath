@@ -25,7 +25,6 @@ provider "azurerm" {
 provider "azapi" {}
 
 data "azurerm_client_config" "current" {}
-data "azurerm_subscription" "current" {}
 
 variable "environment" {
   type    = string
@@ -94,14 +93,26 @@ variable "identity_resource_group" {
   default = "rg-idp-identities-dev"
 }
 
+variable "tags" {
+  description = "Extra or overriding tags, e.g. the organisation tags a landing zone policy requires."
+  type        = map(string)
+  default     = {}
+}
+
 locals {
-  tags = {
-    "managed-by"  = "idp-platform"
-    "environment" = var.environment
-    "lifecycle"   = "platform"
-    "application" = "idp-platform"
-    "owner"       = "platform-team"
-  }
+  # CAF tagging. var.tags adds or overrides organisation tags (costCenter, criticality, ...); the
+  # landing zone may require some of them on resource groups.
+  tags = merge({
+    "managed-by"         = "idp-platform"
+    "workload"           = "idp"
+    "environment"        = var.environment
+    "lifecycle"          = "platform"
+    "application"        = "idp-platform"
+    "owner"              = "platform-team"
+    "costCenter"         = "platform"
+    "criticality"        = "low"
+    "dataClassification" = "internal"
+  }, var.tags)
   extra_clusters = {
     for f in fileset(path.module, "clusters.d/*.json") :
     trimsuffix(basename(f), ".json") => jsondecode(file("${path.module}/${f}"))
@@ -119,24 +130,20 @@ data "azurerm_user_assigned_identity" "id" {
   resource_group_name = var.identity_resource_group
 }
 
-# ------------------------------------------------------------------ resource groups
-resource "azurerm_resource_group" "platform" {
-  name     = "rg-idp-platform-${var.environment}"
-  location = var.location
-  tags     = local.tags
-}
-
-resource "azurerm_resource_group" "apps" {
-  name     = "rg-idp-apps-${var.environment}"
-  location = var.location
-  tags     = merge(local.tags, { "lifecycle" = "application" })
+# ------------------------------------------------------------------ resource groups from 10-identities
+# One group per function (CAF). 10-identities creates them, so the pipeline's platform identity only
+# needs rights inside them, not on the subscription. Teardown empties them; the empty groups stay.
+data "azurerm_resource_group" "rg" {
+  for_each = toset(["aks", "registry", "data", "network", "apps"])
+  name     = "rg-idp-${each.key}-${var.environment}"
 }
 
 # ------------------------------------------------------------------ AKS
 module "aks" {
   source                 = "../../modules/aks-cluster"
   name                   = var.aks.name
-  resource_group_name    = azurerm_resource_group.platform.name
+  resource_group_name    = data.azurerm_resource_group.rg["aks"].name
+  node_resource_group    = "rg-idp-aks-nodes-${var.environment}"
   location               = var.location
   sku_tier               = var.aks.sku_tier
   tenant_id              = data.azurerm_client_config.current.tenant_id
@@ -150,7 +157,8 @@ module "extra_aks" {
   for_each               = local.extra_clusters
   source                 = "../../modules/aks-cluster"
   name                   = each.key
-  resource_group_name    = azurerm_resource_group.platform.name
+  resource_group_name    = data.azurerm_resource_group.rg["aks"].name
+  node_resource_group    = "rg-idp-aks-nodes-${each.key}"
   location               = try(each.value.location, var.location)
   sku_tier               = try(each.value.zonal, false) ? "Standard" : "Free"
   tenant_id              = data.azurerm_client_config.current.tenant_id
@@ -169,7 +177,7 @@ locals {
 module "acr" {
   source              = "../../modules/container-registry"
   name                = var.acr.name
-  resource_group_name = azurerm_resource_group.platform.name
+  resource_group_name = data.azurerm_resource_group.rg["registry"].name
   location            = var.location
   sku                 = var.acr.sku
   tags                = local.tags
@@ -179,7 +187,7 @@ module "extra_acr" {
   for_each            = local.extra_registries
   source              = "../../modules/container-registry"
   name                = each.key
-  resource_group_name = azurerm_resource_group.platform.name
+  resource_group_name = data.azurerm_resource_group.rg["registry"].name
   location            = try(each.value.location, var.location)
   tags                = merge(local.tags, { "request-id" = try(each.value.request_id, "") })
 }
@@ -192,7 +200,7 @@ locals {
 module "postgres" {
   source              = "../../modules/postgresql-flexible"
   name                = var.postgres_name
-  resource_group_name = azurerm_resource_group.platform.name
+  resource_group_name = data.azurerm_resource_group.rg["data"].name
   location            = var.location
   tenant_id           = data.azurerm_client_config.current.tenant_id
   allowed_ips         = var.postgres_allowed_ips
@@ -208,7 +216,7 @@ module "postgres" {
 resource "azurerm_dns_zone" "apps" {
   count               = var.dns_zone_name == null ? 0 : 1
   name                = var.dns_zone_name
-  resource_group_name = azurerm_resource_group.platform.name
+  resource_group_name = data.azurerm_resource_group.rg["network"].name
   tags                = local.tags
 }
 
@@ -216,82 +224,16 @@ resource "azurerm_dns_zone" "apps" {
 module "shared_storage" {
   source              = "../../modules/storage-account"
   name                = var.shared_storage_name
-  resource_group_name = azurerm_resource_group.apps.name
+  resource_group_name = data.azurerm_resource_group.rg["apps"].name
   location            = var.location
   containers          = ["shared"]
   tags                = merge(local.tags, { "lifecycle" = "application", "application" = "shared" })
 }
 
 # ------------------------------------------------------------------ role assignments
-locals {
-  # Roles the provisioning identity may hand out (ABAC condition on RBAC Administrator).
-  assignable_role_ids = [
-    "ba92f5b4-2d11-453d-a403-e96b0029c9fe", # Storage Blob Data Contributor
-    "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1", # Storage Blob Data Reader
-    "4633458b-17de-408a-b874-0445c86b69e6", # Key Vault Secrets User
-  ]
-  rbac_condition = <<-EOT
-    (
-     (
-      !(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})
-     )
-     OR
-     (
-      @Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${join(", ", local.assignable_role_ids)}}
-     )
-    )
-    AND
-    (
-     (
-      !(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})
-     )
-     OR
-     (
-      @Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${join(", ", local.assignable_role_ids)}}
-     )
-    )
-  EOT
-}
-
-# Narrow custom role for application infrastructure (create-new RG, identities, storage, key vault).
-resource "azurerm_role_definition" "app_provisioner" {
-  name        = "IDP App Provisioner (${var.environment})"
-  scope       = data.azurerm_subscription.current.id
-  description = "Creates application infrastructure for the IDP golden path. No compute, network or RBAC beyond the conditioned assignment role."
-  permissions {
-    actions = [
-      "*/read",
-      "Microsoft.Resources/subscriptions/resourceGroups/write",
-      "Microsoft.Resources/subscriptions/resourceGroups/delete",
-      "Microsoft.Resources/deployments/*",
-      "Microsoft.ManagedIdentity/userAssignedIdentities/*",
-      "Microsoft.Storage/storageAccounts/*",
-      "Microsoft.KeyVault/vaults/*",
-      "Microsoft.ContainerService/managedClusters/listClusterUserCredential/action",
-    ]
-    not_actions = [
-      "Microsoft.Storage/storageAccounts/listKeys/action",
-      "Microsoft.Storage/storageAccounts/regenerateKey/action",
-    ]
-  }
-  assignable_scopes = [data.azurerm_subscription.current.id]
-}
-
-resource "azurerm_role_assignment" "provisioning_app_provisioner" {
-  scope              = data.azurerm_subscription.current.id
-  role_definition_id = azurerm_role_definition.app_provisioner.role_definition_resource_id
-  principal_id       = data.azurerm_user_assigned_identity.id["provisioning"].principal_id
-  principal_type     = "ServicePrincipal"
-}
-
-resource "azurerm_role_assignment" "provisioning_rbac_admin" {
-  scope                = data.azurerm_subscription.current.id
-  role_definition_name = "Role Based Access Control Administrator"
-  principal_id         = data.azurerm_user_assigned_identity.id["provisioning"].principal_id
-  principal_type       = "ServicePrincipal"
-  condition_version    = "2.0"
-  condition            = local.rbac_condition
-}
+# The provisioning identity's custom role and subscription-level assignments live in 10-identities:
+# creating a role definition needs Microsoft.Authorization/roleDefinitions/write, which the pipeline's
+# platform identity (Contributor + RBAC Administrator) deliberately doesn't have.
 
 resource "azurerm_role_assignment" "acr_pull" {
   for_each             = { for k, c in local.clusters : k => c }
