@@ -12,6 +12,8 @@ describe('toOrchestratorRequest', () => {
       repoVisibility: 'public',
       availability: { tier: 'standard' },
       infrastructure: {
+        tenantId: 'tenant',
+        managementGroup: 'xycorp-corp',
         region: 'uksouth',
         subscription: { mode: 'existing', id: 'sub' },
         resourceGroup: { mode: 'existing', name: 'rg-idp-apps-dev' },
@@ -22,6 +24,8 @@ describe('toOrchestratorRequest', () => {
       },
     });
     expect(body.application_name).toBe('orders-api');
+    expect(body.tenant_id).toBe('tenant');
+    expect(body.management_group).toBe('xycorp-corp');
     expect(body.resource_group).toEqual({ mode: 'existing', id: undefined, name: 'rg-idp-apps-dev' });
     expect(body.runtime_capability.type).toBe('storage');
     expect(body.availability.tier).toBe('standard');

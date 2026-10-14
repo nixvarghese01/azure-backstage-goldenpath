@@ -18,8 +18,11 @@ from azure_discovery.models import (
     Capabilities,
     ContainerRegistry,
     DataResource,
+    ManagementGroup,
+    ManagementGroupOut,
     ResourceGroup,
     Subscription,
+    Tenant,
     ValidationRequest,
     ValidationResult,
 )
@@ -88,9 +91,9 @@ def create_app(
             content={"status": "ready" if ok else "not_ready", "azure_credential": ok},
         )
 
-    # ---------------- discovery ----------------
-    @app.get("/v1/subscriptions", response_model=list[Subscription])
-    def subscriptions(_: Auth, environment: str | None = None) -> list[Subscription]:
+    # ---------------- discovery: tenant -> management groups -> subscriptions ----------------
+    def _approved_subscriptions(environment: str | None) -> list[Subscription]:
+        """Enabled, allowlisted subscriptions in the approved tenant and landing zone scope."""
         subs = cache.get_or_load("subs", inventory.list_subscriptions)
         out = []
         for s in subs:
@@ -99,8 +102,78 @@ def create_app(
                 entry
                 and s.state.lower() == "enabled"
                 and (environment is None or environment in entry.environments)
+                and policy.tenant_allowed(s.tenant_id)
+                and policy.in_application_scope(s.management_groups)
             ):
                 out.append(s)
+        return out
+
+    @app.get("/v1/tenants", response_model=list[Tenant])
+    def tenants(_: Auth, environment: str | None = None) -> list[Tenant]:
+        used = {(s.tenant_id or "").lower() for s in _approved_subscriptions(environment)}
+        return [
+            t
+            for t in cache.get_or_load("tenants", inventory.list_tenants)
+            if t.id.lower() in used and policy.tenant_allowed(t.id)
+        ]
+
+    @app.get("/v1/management-groups", response_model=list[ManagementGroupOut])
+    def management_groups(
+        _: Auth, tenant_id: Annotated[str, Query()], environment: str | None = None
+    ) -> list[ManagementGroupOut]:
+        """The management group tree, pruned to groups that contain an approved subscription.
+
+        Depth-first from the Tenant Root Group. Without management group access (or a tenant with
+        no groups) this is just the Tenant Root Group, so the form always has one choice.
+        """
+        groups = {
+            g.id.lower(): g
+            for g in cache.get_or_load("mgs", inventory.list_management_groups)
+            if g.tenant_id.lower() == tenant_id.lower()
+        }
+        groups.setdefault(
+            tenant_id.lower(), ManagementGroup(id=tenant_id, name="Tenant Root Group", tenant_id=tenant_id)
+        )
+        keep = {tenant_id.lower()}
+        for s in _approved_subscriptions(environment):
+            if (s.tenant_id or "").lower() == tenant_id.lower():
+                keep.update(m.lower() for m in s.management_groups if m.lower() in groups)
+        children: dict[str, list[ManagementGroup]] = {}
+        for g in groups.values():
+            if g.id.lower() in keep and g.parent_id:
+                children.setdefault(g.parent_id.lower(), []).append(g)
+        out: list[ManagementGroupOut] = []
+
+        def walk(g: ManagementGroup, path: list[str]) -> None:
+            here = [*path, g.name]
+            out.append(ManagementGroupOut(**g.model_dump(), path=here, depth=len(path)))
+            for child in sorted(children.get(g.id.lower(), []), key=lambda c: c.name.lower()):
+                walk(child, here)
+
+        walk(groups[tenant_id.lower()], [])
+        return out
+
+    @app.get("/v1/subscriptions", response_model=list[Subscription])
+    def subscriptions(
+        _: Auth,
+        environment: str | None = None,
+        tenant_id: str | None = None,
+        management_group: str | None = None,
+    ) -> list[Subscription]:
+        """Approved subscriptions, optionally limited to a tenant and a management group's subtree."""
+        out = []
+        for s in _approved_subscriptions(environment):
+            if tenant_id and (s.tenant_id or "").lower() != tenant_id.lower():
+                continue
+            # The Tenant Root Group's id is the tenant id: every subscription in the tenant is below it.
+            under_root = management_group and tenant_id and management_group.lower() == tenant_id.lower()
+            if (
+                management_group
+                and not under_root
+                and management_group.lower() not in {m.lower() for m in s.management_groups}
+            ):
+                continue
+            out.append(s)
         return out
 
     @app.get("/v1/subscriptions/{sub_id}/capabilities", response_model=Capabilities)
@@ -150,6 +223,7 @@ def create_app(
         sub_id: str,
         type: Annotated[str, Query(pattern="^(storage|keyvault)$")],
         environment: str | None = None,
+        resource_group: str | None = None,
     ) -> list[DataResource]:
         _allowed_sub(sub_id, environment)
         wanted = "microsoft.storage/storageaccounts" if type == "storage" else "microsoft.keyvault/vaults"
@@ -158,6 +232,7 @@ def create_app(
             d
             for d in items
             if d.type.lower() == wanted
+            and (resource_group is None or d.resource_group.lower() == resource_group.lower())
             and (e := policy.data_resource(sub_id, d.name, environment)) is not None
             and e.type.lower() == wanted
         ]

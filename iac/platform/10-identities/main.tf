@@ -71,6 +71,16 @@ variable "discovery_subscription_ids" {
   type        = list(string)
 }
 
+variable "discovery_management_group_ids" {
+  description = <<-EOT
+    Management groups whose hierarchy the discovery identity may read, so the request form can show
+    tenant -> management group -> subscription (Cloud Adoption Framework landing zones). Usually the
+    intermediate root, e.g. ["xycorp"]. Empty = the form shows the Tenant Root Group only.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
 variable "state_storage_account_name" {
   type = string
 }
@@ -178,6 +188,15 @@ resource "azurerm_role_assignment" "discovery_reader" {
   for_each             = toset(var.discovery_subscription_ids)
   scope                = "/subscriptions/${each.value}"
   role_definition_name = "Reader"
+  principal_id         = azurerm_user_assigned_identity.service["discovery"].principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+# Read-only view of the management group tree (no access to the resources inside it).
+resource "azurerm_role_assignment" "discovery_management_group_reader" {
+  for_each             = toset(var.discovery_management_group_ids)
+  scope                = "/providers/Microsoft.Management/managementGroups/${each.value}"
+  role_definition_name = "Management Group Reader"
   principal_id         = azurerm_user_assigned_identity.service["discovery"].principal_id
   principal_type       = "ServicePrincipal"
 }

@@ -20,6 +20,14 @@ environments:
 regions:
   - uksouth
 
+hierarchy:
+  # Cloud Adoption Framework placement. The form walks tenant -> management group -> subscription.
+  # Both keys are optional: leave tenant_id null to accept any tenant the identity sees, and the list
+  # empty to accept subscriptions anywhere (for example one free-tier subscription directly under the
+  # Tenant Root Group). With Azure landing zones, list the "Landing zones" group (or Corp/Online).
+  tenant_id: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+  application_management_groups: [xycorp-landingzones]
+
 subscriptions:
   # Subscription IDs the platform may use. Discovery hides everything else.
   - id: 00000000-0000-0000-0000-000000000000

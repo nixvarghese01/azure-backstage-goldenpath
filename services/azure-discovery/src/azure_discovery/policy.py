@@ -41,6 +41,19 @@ class DataResourceEntry(ScopedEntry):
     type: str
 
 
+class Hierarchy(BaseModel):
+    """Where application subscriptions may sit in the tenant (Cloud Adoption Framework landing zones).
+
+    Both fields are optional so the same design works for a single free-tier subscription under the
+    Tenant Root Group and for a full Azure landing zones hierarchy.
+    """
+
+    tenant_id: str | None = None
+    # Management groups whose subtree may hold application subscriptions, e.g. the "Landing zones"
+    # group. Empty = anywhere in the tenant.
+    application_management_groups: list[str] = Field(default_factory=list)
+
+
 class SubscriptionVending(BaseModel):
     billing_scope: str | None = None
     management_group: str | None = None
@@ -96,6 +109,7 @@ class Allowlist(BaseModel):
     version: int
     environments: dict[str, EnvironmentPolicy]
     regions: list[str]
+    hierarchy: Hierarchy = Field(default_factory=Hierarchy)
     subscriptions: list[SubscriptionEntry]
     resource_groups: list[ScopedEntry] = Field(default_factory=list)
     aks_clusters: list[AksEntry] = Field(default_factory=list)
@@ -112,6 +126,15 @@ class Allowlist(BaseModel):
     # ---- lookups (case-insensitive, Azure names are case-insensitive) ----
     def subscription(self, sub_id: str) -> SubscriptionEntry | None:
         return next((s for s in self.subscriptions if s.id.lower() == sub_id.lower()), None)
+
+    def tenant_allowed(self, tenant_id: str | None) -> bool:
+        wanted = self.hierarchy.tenant_id
+        return not wanted or (tenant_id or "").lower() == wanted.lower()
+
+    def in_application_scope(self, management_groups: list[str]) -> bool:
+        """True when a subscription with these ancestors may hold applications."""
+        scopes = {m.lower() for m in self.hierarchy.application_management_groups}
+        return not scopes or any(m.lower() in scopes for m in management_groups)
 
     def region_allowed(self, region: str) -> bool:
         return region.lower() in {r.lower() for r in self.regions}

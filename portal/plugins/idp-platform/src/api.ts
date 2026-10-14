@@ -1,6 +1,6 @@
 import { createApiRef, type DiscoveryApi, type FetchApi } from '@backstage/core-plugin-api';
 import { ResponseError } from '@backstage/errors';
-import type { Capabilities, RequestView } from '@internal/plugin-idp-platform-common';
+import type { Capabilities, ManagementGroup, RequestView, Tenant } from '@internal/plugin-idp-platform-common';
 
 export interface NamedResource {
   id: string;
@@ -21,12 +21,21 @@ export interface Stack {
   enabled: boolean;
 }
 
+export interface SubscriptionFilter {
+  environment?: string;
+  tenantId?: string;
+  managementGroup?: string;
+}
+
 export interface IdpApi {
-  subscriptions(environment?: string): Promise<{ id: string; name: string; quota_id?: string }[]>;
+  tenants(environment?: string): Promise<Tenant[]>;
+  managementGroups(tenantId: string, environment?: string): Promise<ManagementGroup[]>;
+  subscriptions(filter?: SubscriptionFilter): Promise<{ id: string; name: string; quota_id?: string }[]>;
   capabilities(subscriptionId: string, region: string): Promise<Capabilities>;
   list(subscriptionId: string, kind: 'resource-groups' | 'aks-clusters' | 'container-registries',
     environment?: string): Promise<NamedResource[]>;
-  dataResources(subscriptionId: string, type: 'storage' | 'keyvault', environment?: string): Promise<NamedResource[]>;
+  dataResources(subscriptionId: string, type: 'storage' | 'keyvault', environment?: string,
+    resourceGroup?: string): Promise<NamedResource[]>;
   stacks(): Promise<Stack[]>;
   requestsFor(application: string): Promise<RequestView[]>;
   approvals(): Promise<RequestView[]>;
@@ -56,8 +65,18 @@ export class IdpClient implements IdpApi {
     return s ? `?${s}` : '';
   }
 
-  subscriptions(environment?: string) {
-    return this.req<{ id: string; name: string; quota_id?: string }[]>(`/discovery/subscriptions${this.qs({ environment })}`);
+  tenants(environment?: string) {
+    return this.req<Tenant[]>(`/discovery/tenants${this.qs({ environment })}`);
+  }
+  managementGroups(tenantId: string, environment?: string) {
+    return this.req<ManagementGroup[]>(`/discovery/management-groups${this.qs({ tenant_id: tenantId, environment })}`);
+  }
+  subscriptions(filter: SubscriptionFilter = {}) {
+    return this.req<{ id: string; name: string; quota_id?: string }[]>(`/discovery/subscriptions${this.qs({
+      environment: filter.environment,
+      tenant_id: filter.tenantId,
+      management_group: filter.managementGroup,
+    })}`);
   }
   capabilities(subscriptionId: string, region: string) {
     return this.req<Capabilities>(`/discovery/subscriptions/${encodeURIComponent(subscriptionId)}/capabilities${this.qs({ region })}`);
@@ -65,8 +84,9 @@ export class IdpClient implements IdpApi {
   list(subscriptionId: string, kind: 'resource-groups' | 'aks-clusters' | 'container-registries', environment?: string) {
     return this.req<NamedResource[]>(`/discovery/subscriptions/${encodeURIComponent(subscriptionId)}/${kind}${this.qs({ environment })}`);
   }
-  dataResources(subscriptionId: string, type: 'storage' | 'keyvault', environment?: string) {
-    return this.req<NamedResource[]>(`/discovery/subscriptions/${encodeURIComponent(subscriptionId)}/resources${this.qs({ type, environment })}`);
+  dataResources(subscriptionId: string, type: 'storage' | 'keyvault', environment?: string, resourceGroup?: string) {
+    return this.req<NamedResource[]>(`/discovery/subscriptions/${encodeURIComponent(subscriptionId)}/resources${this.qs({
+      type, environment, resource_group: resourceGroup })}`);
   }
   stacks() {
     return this.req<Stack[]>('/stacks');

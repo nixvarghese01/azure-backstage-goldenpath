@@ -28,6 +28,8 @@ export function toOrchestratorRequest(input: {
     owner: input.owner,
     environment: input.environment,
     region: i.region,
+    tenant_id: i.tenantId,
+    management_group: i.managementGroup,
     stack: input.stack,
     subscription: sel(i.subscription),
     resource_group: sel(i.resourceGroup),

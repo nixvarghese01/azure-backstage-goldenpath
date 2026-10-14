@@ -11,6 +11,8 @@ function collector() {
 }
 
 const good: InfrastructureSelection = {
+  tenantId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  managementGroup: 'xycorp-corp',
   region: 'uksouth',
   subscription: { mode: 'existing', id: 'sub', name: 'sub-idp-dev' },
   resourceGroup: { mode: 'existing', name: 'rg-idp-apps-dev' },
@@ -25,6 +27,12 @@ describe('validateInfrastructure', () => {
     const { validation, errors } = collector();
     validateInfrastructure(good, validation);
     expect(errors).toEqual([]);
+  });
+
+  it('requires the tenant and landing zone management group', () => {
+    const { validation, errors } = collector();
+    validateInfrastructure({ ...good, tenantId: undefined, managementGroup: undefined }, validation);
+    expect(errors).toEqual(['Tenant: select one.', 'Management group: select the landing zone.']);
   });
 
   it('requires names and rejects bad resource group and namespace names', () => {

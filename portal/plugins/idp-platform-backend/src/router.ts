@@ -13,6 +13,8 @@ import Router from 'express-promise-router';
 import { PlatformClient, type UserContext } from './client';
 
 const SAFE_ID = /^[A-Za-z0-9-]{1,64}$/;
+// Management group and resource group names also allow '.', '_' and parentheses (Azure naming rules).
+const SAFE_NAME = /^[A-Za-z0-9._()-]{1,90}$/;
 
 export async function createRouter(deps: {
   config: Config;
@@ -43,11 +45,34 @@ export async function createRouter(deps: {
   }
 
   const q = (req: Request, key: string) => (typeof req.query[key] === 'string' ? (req.query[key] as string) : undefined);
+  const qName = (req: Request, key: string) => {
+    const value = q(req, key);
+    if (value !== undefined && !SAFE_NAME.test(value)) throw new InputError(`invalid ${key}`);
+    return value;
+  };
 
   // ---------------- discovery (read-only), for the scaffolder pickers ----------------
+  // Cloud Adoption Framework order: tenant -> management group -> subscription -> resource group.
+  router.get('/discovery/tenants', async (req, res) => {
+    await user(req);
+    res.json(await client.discovery('/v1/tenants', { environment: q(req, 'environment') }));
+  });
+
+  router.get('/discovery/management-groups', async (req, res) => {
+    await user(req);
+    res.json(await client.discovery('/v1/management-groups', {
+      tenant_id: qName(req, 'tenant_id'),
+      environment: q(req, 'environment'),
+    }));
+  });
+
   router.get('/discovery/subscriptions', async (req, res) => {
     await user(req);
-    res.json(await client.discovery('/v1/subscriptions', { environment: q(req, 'environment') }));
+    res.json(await client.discovery('/v1/subscriptions', {
+      environment: q(req, 'environment'),
+      tenant_id: qName(req, 'tenant_id'),
+      management_group: qName(req, 'management_group'),
+    }));
   });
 
   router.get('/discovery/subscriptions/:sub/capabilities', async (req, res) => {
@@ -61,6 +86,7 @@ export async function createRouter(deps: {
       res.json(await client.discovery(`/v1/subscriptions/${id(req.params.sub)}/${kind}`, {
         environment: q(req, 'environment'),
         type: q(req, 'type'),
+        resource_group: qName(req, 'resource_group'),
       }));
     });
   }

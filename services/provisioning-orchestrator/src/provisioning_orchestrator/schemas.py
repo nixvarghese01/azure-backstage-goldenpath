@@ -38,6 +38,9 @@ class RequestCreate(BaseModel):
     environment: str = "dev"
     region: str
     stack: str = "nestjs"
+    # Where the subscription was picked in the CAF hierarchy; azure-discovery re-checks both.
+    tenant_id: str | None = None
+    management_group: str | None = None
     subscription: Selection
     resource_group: Selection
     aks_cluster: Selection

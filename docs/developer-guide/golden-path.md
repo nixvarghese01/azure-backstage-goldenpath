@@ -22,6 +22,8 @@ The examples in this guide use the following request.
 | Owner | `team-orders` |
 | Stack | NestJS (TypeScript) |
 | Environment | `dev` |
+| Tenant | `XY Corp (xycorp.onmicrosoft.com)` |
+| Management group | `Landing zones / Corp` (internal application landing zone) |
 | Subscription | Select existing: `sub-idp-dev` |
 | Resource group | Select existing: `rg-idp-apps-dev` |
 | AKS cluster | Select existing: `aks-idp-shared-dev` |
@@ -123,7 +125,8 @@ A developer who accepts the defaults types only the application name and picks a
 |---|---|---|
 | Stack | NestJS; stacks awaiting validation are listed as *coming soon* | Any enabled stack |
 | Environment | `dev` | — (only `dev` is enabled) |
-| Subscription, resource group, AKS cluster, container registry, Storage or Key Vault | The first approved resource from `azure-discovery`, filtered by the selection above it | **Create new…** with a suggested name; disabled with the reason when the subscription can't support it |
+| Tenant and management group | The only approved tenant, and the deepest landing zone holding an approved subscription (e.g. *Landing zones / Corp*) | Another approved tenant or group; none can be created here ([ADR-0008](../adr/0008-caf-landing-zone-placement.md)) |
+| Subscription, resource group, AKS cluster, container registry, Storage or Key Vault | The first approved resource from `azure-discovery`, filtered by the selection above it (tenant → management group → subscription → resource group → Storage or Key Vault) | **Create new…** with a suggested name; disabled with the reason when the subscription can't support it |
 | Kubernetes namespace | The application name | **Custom…** |
 | Endpoint host | `<name>.<gateway domain>` of the selected cluster, e.g. `orders-api.dev.xycorp.local` | **Custom…**; outside the gateway domain you own DNS and TLS |
 | Availability | Standard: one pod with the stack's minimum resources ([sizing](technology-stacks.md#runtime-sizing)) | High availability, which asks for a reason, justification and SLO target |

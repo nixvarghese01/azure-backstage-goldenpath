@@ -60,6 +60,8 @@ def _validation_body(req: Request) -> dict[str, Any]:
         "application_name": req.application_name,
         "environment": req.environment,
         "region": s["region"],
+        "tenant_id": s.get("tenant_id"),
+        "management_group": s.get("management_group"),
         "subscription": s["subscription"],
         "resource_group": s["resource_group"],
         "aks_cluster": s["aks_cluster"],

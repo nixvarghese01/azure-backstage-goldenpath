@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from azure_discovery.models import AksCluster, ContainerRegistry, DataResource, ResourceGroup, Subscription
+from azure_discovery.models import (
+    AksCluster,
+    ContainerRegistry,
+    DataResource,
+    ManagementGroup,
+    ResourceGroup,
+    Subscription,
+    Tenant,
+)
 
 
 class InventoryError(Exception):
@@ -24,6 +32,12 @@ class AzureUnavailableError(InventoryError):
 
 
 class AzureInventory(Protocol):
+    def list_tenants(self) -> list[Tenant]:
+        """Entra tenants the identity can see."""
+
+    def list_management_groups(self) -> list[ManagementGroup]:
+        """Every management group the identity can read; empty if it can't read any."""
+
     def list_subscriptions(self) -> list[Subscription]: ...
 
     def get_subscription(self, subscription_id: str) -> Subscription | None: ...
