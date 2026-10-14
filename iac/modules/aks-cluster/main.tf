@@ -123,6 +123,9 @@ resource "azurerm_kubernetes_cluster" "this" {
     only_critical_addons_enabled = var.user_pool != null
     max_pods                     = 110
     host_encryption_enabled      = true # needs the Microsoft.Compute/EncryptionAtHost feature
+    # The node VM scale set takes its tags from the pool, not the cluster; landing zones that require
+    # tags on every resource deny an untagged scale set.
+    tags = var.tags
     upgrade_settings {
       max_surge = "10%"
     }
