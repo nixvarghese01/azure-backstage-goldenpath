@@ -9,11 +9,35 @@ from pydantic import BaseModel, Field
 Mode = Literal["new", "existing"]
 
 
+class Tenant(BaseModel):
+    id: str
+    name: str
+    default_domain: str | None = None
+
+
+class ManagementGroup(BaseModel):
+    """A management group. ``parent_id`` is None for the Tenant Root Group (its id is the tenant id)."""
+
+    id: str
+    name: str
+    tenant_id: str
+    parent_id: str | None = None
+
+
+class ManagementGroupOut(ManagementGroup):
+    # Ancestor names from the Tenant Root Group down to this group, for "Platform / Corp" style labels.
+    path: list[str] = Field(default_factory=list)
+    depth: int = 0
+
+
 class Subscription(BaseModel):
     id: str
     name: str
     state: str
     quota_id: str | None = None
+    tenant_id: str | None = None
+    # Management group ids from the direct parent up to the Tenant Root Group; empty when unknown.
+    management_groups: list[str] = Field(default_factory=list)
 
 
 class ResourceGroup(BaseModel):
@@ -111,6 +135,9 @@ class ValidationRequest(BaseModel):
     application_name: str
     environment: str
     region: str
+    # Where the subscription was picked in the CAF hierarchy; checked against the live hierarchy.
+    tenant_id: str | None = None
+    management_group: str | None = None
     subscription: Selection
     resource_group: Selection
     aks_cluster: Selection

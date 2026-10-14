@@ -25,6 +25,8 @@ interface Props {
   customPlaceholder?: string;
   customHelp?: string;
   helperText?: string;
+  /** What this field is for, with a realistic example value, shown under the dropdown. */
+  example?: string;
 }
 
 /**
@@ -33,10 +35,10 @@ interface Props {
  */
 export const DefaultOrCustomSelect = ({
   label, options, selected, onSelect, customLabel, customDisabledReason, customValue, onCustomChange,
-  customFieldLabel, customPlaceholder, customHelp, helperText,
+  customFieldLabel, customPlaceholder, customHelp, helperText, example,
 }: Props) => (
   <Box mb={2}>
-    <TextField select fullWidth size="small" label={label} value={selected} onChange={e => onSelect(e.target.value)}>
+    <TextField select fullWidth size="small" variant="outlined" label={label} value={selected} onChange={e => onSelect(e.target.value)}>
       {options.map(o => (
         <MenuItem key={o.value} value={o.value} disabled={o.disabled}>{o.label}</MenuItem>
       ))}
@@ -46,11 +48,13 @@ export const DefaultOrCustomSelect = ({
     </TextField>
     {customDisabledReason && <FormHelperText>{customLabel} unavailable: {customDisabledReason}</FormHelperText>}
     {helperText && <FormHelperText>{helperText}</FormHelperText>}
+    {example && <FormHelperText>{example}</FormHelperText>}
     {selected === CUSTOM && onCustomChange && (
       <Box mt={1}>
         <TextField
           fullWidth
           size="small"
+          variant="outlined"
           label={customFieldLabel ?? 'Name'}
           placeholder={customPlaceholder}
           helperText={customHelp}

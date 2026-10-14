@@ -23,6 +23,9 @@ export interface RuntimeCapability extends Selection {
 
 /** Value produced by the IdpAzureResourcePicker field. */
 export interface InfrastructureSelection {
+  /** Entra tenant and management group the subscription was picked under (CAF landing zones). */
+  tenantId?: string;
+  managementGroup?: string;
   region: string;
   subscription: Selection;
   resourceGroup: Selection;
@@ -40,6 +43,22 @@ export interface AvailabilitySelection {
   reason?: string;
   justification?: string;
   sloTarget?: string;
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  default_domain?: string | null;
+}
+
+/** A management group; `path` runs from the Tenant Root Group down to this group. */
+export interface ManagementGroup {
+  id: string;
+  name: string;
+  tenant_id: string;
+  parent_id?: string | null;
+  path: string[];
+  depth: number;
 }
 
 export interface CapabilityOption {

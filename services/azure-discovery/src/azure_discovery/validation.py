@@ -22,6 +22,15 @@ ACR_NAME = re.compile(r"^[a-zA-Z0-9]{5,50}$")
 AKS_NAME = re.compile(r"^[a-z][a-z0-9-]{1,61}[a-z0-9]$")
 
 
+def _under(management_group: str, tenant_id: str | None, ancestors: list[str]) -> bool:
+    """True when a subscription with these ancestors sits below ``management_group``.
+
+    The Tenant Root Group's id is the tenant id, so every subscription in the tenant is below it.
+    """
+    mg = management_group.lower()
+    return mg == (tenant_id or "").lower() or mg in {a.lower() for a in ancestors}
+
+
 def _name_from_id(resource_id: str | None) -> str | None:
     return resource_id.rstrip("/").split("/")[-1] if resource_id else None
 
@@ -92,6 +101,24 @@ def validate_request(
             c.error("subscription", "not_allowlisted", "Subscription is not approved for this environment.")
         elif not live or live.state.lower() != "enabled":
             c.error("subscription", "not_found", "Subscription not found or not enabled.")
+        elif not policy.tenant_allowed(live.tenant_id) or (
+            req.tenant_id and (live.tenant_id or "").lower() != req.tenant_id.lower()
+        ):
+            c.error("tenant_id", "wrong_tenant", "The subscription isn't in the selected, approved tenant.")
+        elif not policy.in_application_scope(live.management_groups):
+            c.error(
+                "management_group",
+                "outside_landing_zone",
+                "The subscription isn't under a management group approved for applications.",
+            )
+        elif req.management_group and not _under(
+            req.management_group, live.tenant_id, live.management_groups
+        ):
+            c.error(
+                "management_group",
+                "not_in_management_group",
+                f"The subscription isn't under management group '{req.management_group}'.",
+            )
         else:
             resolved["subscription_id"] = live.id
             caps = compute_capabilities(sub_id, req.region, inventory, policy)

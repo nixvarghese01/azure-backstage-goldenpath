@@ -26,14 +26,31 @@ from azure_discovery.models import (
     AksCluster,
     ContainerRegistry,
     DataResource,
+    ManagementGroup,
     NodePool,
     ResourceGroup,
     Subscription,
+    Tenant,
 )
 
 log = logging.getLogger(__name__)
 
 _ARM_SCOPE = "https://management.azure.com/.default"
+
+# Tenant scope (no subscription filter): management groups the identity can read, and each
+# subscription's ancestor chain (direct parent first, Tenant Root Group last).
+_Q_MANAGEMENT_GROUPS = """
+resourcecontainers
+| where type == 'microsoft.management/managementgroups'
+| project id = name, name = tostring(properties.displayName), tenantId,
+          parentId = tostring(properties.details.parent.name)
+"""
+
+_Q_SUBSCRIPTION_ANCESTORS = """
+resourcecontainers
+| where type == 'microsoft.resources/subscriptions'
+| project subscriptionId, chain = properties.managementGroupAncestorsChain
+"""
 
 _Q_RESOURCE_GROUPS = """
 resourcecontainers
@@ -87,15 +104,15 @@ class SdkInventory:
         self._subs = SubscriptionClient(self._credential)
 
     # ---- Resource Graph with skip-token paging ----
-    def _query(self, subscription_id: str, kql: str) -> list[dict[str, Any]]:
+    def _query(self, subscription_id: str | None, kql: str) -> list[dict[str, Any]]:
+        """Query one subscription, or (``None``) everything the identity can read in the tenant."""
         rows: list[dict[str, Any]] = []
         skip_token: str | None = None
+        scope = [subscription_id] if subscription_id else None
         try:
             while True:
                 options = QueryRequestOptions(result_format="objectArray", skip_token=skip_token, top=1000)
-                result = self._graph.resources(
-                    QueryRequest(subscriptions=[subscription_id], query=kql, options=options)
-                )
+                result = self._graph.resources(QueryRequest(subscriptions=scope, query=kql, options=options))
                 # objectArray results are lists; the table format would be a mapping.
                 if isinstance(result.data, list):
                     rows.extend(result.data)
@@ -105,19 +122,63 @@ class SdkInventory:
         except Exception as exc:
             raise _translate(exc) from exc
 
-    def list_subscriptions(self) -> list[Subscription]:
+    def list_tenants(self) -> list[Tenant]:
         try:
             return [
-                Subscription(
-                    id=s.subscription_id or "",
-                    name=s.display_name or s.subscription_id or "",
-                    state=str(s.state),
-                    quota_id=getattr(s.subscription_policies, "quota_id", None),
+                Tenant(
+                    id=t.tenant_id or "",
+                    name=t.display_name or t.default_domain or t.tenant_id or "",
+                    default_domain=t.default_domain,
                 )
-                for s in self._subs.subscriptions.list()
+                for t in self._subs.tenants.list()
             ]
         except Exception as exc:
             raise _translate(exc) from exc
+
+    def list_management_groups(self) -> list[ManagementGroup]:
+        # Optional level: without management group Reader access the form falls back to the tenant.
+        try:
+            rows = self._query(None, _Q_MANAGEMENT_GROUPS)
+        except AzurePermissionError:
+            log.warning("discovery identity can't read management groups; showing the tenant only")
+            return []
+        return [
+            ManagementGroup(
+                id=r["id"],
+                name=r.get("name") or r["id"],
+                tenant_id=r.get("tenantId") or "",
+                parent_id=r.get("parentId") or None,
+            )
+            for r in rows
+        ]
+
+    def _ancestors(self) -> dict[str, list[str]]:
+        try:
+            rows = self._query(None, _Q_SUBSCRIPTION_ANCESTORS)
+        except AzurePermissionError:
+            return {}
+        return {
+            str(r["subscriptionId"]).lower(): [str(a.get("name")) for a in (r.get("chain") or [])]
+            for r in rows
+        }
+
+    def list_subscriptions(self) -> list[Subscription]:
+        try:
+            subs = list(self._subs.subscriptions.list())
+        except Exception as exc:
+            raise _translate(exc) from exc
+        ancestors = self._ancestors()
+        return [
+            Subscription(
+                id=s.subscription_id or "",
+                name=s.display_name or s.subscription_id or "",
+                state=str(s.state),
+                quota_id=getattr(s.subscription_policies, "quota_id", None),
+                tenant_id=s.tenant_id,
+                management_groups=ancestors.get((s.subscription_id or "").lower(), []),
+            )
+            for s in subs
+        ]
 
     def get_subscription(self, subscription_id: str) -> Subscription | None:
         try:
@@ -133,6 +194,8 @@ class SdkInventory:
             name=s.display_name or s.subscription_id or subscription_id,
             state=str(s.state),
             quota_id=getattr(s.subscription_policies, "quota_id", None),
+            tenant_id=s.tenant_id,
+            management_groups=self._ancestors().get(subscription_id.lower(), []),
         )
 
     def list_resource_groups(self, subscription_id: str) -> list[ResourceGroup]:
