@@ -7,7 +7,7 @@ and how to undo it.
 
 First run: 2026-10-14/15, `dev` environment, Azure Free Trial (spending limit on), region
 `swedencentral`. Subscription and tenant IDs are deliberately not recorded here (public repository);
-they are in the git-ignored `terraform.tfvars` files and the repository variables.
+they are in the git-ignored `terraform.tfvars` files and in GitHub **secrets** (masked in logs).
 
 ## Why these steps are outside the pipeline
 
@@ -27,7 +27,8 @@ boundary; see [terraform-state.md](terraform-state.md) for the state side.
 | 5 | Stack inputs | Copied `terraform.tfvars.example` to `terraform.tfvars` in `10-identities` and `20-shared-dev`; set subscription, GitHub owner ID, region, globally unique names (`…nv01`), the admin group ID | Local, git-ignored files | They become the `PLATFORM_TFVARS_JSON` variable in step 8 |
 | 6 | Terraform state (`00-bootstrap`) | `scripts/bootstrap-platform.sh state --location swedencentral` | `rg-idp-tfstate-dev`, storage `stidptfstatedevnv01` (containers `platform`, `apps`, `CanNotDelete` lock); your user gets **Storage Blob Data Contributor** on it; the stack's own state migrated into it | No: the pipeline keeps its state here |
 | 7 | Identities (`10-identities`) | `scripts/bootstrap-platform.sh identities --location swedencentral` | 51 resources: see below | Later changes, yes (through `platform-apply`), except role definitions and app registrations |
-| 8 | GitHub settings | `scripts/bootstrap-platform.sh github --location swedencentral` | 15 repository variables (IDs only) and 4 environments | No: needs a repository admin |
+| 7b | OIDC subject format | `terraform apply` of `10-identities` after setting `github_repo_id` | The 5 platform federated credentials now trust `repo:<owner>@<owner id>/<repo>@<repo id>:environment:<env>`, GitHub's immutable subject (the repository has `use_immutable_subject`). A re-created repository with the same name can't use them | Yes, later changes go through `platform-apply` |
+| 8 | GitHub settings | `scripts/bootstrap-platform.sh github --location swedencentral` | 12 repository secrets, 4 variables and 4 environments | No: needs a repository admin |
 
 ### Step 7 in detail (`10-identities`, 51 resources)
 
@@ -43,9 +44,13 @@ boundary; see [terraform-state.md](terraform-state.md) for the state side.
 
 ### Step 8 in detail (GitHub)
 
-- **Variables:** `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, the client IDs (`PLATFORM_*`, `VENDING_*`,
-  `BACKSTAGE_*`, `DISCOVERY_*`, `ORCHESTRATOR_*`), `PLATFORM_BACKEND_HCL`, `PLATFORM_TFVARS_JSON`,
-  `ACR_NAME`, `AKS_NAME`, `AKS_RESOURCE_GROUP`, `PLATFORM_CHART_VALUES_JSON`. Identifiers only.
+- **Secrets** (identifiers and configuration; GitHub masks them in logs, which are public for a public
+  repository): `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, the client IDs (`PLATFORM_CLIENT_ID`,
+  `PLATFORM_PLAN_CLIENT_ID`, `PLATFORM_DEPLOY_CLIENT_ID`, `VENDING_CLIENT_ID`, `BACKSTAGE_CLIENT_ID`,
+  `DISCOVERY_CLIENT_ID`, `ORCHESTRATOR_CLIENT_ID`), `PLATFORM_BACKEND_HCL`, `PLATFORM_TFVARS_JSON`,
+  `PLATFORM_CHART_VALUES_JSON`. Nothing is hardcoded in the repository.
+- **Variables** (plain names and switches): `ACR_NAME`, `AKS_NAME`, `AKS_RESOURCE_GROUP`,
+  `PLATFORM_AZURE_READY` (`true` once the secrets exist; job conditions can't read secrets).
 - **Environments** (deployments only from `develop` and `main`): `platform` and `platform-deploy`
   (you approve each run), `platform-plan` (read-only), `platform-teardown` (destroy only, no approval,
   so the time-to-live teardown never waits).

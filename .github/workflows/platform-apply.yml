@@ -43,8 +43,8 @@ concurrency:
 env:
   ARM_USE_OIDC: "true"
   ARM_USE_AZUREAD: "true"
-  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   IDP_REQUEST_ID: ${{ inputs.request_id }}
   IDP_CALLBACK_URL: ${{ vars.IDP_CALLBACK_URL }}
   STACK: ${{ inputs.stack }}
@@ -97,8 +97,8 @@ jobs:
           terraform_wrapper: false
       - name: Select identity
         env:
-          VENDING_CLIENT_ID: ${{ vars.VENDING_CLIENT_ID }}
-          PLATFORM_CLIENT_ID: ${{ vars.PLATFORM_CLIENT_ID }}
+          VENDING_CLIENT_ID: ${{ secrets.VENDING_CLIENT_ID }}
+          PLATFORM_CLIENT_ID: ${{ secrets.PLATFORM_CLIENT_ID }}
         run: |
           if [[ "$STACK" == "05-subscriptions" ]]; then
             echo "ARM_CLIENT_ID=${VENDING_CLIENT_ID}" >> "$GITHUB_ENV"
@@ -108,13 +108,13 @@ jobs:
       - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ env.ARM_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - run: bash "$GITHUB_WORKSPACE/scripts/ci/install-tools.sh" conftest kubelogin
       - name: Write stack inputs from repository variables (IDs only)
         env:
-          PLATFORM_BACKEND_HCL: ${{ vars.PLATFORM_BACKEND_HCL }}
-          PLATFORM_TFVARS_JSON: ${{ vars.PLATFORM_TFVARS_JSON }}
+          PLATFORM_BACKEND_HCL: ${{ secrets.PLATFORM_BACKEND_HCL }}
+          PLATFORM_TFVARS_JSON: ${{ secrets.PLATFORM_TFVARS_JSON }}
         run: |
           printf '%s\n' "${PLATFORM_BACKEND_HCL//__STACK__/$STACK}" > backend.hcl
           jq -er --arg s "$STACK" '.[$s]' <<< "$PLATFORM_TFVARS_JSON" > terraform.tfvars

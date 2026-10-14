@@ -55,6 +55,17 @@ variable "github_org_id" {
   type        = string
 }
 
+variable "github_repo_id" {
+  description = <<-EOT
+    Numeric ID of the platform repository. With GitHub's immutable OIDC subjects
+    (use_immutable_subject, the default for new repositories) the subject is
+    repo:<owner>@<owner id>/<repo>@<repo id>:environment:<env>, which can't be claimed by a
+    re-created repository with the same name. null = the older name-only subject.
+  EOT
+  type        = string
+  default     = null
+}
+
 variable "platform_repo" {
   type    = string
   default = "azure-backstage-goldenpath"
@@ -115,7 +126,11 @@ locals {
     "dataClassification" = "internal"
   }, var.tags)
   platform_repo = "${var.github_org}/${var.platform_repo}"
-  reusable      = "${var.github_org}/${var.platform_repo}/.github/workflows"
+  # Subject prefix for the platform repository's own workflows (environment-bound).
+  platform_subject = (var.github_repo_id == null
+    ? "repo:${local.platform_repo}"
+  : "repo:${var.github_org}@${var.github_org_id}/${var.platform_repo}@${var.github_repo_id}")
+  reusable = "${var.github_org}/${var.platform_repo}/.github/workflows"
   app_subject = {
     for k, v in {
       plan   = { env = "${var.environment}-infra-plan", wf = "reusable-terraform.yml" }
@@ -159,10 +174,10 @@ module "platform" {
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
   subjects = {
-    "platform-apply" = "repo:${local.platform_repo}:environment:platform"
+    "platform-apply" = "${local.platform_subject}:environment:platform"
     # Destroy-only runs (platform-provision teardown, platform-ttl): no reviewers, so a forgotten
     # dev platform is always removed on time.
-    "platform-teardown" = "repo:${local.platform_repo}:environment:platform-teardown"
+    "platform-teardown" = "${local.platform_subject}:environment:platform-teardown"
   }
   tags = local.tags
 }
@@ -172,7 +187,7 @@ module "platform_plan" {
   name                = "id-idp-platform-plan-${var.environment}"
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
-  subjects            = { "platform-plan" = "repo:${local.platform_repo}:environment:platform-plan" }
+  subjects            = { "platform-plan" = "${local.platform_subject}:environment:platform-plan" }
   tags                = local.tags
 }
 
@@ -181,7 +196,7 @@ module "platform_deploy" {
   name                = "id-idp-platform-deploy-${var.environment}"
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
-  subjects            = { "platform-deploy" = "repo:${local.platform_repo}:environment:platform-deploy" }
+  subjects            = { "platform-deploy" = "${local.platform_subject}:environment:platform-deploy" }
   tags                = local.tags
 }
 
@@ -190,7 +205,7 @@ module "vending" {
   name                = "id-idp-vending-${var.environment}"
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
-  subjects            = { "platform-vending" = "repo:${local.platform_repo}:environment:platform-vending" }
+  subjects            = { "platform-vending" = "${local.platform_subject}:environment:platform-vending" }
   tags                = local.tags
 }
 

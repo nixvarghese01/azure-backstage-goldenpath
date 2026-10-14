@@ -197,22 +197,28 @@ github() {
   sub="$(az account show --query id -o tsv)"
   cid() { json "d['client_ids']['value']['$1']" <<< "$out"; }
 
-  echo "Repository variables on ${REPO} (identifiers only)"
-  setvar() {
+  # Identifiers and configuration go in as secrets: GitHub masks them in logs, which are public for a
+  # public repository. Plain names and switches stay as variables.
+  echo "Repository secrets on ${REPO} (identifiers and configuration; masked in logs)"
+  setsecret() {
     [[ -n "$2" && "$2" != "{}" ]] || { fail "$1: no value computed (see the error above)"; exit 1; }
-    gh variable set "$1" --repo "$REPO" --body "$2" >/dev/null && ok "$1"
+    printf '%s' "$2" | gh secret set "$1" --repo "$REPO" >/dev/null && ok "$1"
   }
-  setvar AZURE_TENANT_ID "$tenant"
-  setvar AZURE_SUBSCRIPTION_ID "$sub"
-  setvar PLATFORM_CLIENT_ID "$(cid platform)"
-  setvar PLATFORM_PLAN_CLIENT_ID "$(cid platform_plan)"
-  setvar PLATFORM_DEPLOY_CLIENT_ID "$(cid platform_deploy)"
-  setvar VENDING_CLIENT_ID "$(cid vending)"
-  setvar BACKSTAGE_CLIENT_ID "$(cid backstage)"
-  setvar DISCOVERY_CLIENT_ID "$(cid discovery)"
-  setvar ORCHESTRATOR_CLIENT_ID "$(cid orchestrator)"
-  setvar PLATFORM_BACKEND_HCL "$(backend_hcl __STACK__ oidc)"
-  setvar PLATFORM_TFVARS_JSON "$("$PY" - "$(native "$PLATFORM")" <<'EOF'
+  setvar() {
+    [[ -n "$2" ]] || { fail "$1: no value computed"; exit 1; }
+    gh variable set "$1" --repo "$REPO" --body "$2" >/dev/null && ok "$1 (variable)"
+  }
+  setsecret AZURE_TENANT_ID "$tenant"
+  setsecret AZURE_SUBSCRIPTION_ID "$sub"
+  setsecret PLATFORM_CLIENT_ID "$(cid platform)"
+  setsecret PLATFORM_PLAN_CLIENT_ID "$(cid platform_plan)"
+  setsecret PLATFORM_DEPLOY_CLIENT_ID "$(cid platform_deploy)"
+  setsecret VENDING_CLIENT_ID "$(cid vending)"
+  setsecret BACKSTAGE_CLIENT_ID "$(cid backstage)"
+  setsecret DISCOVERY_CLIENT_ID "$(cid discovery)"
+  setsecret ORCHESTRATOR_CLIENT_ID "$(cid orchestrator)"
+  setsecret PLATFORM_BACKEND_HCL "$(backend_hcl __STACK__ oidc)"
+  setsecret PLATFORM_TFVARS_JSON "$("$PY" - "$(native "$PLATFORM")" <<'EOF'
 import json, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 found = {s: (root / s / "terraform.tfvars").read_text(encoding="utf-8")
@@ -228,7 +234,7 @@ EOF
   setvar AKS_NAME "$(sed -nE '/^aks *=/,/^}/ s/^ *name *= *"([^"]+)".*/\1/p' "$tfv" | head -1)"
   setvar AKS_RESOURCE_GROUP "rg-idp-aks-${ENVIRONMENT}"
   # Terraform outputs go through the environment: on Windows, Python can't open Git Bash's /tmp paths.
-  setvar PLATFORM_CHART_VALUES_JSON "$(TF_OUTPUTS="$out" "$PY" - "$(native "$tfv")" "$ENVIRONMENT" <<'EOF'
+  setsecret PLATFORM_CHART_VALUES_JSON "$(TF_OUTPUTS="$out" "$PY" - "$(native "$tfv")" "$ENVIRONMENT" <<'EOF'
 import json, os, re, sys
 out = json.loads(os.environ["TF_OUTPUTS"])
 tfvars, env = open(sys.argv[1], encoding="utf-8").read(), sys.argv[2]
@@ -253,6 +259,12 @@ print(json.dumps({
 }))
 EOF
 )"
+
+  setvar PLATFORM_AZURE_READY true
+  # Earlier versions stored the identifiers as variables; remove those copies.
+  for v in AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID PLATFORM_CLIENT_ID PLATFORM_PLAN_CLIENT_ID            PLATFORM_DEPLOY_CLIENT_ID VENDING_CLIENT_ID BACKSTAGE_CLIENT_ID DISCOVERY_CLIENT_ID            ORCHESTRATOR_CLIENT_ID PLATFORM_BACKEND_HCL PLATFORM_TFVARS_JSON PLATFORM_CHART_VALUES_JSON; do
+    gh variable delete "$v" --repo "$REPO" >/dev/null 2>&1 && ok "removed old variable $v" || true
+  done
 
   echo "Environments (deployments limited to develop and main)"
   local me; me="$(gh api user -q .id)"
