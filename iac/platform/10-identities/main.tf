@@ -94,14 +94,26 @@ variable "key_vault_name" {
   default = "kv-idp-plat-dev"
 }
 
+variable "tags" {
+  description = "Extra or overriding tags, e.g. the organisation tags a landing zone policy requires."
+  type        = map(string)
+  default     = {}
+}
+
 locals {
-  tags = {
-    "managed-by"  = "idp-platform"
-    "environment" = var.environment
-    "lifecycle"   = "platform"
-    "application" = "idp-platform"
-    "owner"       = "platform-team"
-  }
+  # CAF tagging. var.tags adds or overrides organisation tags (costCenter, criticality, ...); the
+  # landing zone may require some of them on resource groups.
+  tags = merge({
+    "managed-by"         = "idp-platform"
+    "workload"           = "idp"
+    "environment"        = var.environment
+    "lifecycle"          = "platform"
+    "application"        = "idp-platform"
+    "owner"              = "platform-team"
+    "costCenter"         = "platform"
+    "criticality"        = "low"
+    "dataClassification" = "internal"
+  }, var.tags)
   platform_repo = "${var.github_org}/${var.platform_repo}"
   reusable      = "${var.github_org}/${var.platform_repo}/.github/workflows"
   app_subject = {
@@ -132,7 +144,7 @@ module "platform" {
     # dev platform is always removed on time.
     "platform-teardown" = "repo:${local.platform_repo}:environment:platform-teardown"
   }
-  tags                = local.tags
+  tags = local.tags
 }
 
 module "platform_plan" {

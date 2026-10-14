@@ -113,6 +113,7 @@ preflight() {
   vm="$(sed -nE 's/^ *vm_size *= *"([^"]+)".*//p' "${PLATFORM}/20-shared-dev/terraform.tfvars" 2>/dev/null | head -1)"
   vm="${vm:-Standard_D2s_v5}"
   case "$vm" in
+    Standard_B*_v2) family=standardBsv2Family ;;
     Standard_B*) family=standardBSFamily ;;
     Standard_D*as_v5) family=standardDASv5Family ;;
     *) family=standardDSv5Family ;;

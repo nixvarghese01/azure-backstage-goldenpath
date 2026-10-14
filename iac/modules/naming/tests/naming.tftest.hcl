@@ -9,7 +9,7 @@ run "tags_and_names" {
   command = plan
 
   assert {
-    condition     = output.tags["managed-by"] == "idp-platform" && output.tags["request-id"] != ""
+    condition     = output.tags["managed-by"] == "idp-platform" && output.tags["request-id"] != "" && output.tags["workload"] == var.application
     error_message = "standard tags missing"
   }
   assert {
@@ -28,4 +28,17 @@ run "rejects_bad_application_name" {
     application = "Bad_Name"
   }
   expect_failures = [var.application]
+}
+
+run "extra_tags_add_but_never_override" {
+  command = plan
+
+  variables {
+    extra_tags = { costCenter = "cc-1234", owner = "someone-else" }
+  }
+
+  assert {
+    condition     = output.tags["costCenter"] == "cc-1234" && output.tags["owner"] == "team-orders"
+    error_message = "organisation tags must be added without overriding the standard tags"
+  }
 }

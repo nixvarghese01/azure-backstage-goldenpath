@@ -94,14 +94,26 @@ variable "identity_resource_group" {
   default = "rg-idp-identities-dev"
 }
 
+variable "tags" {
+  description = "Extra or overriding tags, e.g. the organisation tags a landing zone policy requires."
+  type        = map(string)
+  default     = {}
+}
+
 locals {
-  tags = {
-    "managed-by"  = "idp-platform"
-    "environment" = var.environment
-    "lifecycle"   = "platform"
-    "application" = "idp-platform"
-    "owner"       = "platform-team"
-  }
+  # CAF tagging. var.tags adds or overrides organisation tags (costCenter, criticality, ...); the
+  # landing zone may require some of them on resource groups.
+  tags = merge({
+    "managed-by"         = "idp-platform"
+    "workload"           = "idp"
+    "environment"        = var.environment
+    "lifecycle"          = "platform"
+    "application"        = "idp-platform"
+    "owner"              = "platform-team"
+    "costCenter"         = "platform"
+    "criticality"        = "low"
+    "dataClassification" = "internal"
+  }, var.tags)
   extra_clusters = {
     for f in fileset(path.module, "clusters.d/*.json") :
     trimsuffix(basename(f), ".json") => jsondecode(file("${path.module}/${f}"))

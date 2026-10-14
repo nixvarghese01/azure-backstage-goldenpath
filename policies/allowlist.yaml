@@ -19,6 +19,7 @@ environments:
 
 regions:
   - uksouth
+  - swedencentral   # landing zones that allow only Sweden Central (also has the newer v2 B-series)
 
 hierarchy:
   # Cloud Adoption Framework placement. The form walks tenant -> management group -> subscription.
@@ -84,7 +85,7 @@ skus:
   storage_account: [Standard_LRS, Standard_ZRS, Standard_GZRS] # GZRS: Terraform state account only
   key_vault: [standard]
   container_registry: [Basic, Standard]
-  aks_node_vm: [Standard_D2s_v5, Standard_D2as_v5, Standard_B2s]
+  aks_node_vm: [Standard_D2s_v5, Standard_D2as_v5, Standard_B2s, Standard_B2s_v2]
 
 roles:
   # Roles the provisioning identity may assign to application runtime identities.
