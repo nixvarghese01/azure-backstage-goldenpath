@@ -13,6 +13,38 @@ permissions:
   contents: read
 
 jobs:
+  # What a generated repository runs: module sources resolved from the published tags, not this checkout.
+  tagged-sources:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.14"
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - name: Every module tag the skeleton pins exists
+        run: |
+          missing=0
+          for ref in $(bash scripts/ci/skeleton-module-refs.sh); do
+            git ls-remote --exit-code --tags origin "refs/tags/$ref" >/dev/null \
+              || { echo "::error::Tag $ref does not exist; tag it with the release-modules workflow"; missing=1; }
+          done
+          exit "$missing"
+      - name: Render skeleton with fixture values
+        run: |
+          cd services && uv sync --package provisioning-orchestrator
+          uv run python ../templates/applications/nestjs/render_fixture.py "$RUNNER_TEMP/orders-api"
+      - name: Terraform init and validate against the tagged modules
+        working-directory: ${{ runner.temp }}/orders-api/infra/terraform
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
   render-and-check:
     runs-on: ubuntu-24.04
     strategy:
