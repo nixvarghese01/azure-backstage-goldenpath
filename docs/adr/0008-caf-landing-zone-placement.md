@@ -84,5 +84,5 @@ production never shows invented resources.
 - Moving a subscription out of the landing zones (for example to Decommissioned) removes it from the
   form and makes validation fail, with no allowlist change needed.
 - Reusing an existing Storage account or Key Vault now means choosing its resource group first.
-- The orchestrator stores `tenant_id` and `management_group` with the request, so approvers see where
-  the application will land.
+- The orchestrator stores `tenant_id` and `management_group` with the request and sends them back to
+  discovery on every validation. Showing them on the approval card is a follow-up.
