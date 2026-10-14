@@ -29,8 +29,8 @@ auth:
     guest:
       # The image runs NODE_ENV=production; this opt-in applies only to this local override.
       dangerouslyAllowOutsideDevelopment: true
-      userEntityRef: user:default/alex
-      ownershipEntityRefs: [user:default/alex, group:default/team-orders]
+      userEntityRef: user:default/nixvarghese01
+      ownershipEntityRefs: [user:default/nixvarghese01, group:default/team-orders]
 idp:
   githubOrg: ${ORCHESTRATOR_GITHUB_ORG}
   orchestratorGithubAppId: 0

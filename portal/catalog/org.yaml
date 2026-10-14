@@ -1,4 +1,4 @@
-# Demo organisation. Replace user names with real GitHub usernames (sign-in resolves by user name).
+# Demo organisation. A user's metadata.name must be their GitHub username: sign-in resolves by it.
 apiVersion: backstage.io/v1alpha1
 kind: Group
 metadata:
@@ -29,17 +29,19 @@ spec:
 apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
-  name: alex
+  name: nixvarghese01
 spec:
   profile:
-    displayName: Alex (developer)
-  memberOf: [team-orders]
+    displayName: Nixon (developer and platform approver)
+  # Also an approver: can approve other people's requests. Separation of duties still stops anyone
+  # approving their own request (provisioning-orchestrator), so Ancy approves Nixon's.
+  memberOf: [team-orders, platform-approvers]
 ---
 apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
-  name: sam
+  name: ancy   # replace with Ancy's GitHub username
 spec:
   profile:
-    displayName: Sam (platform approver)
+    displayName: Ancy (platform approver)
   memberOf: [platform-team, platform-approvers]
