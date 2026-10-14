@@ -90,6 +90,7 @@ resource "azurerm_kubernetes_cluster" "this" {
   #checkov:skip=CKV_AZURE_170:sku_tier is configurable; the demo uses Free (no uptime SLA), production sets Standard.
   #checkov:skip=CKV_AZURE_117:Platform-managed disk encryption; a customer-managed disk encryption set is out of scope.
   #checkov:skip=CKV_AZURE_226:Ephemeral OS disks need a VM size with a local cache disk; Standard_D2s_v5 has none.
+  #checkov:skip=CKV_AZURE_232:The dev cluster has one node pool by design (cost); a user pool with only_critical_addons_enabled on system is added for HA (user_pool).
   #checkov:skip=CKV_AZURE_4:Container Insights needs a Log Analytics workspace (ingestion cost); not enabled in the demo.
   name                      = var.name
   location                  = var.location

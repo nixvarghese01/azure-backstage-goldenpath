@@ -56,6 +56,7 @@ resource "azurerm_storage_account" "this" {
   min_tls_version                 = "TLS1_2"
   https_traffic_only_enabled      = true
   shared_access_key_enabled       = false
+  local_user_enabled              = false # SFTP/local users: Entra only (CKV_AZURE_244)
   default_to_oauth_authentication = true
   allow_nested_items_to_be_public = false
   public_network_access_enabled   = var.public_network_access_enabled

@@ -149,8 +149,11 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Plan policy (Conftest)
         run: conftest test plan.json -p "$GITHUB_WORKSPACE/policies/terraform" -d "$GITHUB_WORKSPACE/policies/allowlist.yaml" --namespace main
+      # Enrichment reads the inline checkov:skip waivers from the module sources. The root is iac/modules,
+      # not the whole repo: resource names like azurerm_kubernetes_cluster.this also exist as data sources
+      # in other stacks, and Checkov would match the wrong file and ignore the waivers.
       - name: Plan misconfiguration scan (Checkov, resolved values)
-        run: pipx run checkov==3.3.26 -f plan.json --framework terraform_plan --repo-root-for-plan-enrichment "$GITHUB_WORKSPACE" --quiet --compact
+        run: pipx run checkov==3.3.26 -f plan.json --framework terraform_plan --repo-root-for-plan-enrichment "$GITHUB_WORKSPACE/iac/modules" --quiet --compact
       - name: Apply the checked plan (never re-plans)
         run: terraform apply plan.bin
       - name: Report to orchestrator
