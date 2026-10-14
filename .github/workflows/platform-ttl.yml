@@ -1,6 +1,7 @@
 # Destroys the dev platform when its time-to-live expires, so a forgotten AKS cluster doesn't keep using
-# the subscription's credit. Hourly: if the platform resource group exists, the lifetime starts at the
-# later of its creation time and the last platform-provision run, and lasts that run's ttl_hours
+# the subscription's credit. Hourly: if an AKS cluster exists in rg-idp-aks-<env> (teardown empties the
+# group but keeps it), the lifetime starts at the later of the cluster's creation time and the last
+# platform-provision run, and lasts that run's ttl_hours
 # (default 4). Expired -> platform-provision teardown (30-cluster-config, then 20-shared-dev), which runs
 # in the platform-teardown environment and needs no approval. State and identities are kept.
 name: platform-ttl
@@ -39,13 +40,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SUB: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-          RG: rg-idp-platform-${{ vars.PLATFORM_ENVIRONMENT || 'dev' }}
+          RG: rg-idp-aks-${{ vars.PLATFORM_ENVIRONMENT || 'dev' }}
         run: |
           created="$(az rest --method get \
-            --url "https://management.azure.com/subscriptions/${SUB}/resourcegroups?api-version=2021-04-01&\$expand=createdTime" \
-            --query "value[?name=='${RG}'].createdTime | [0]" -o tsv)"
+            --url "https://management.azure.com/subscriptions/${SUB}/resourceGroups/${RG}/resources?api-version=2021-04-01&\$expand=createdTime" \
+            --query "value[?type=='Microsoft.ContainerService/managedClusters'].createdTime | sort(@) | [0]" -o tsv 2>/dev/null || true)"
           if [[ -z "$created" ]]; then
-            echo "No ${RG}: nothing is running." >> "$GITHUB_STEP_SUMMARY"
+            echo "No AKS cluster in ${RG}: nothing is running." >> "$GITHUB_STEP_SUMMARY"
             echo "expired=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
           last="$(gh run list -R "$GITHUB_REPOSITORY" --workflow platform-provision.yml --limit 20 \
@@ -57,7 +58,7 @@ jobs:
           now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           {
             echo "| | |"; echo "|---|---|"
-            echo "| Platform resource group | \`${RG}\` |"
+            echo "| AKS resource group | \`${RG}\` |"
             echo "| Running since | ${started} |"
             echo "| Time-to-live | ${ttl} h |"
             echo "| Expires | ${expires} |"

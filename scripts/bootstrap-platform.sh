@@ -218,7 +218,7 @@ EOF
   local tfv="${PLATFORM}/20-shared-dev/terraform.tfvars"
   setvar ACR_NAME "$(sed -nE '/^acr *=/,/^}/ s/^ *name *= *"([^"]+)".*/\1/p' "$tfv" | head -1)"
   setvar AKS_NAME "$(sed -nE '/^aks *=/,/^}/ s/^ *name *= *"([^"]+)".*/\1/p' "$tfv" | head -1)"
-  setvar AKS_RESOURCE_GROUP "rg-idp-platform-${ENVIRONMENT}"
+  setvar AKS_RESOURCE_GROUP "rg-idp-aks-${ENVIRONMENT}"
   local outputs; outputs="$(mktemp)"; printf '%s' "$out" > "$outputs"
   setvar PLATFORM_CHART_VALUES_JSON "$("$PY" - "$tfv" "$ENVIRONMENT" "$outputs" <<'EOF'
 import json, re, sys

@@ -7,8 +7,30 @@ Shared platform infrastructure, one Terraform state per stack, applied in order 
 | `00-bootstrap` | Terraform state storage account and `platform` / `apps` containers | A platform admin, once (local state, then migrated) |
 | `05-subscriptions` | Vended subscriptions from `subscriptions.d/*.json` (EA/MCA only) | Vending identity |
 | `10-identities` | All platform identities, GitHub OIDC federation, platform Key Vault and per-secret RBAC, discovery `Reader`, state access, the `IDP App Provisioner` custom role and the provisioning identity's subscription-level assignments (role definitions need an admin) | A platform admin the first time, then the platform identity |
-| `20-shared-dev` | Platform and apps resource groups, shared AKS (+ `clusters.d/*.json`), ACR (+ `registries.d/*.json`), PostgreSQL, DNS, shared demo storage, role assignments | Platform identity |
+| `20-shared-dev` | Shared AKS (+ `clusters.d/*.json`), ACR (+ `registries.d/*.json`), PostgreSQL, DNS, shared demo storage, role assignments, each in its own resource group (below) | Platform identity |
 | `30-cluster-config` | Kubernetes namespaces, shared Gateway, ClusterRoles/bindings, Workload Identity federation for the platform services | Platform identity |
+
+## Resource groups and rights
+
+One resource group per function (Cloud Adoption Framework), all tagged for the landing zone policy.
+`10-identities` creates them, empty, so the pipeline identities get rights **inside these groups only**.
+That matters on a subscription shared with other workloads: they stay out of reach.
+
+| Resource group | Holds | Pipeline rights |
+|---|---|---|
+| `rg-idp-tfstate-<env>` | Terraform state (00) | Blob data access per container |
+| `rg-idp-identities-<env>` | Identities, platform Key Vault (10) | None (admin-applied) |
+| `rg-idp-aks-<env>` | AKS cluster (20) | `platform`: Contributor + RBAC Administrator |
+| `rg-idp-aks-nodes-<env>` | Nodes, disks, load balancer (created by AKS with the cluster's tags) | Managed by AKS |
+| `rg-idp-registry-<env>` | Container registry (20) | `platform`: Contributor + RBAC Administrator |
+| `rg-idp-data-<env>` | PostgreSQL (20) | `platform`: Contributor + RBAC Administrator |
+| `rg-idp-network-<env>` | DNS zone (20) | `platform`: Contributor + RBAC Administrator |
+| `rg-idp-apps-<env>` | Shared demo storage (20) and golden-path applications | `platform` as above; `provisioning`: App Provisioner + RBAC Administrator limited by ABAC |
+
+The `platform` identity is Reader on the subscription and can't change anything outside these groups.
+Golden-path applications land in `rg-idp-apps-<env>`; creating new resource groups is off in the
+allowlist (`create_new.resource_group: false`). Teardown empties the groups and keeps them (they cost
+nothing), so the next provision reuses them.
 
 ## First-time setup
 

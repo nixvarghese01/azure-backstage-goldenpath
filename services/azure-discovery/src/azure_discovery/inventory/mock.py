@@ -86,15 +86,16 @@ class MockInventory:
         ]
         self.resource_groups = [
             ResourceGroup(id=f"{_P}/rg-idp-apps-dev", name="rg-idp-apps-dev", location="uksouth"),
-            ResourceGroup(id=f"{_P}/rg-idp-platform-dev", name="rg-idp-platform-dev", location="uksouth"),
+            ResourceGroup(id=f"{_P}/rg-idp-aks-dev", name="rg-idp-aks-dev", location="uksouth"),
+            ResourceGroup(id=f"{_P}/rg-idp-registry-dev", name="rg-idp-registry-dev", location="uksouth"),
             ResourceGroup(id=f"{_P}/rg-other", name="rg-other", location="westeurope"),
         ]
         self.clusters = [
             AksCluster(
-                id=f"{_P}/rg-idp-platform-dev/providers/Microsoft.ContainerService/managedClusters/"
+                id=f"{_P}/rg-idp-aks-dev/providers/Microsoft.ContainerService/managedClusters/"
                 "aks-idp-shared-dev",
                 name="aks-idp-shared-dev",
-                resource_group="rg-idp-platform-dev",
+                resource_group="rg-idp-aks-dev",
                 location="uksouth",
                 kubernetes_version="1.36.4",
                 oidc_issuer_enabled=True,
@@ -112,9 +113,9 @@ class MockInventory:
         ]
         self.registries = [
             ContainerRegistry(
-                id=f"{_P}/rg-idp-platform-dev/providers/Microsoft.ContainerRegistry/registries/acridpdev",
+                id=f"{_P}/rg-idp-registry-dev/providers/Microsoft.ContainerRegistry/registries/acridpdev",
                 name="acridpdev",
-                resource_group="rg-idp-platform-dev",
+                resource_group="rg-idp-registry-dev",
                 location="uksouth",
                 sku="Basic",
                 login_server="acridpdev.azurecr.io",

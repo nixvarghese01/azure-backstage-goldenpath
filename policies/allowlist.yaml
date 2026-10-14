@@ -43,7 +43,7 @@ resource_groups:
 
 aks_clusters:
   - name: aks-idp-shared-dev
-    resource_group: rg-idp-platform-dev
+    resource_group: rg-idp-aks-dev
     subscription: 00000000-0000-0000-0000-000000000000
     environments: [dev]
     gateway:
@@ -53,7 +53,7 @@ aks_clusters:
 
 container_registries:
   - name: acridpdev
-    resource_group: rg-idp-platform-dev
+    resource_group: rg-idp-registry-dev
     subscription: 00000000-0000-0000-0000-000000000000
     environments: [dev]
 
@@ -74,7 +74,7 @@ subscription_vending:
 create_new:
   # Which "Create new" options the platform offers (subject to subscription capabilities).
   subscription: true
-  resource_group: true
+  resource_group: false   # shared subscription: apps land in rg-idp-apps-<env> (10-identities scopes rights there)
   aks_cluster: true
   container_registry: true
   namespace: true

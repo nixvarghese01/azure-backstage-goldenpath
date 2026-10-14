@@ -132,6 +132,26 @@ resource "azurerm_resource_group" "identities" {
   tags     = local.tags
 }
 
+# Workload groups, one per function (CAF). Created here, empty, so the pipeline identities get rights
+# inside them only and never on the whole subscription, which may hold other workloads. 20-shared-dev
+# fills them; teardown empties them.
+locals {
+  workload_groups = {
+    aks      = "platform"
+    registry = "platform"
+    data     = "platform"
+    network  = "platform"
+    apps     = "application"
+  }
+}
+
+resource "azurerm_resource_group" "workload" {
+  for_each = local.workload_groups
+  name     = "rg-idp-${each.key}-${var.environment}"
+  location = var.location
+  tags     = merge(local.tags, { "lifecycle" = each.value })
+}
+
 # ------------------------------------------------------------------ GitHub-federated identities
 module "platform" {
   source              = "../../modules/github-oidc-identity"
@@ -285,11 +305,19 @@ resource "azurerm_role_assignment" "secret_reader" {
 # only usable from platform-apply.yml behind the `platform` environment's required reviewers.
 resource "azurerm_role_assignment" "platform" {
   for_each = {
-    contributor = "Contributor"
-    rbac        = "Role Based Access Control Administrator"
+    for pair in setproduct(keys(local.workload_groups), ["Contributor", "Role Based Access Control Administrator"]) :
+    "${pair[0]}-${pair[1] == "Contributor" ? "contributor" : "rbac"}" => { group = pair[0], role = pair[1] }
   }
+  scope                = azurerm_resource_group.workload[each.value.group].id
+  role_definition_name = each.value.role
+  principal_id         = module.platform.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+# Reads outside its groups (identities, the subscription's capabilities); no write anywhere else.
+resource "azurerm_role_assignment" "platform_reader" {
   scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
-  role_definition_name = each.value
+  role_definition_name = "Reader"
   principal_id         = module.platform.principal_id
   principal_type       = "ServicePrincipal"
 }
@@ -359,15 +387,17 @@ resource "azurerm_role_definition" "app_provisioner" {
   assignable_scopes = ["/subscriptions/${data.azurerm_client_config.current.subscription_id}"]
 }
 
+# Applications land in the approved apps group: on a shared subscription the golden path can't
+# create resource groups or touch anything outside rg-idp-apps-<env>.
 resource "azurerm_role_assignment" "provisioning_app_provisioner" {
-  scope              = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+  scope              = azurerm_resource_group.workload["apps"].id
   role_definition_id = azurerm_role_definition.app_provisioner.role_definition_resource_id
   principal_id       = module.provisioning.principal_id
   principal_type     = "ServicePrincipal"
 }
 
 resource "azurerm_role_assignment" "provisioning_rbac_admin" {
-  scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+  scope                = azurerm_resource_group.workload["apps"].id
   role_definition_name = "Role Based Access Control Administrator"
   principal_id         = module.provisioning.principal_id
   principal_type       = "ServicePrincipal"
@@ -432,6 +462,11 @@ output "principal_ids" {
     discovery       = azurerm_user_assigned_identity.service["discovery"].principal_id
     orchestrator    = azurerm_user_assigned_identity.service["orchestrator"].principal_id
   }
+}
+
+output "resource_groups" {
+  description = "Workload resource groups the pipelines may change."
+  value       = { for k, g in azurerm_resource_group.workload : k => g.name }
 }
 
 output "key_vault_name" {

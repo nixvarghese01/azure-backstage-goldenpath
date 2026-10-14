@@ -16,8 +16,8 @@ const good: InfrastructureSelection = {
   region: 'uksouth',
   subscription: { mode: 'existing', id: 'sub', name: 'sub-idp-dev' },
   resourceGroup: { mode: 'existing', name: 'rg-idp-apps-dev' },
-  aksCluster: { mode: 'existing', name: 'aks-idp-shared-dev', resourceGroup: 'rg-idp-platform-dev' },
-  containerRegistry: { mode: 'existing', name: 'acridpdev', resourceGroup: 'rg-idp-platform-dev' },
+  aksCluster: { mode: 'existing', name: 'aks-idp-shared-dev', resourceGroup: 'rg-idp-aks-dev' },
+  containerRegistry: { mode: 'existing', name: 'acridpdev', resourceGroup: 'rg-idp-registry-dev' },
   namespace: { mode: 'new', name: 'orders-api' },
   runtimeCapability: { type: 'storage', mode: 'existing', name: 'stidpshareddev' },
 };

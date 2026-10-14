@@ -130,24 +130,20 @@ data "azurerm_user_assigned_identity" "id" {
   resource_group_name = var.identity_resource_group
 }
 
-# ------------------------------------------------------------------ resource groups
-resource "azurerm_resource_group" "platform" {
-  name     = "rg-idp-platform-${var.environment}"
-  location = var.location
-  tags     = local.tags
-}
-
-resource "azurerm_resource_group" "apps" {
-  name     = "rg-idp-apps-${var.environment}"
-  location = var.location
-  tags     = merge(local.tags, { "lifecycle" = "application" })
+# ------------------------------------------------------------------ resource groups from 10-identities
+# One group per function (CAF). 10-identities creates them, so the pipeline's platform identity only
+# needs rights inside them, not on the subscription. Teardown empties them; the empty groups stay.
+data "azurerm_resource_group" "rg" {
+  for_each = toset(["aks", "registry", "data", "network", "apps"])
+  name     = "rg-idp-${each.key}-${var.environment}"
 }
 
 # ------------------------------------------------------------------ AKS
 module "aks" {
   source                 = "../../modules/aks-cluster"
   name                   = var.aks.name
-  resource_group_name    = azurerm_resource_group.platform.name
+  resource_group_name    = data.azurerm_resource_group.rg["aks"].name
+  node_resource_group    = "rg-idp-aks-nodes-${var.environment}"
   location               = var.location
   sku_tier               = var.aks.sku_tier
   tenant_id              = data.azurerm_client_config.current.tenant_id
@@ -161,7 +157,8 @@ module "extra_aks" {
   for_each               = local.extra_clusters
   source                 = "../../modules/aks-cluster"
   name                   = each.key
-  resource_group_name    = azurerm_resource_group.platform.name
+  resource_group_name    = data.azurerm_resource_group.rg["aks"].name
+  node_resource_group    = "rg-idp-aks-nodes-${each.key}"
   location               = try(each.value.location, var.location)
   sku_tier               = try(each.value.zonal, false) ? "Standard" : "Free"
   tenant_id              = data.azurerm_client_config.current.tenant_id
@@ -180,7 +177,7 @@ locals {
 module "acr" {
   source              = "../../modules/container-registry"
   name                = var.acr.name
-  resource_group_name = azurerm_resource_group.platform.name
+  resource_group_name = data.azurerm_resource_group.rg["registry"].name
   location            = var.location
   sku                 = var.acr.sku
   tags                = local.tags
@@ -190,7 +187,7 @@ module "extra_acr" {
   for_each            = local.extra_registries
   source              = "../../modules/container-registry"
   name                = each.key
-  resource_group_name = azurerm_resource_group.platform.name
+  resource_group_name = data.azurerm_resource_group.rg["registry"].name
   location            = try(each.value.location, var.location)
   tags                = merge(local.tags, { "request-id" = try(each.value.request_id, "") })
 }
@@ -203,7 +200,7 @@ locals {
 module "postgres" {
   source              = "../../modules/postgresql-flexible"
   name                = var.postgres_name
-  resource_group_name = azurerm_resource_group.platform.name
+  resource_group_name = data.azurerm_resource_group.rg["data"].name
   location            = var.location
   tenant_id           = data.azurerm_client_config.current.tenant_id
   allowed_ips         = var.postgres_allowed_ips
@@ -219,7 +216,7 @@ module "postgres" {
 resource "azurerm_dns_zone" "apps" {
   count               = var.dns_zone_name == null ? 0 : 1
   name                = var.dns_zone_name
-  resource_group_name = azurerm_resource_group.platform.name
+  resource_group_name = data.azurerm_resource_group.rg["network"].name
   tags                = local.tags
 }
 
@@ -227,7 +224,7 @@ resource "azurerm_dns_zone" "apps" {
 module "shared_storage" {
   source              = "../../modules/storage-account"
   name                = var.shared_storage_name
-  resource_group_name = azurerm_resource_group.apps.name
+  resource_group_name = data.azurerm_resource_group.rg["apps"].name
   location            = var.location
   containers          = ["shared"]
   tags                = merge(local.tags, { "lifecycle" = "application", "application" = "shared" })
