@@ -11,6 +11,7 @@ dev = [
   "testcontainers[postgres]~=4.15",
   "ruff~=0.17.0",
   "mypy~=2.4",
+  "pytest-cov~=7.0",
 ]
 
 [tool.ruff]
