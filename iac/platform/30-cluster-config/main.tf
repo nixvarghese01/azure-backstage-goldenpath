@@ -89,6 +89,37 @@ locals {
   }
 }
 
+# ------------------------------------------------------------------ storage
+# Disks created for volume claims get the landing zone's required tags. AKS's own storage classes
+# create untagged disks, which a "require a tag on resources" policy denies (RequestDisallowedByPolicy,
+# the claim stays Pending). Platform and application volumes use this class.
+variable "disk_tags" {
+  description = "Tags on dynamically created disks; must satisfy the landing zone's tag policy."
+  type        = map(string)
+  default = {
+    "workload"           = "idp"
+    "owner"              = "platform-team"
+    "costCenter"         = "platform"
+    "criticality"        = "low"
+    "dataClassification" = "internal"
+    "managed-by"         = "idp-platform"
+  }
+}
+
+resource "kubernetes_storage_class_v1" "tagged" {
+  metadata {
+    name = "managed-csi-tagged"
+  }
+  storage_provisioner    = "disk.csi.azure.com"
+  reclaim_policy         = "Delete"
+  volume_binding_mode    = "WaitForFirstConsumer"
+  allow_volume_expansion = true
+  parameters = {
+    skuName = "StandardSSD_LRS"
+    tags    = join(",", [for k, v in merge(var.disk_tags, { "environment" = var.environment }) : "${k}=${v}"])
+  }
+}
+
 # ------------------------------------------------------------------ namespaces
 # The Gateway's proxy pods are created and managed by AKS App Routing (Istio). Their istio-proxy
 # container sets no seccomp profile, which "restricted" rejects, so this namespace enforces
