@@ -333,8 +333,17 @@ EOF
       *) ok "$e (you approve each run)" ;;
     esac
   done
+  # Wait-timer environments for platform-ttl-timer.yml: N hours + 5 minutes, no reviewers.
+  for h in 2 4 6 8 24; do
+    gh api -X PUT "repos/${REPO}/environments/platform-ttl-${h}h" --input - >/dev/null <<< \
+      "{\"wait_timer\":$((h * 60 + 5)),\"deployment_branch_policy\":{\"protected_branches\":false,\"custom_branch_policies\":true}}"
+    for b in develop main; do
+      gh api -X POST "repos/${REPO}/environments/platform-ttl-${h}h/deployment-branch-policies" -f name="$b" -f type=branch >/dev/null 2>&1 || true
+    done
+    ok "platform-ttl-${h}h (waits ${h} h 5 min)"
+  done
   echo "Done. Next: Actions -> platform-provision -> Run workflow on develop (pick ttl_hours)."
-  echo "platform-ttl tears the platform down when ttl_hours expires; check it hourly in Actions."
+  echo "platform-ttl tears the platform down when ttl_hours expires (platform-ttl-timer, hourly cron as backup)."
 }
 
 # policies/allowlist.yaml holds example IDs only. This environment's real ones (tenant, subscription,
