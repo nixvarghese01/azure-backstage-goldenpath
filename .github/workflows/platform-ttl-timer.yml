@@ -1,0 +1,37 @@
+# A reliable deadline for the dev platform's time-to-live. GitHub doesn't guarantee scheduled runs:
+# platform-ttl's hourly cron has run as rarely as every 5-6 hours, which keeps an expired cluster
+# using credit. platform-provision starts this after provisioning. The job waits in the environment
+# platform-ttl-<N>h, whose wait timer is N hours + 5 minutes (no runner is used while waiting), then
+# starts platform-ttl. That run tears down only if the platform really expired, so a later
+# re-provision (with its own, newer timer) or a manual teardown makes an older timer harmless.
+# The hourly cron stays as a backup.
+name: platform-ttl-timer
+run-name: "platform-ttl-timer ${{ inputs.ttl_hours }}h"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ttl_hours:
+        description: Hours to wait (an environment platform-ttl-<N>h must exist)
+        type: choice
+        options: ["2", "4", "6", "8", "24"]
+        default: "4"
+
+permissions:
+  contents: read
+
+jobs:
+  deadline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: platform-ttl-${{ inputs.ttl_hours }}h   # wait timer; no reviewers
+    permissions:
+      actions: write   # start platform-ttl
+    steps:
+      - name: Start the time-to-live check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.ref_name }}
+        run: |
+          gh workflow run platform-ttl.yml --repo "$GITHUB_REPOSITORY" --ref "$REF"
+          echo "Started platform-ttl on ${REF}; it tears the platform down only if it expired." >> "$GITHUB_STEP_SUMMARY"

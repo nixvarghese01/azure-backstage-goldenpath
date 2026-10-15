@@ -8,7 +8,8 @@
 # create the identities this pipeline signs in with.
 #
 # Every provision has a lifetime (ttl_hours). platform-ttl.yml destroys the stacks when it expires, so
-# a forgotten dev platform doesn't keep using the subscription's credit. The run name records the TTL.
+# a forgotten dev platform doesn't keep using the subscription's credit. The run name records the TTL;
+# the ttl-timer job starts platform-ttl-timer.yml, which runs that check when the TTL expires.
 name: platform-provision
 run-name: "platform-provision ${{ inputs.action }} ttl=${{ inputs.ttl_hours || 'n/a' }}h"
 
@@ -174,6 +175,26 @@ jobs:
       contents: read
       id-token: write
       attestations: write
+
+  # The deadline: platform-ttl's hourly cron alone is unreliable (GitHub skips scheduled runs), so start
+  # a timer run that checks the TTL right when it expires. Runs whenever the cluster stacks were applied,
+  # even if the release failed: the cost is in the cluster.
+  ttl-timer:
+    needs: [cluster-config, release]
+    if: inputs.action == 'provision' && !cancelled() && needs.cluster-config.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write   # start platform-ttl-timer
+    steps:
+      - name: Start the time-to-live timer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.ref_name }}
+          TTL: ${{ inputs.ttl_hours || '4' }}
+        run: |
+          gh workflow run platform-ttl-timer.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" -f ttl_hours="$TTL"
+          echo "Time-to-live timer started: platform-ttl checks in ${TTL} h." >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------- teardown: 30 -> 20 (00 and 10 stay; see docs/operations/cleanup.md) ----------------
   teardown-cluster-config:

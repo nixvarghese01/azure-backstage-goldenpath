@@ -93,3 +93,4 @@ jobs:
       contents: read
       id-token: write
       attestations: write
+      actions: write   # platform-provision's ttl-timer job declares it (skipped on teardown)
