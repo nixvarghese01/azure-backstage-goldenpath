@@ -229,7 +229,8 @@ module "deployment" {
 
 # ------------------------------------------------------------------ platform service identities
 resource "azurerm_user_assigned_identity" "service" {
-  for_each            = toset(["backstage", "discovery", "orchestrator"])
+  # postgres: the dev in-cluster database (deploy/charts/postgres) reads its passwords from Key Vault.
+  for_each            = toset(["backstage", "discovery", "orchestrator", "postgres"])
   name                = "id-idp-${each.key}-${var.environment}"
   resource_group_name = azurerm_resource_group.identities.name
   location            = var.location
@@ -298,20 +299,28 @@ variable "secrets_created" {
 }
 
 locals {
+  # Secret -> the workloads that may read it (per-secret RBAC). The database passwords are read by the
+  # service and by postgres, which creates the login roles (dev in-cluster PostgreSQL only).
   secrets = {
-    "gh-app-backstage-key"               = "backstage"
-    "gh-app-backstage-client-secret"     = "backstage"
-    "backstage-session-secret"           = "backstage"
-    "gh-app-orchestrator-key"            = "orchestrator"
-    "gh-app-orchestrator-webhook-secret" = "orchestrator"
+    "gh-app-backstage-key"               = ["backstage"]
+    "gh-app-backstage-client-secret"     = ["backstage"]
+    "backstage-session-secret"           = ["backstage"]
+    "gh-app-orchestrator-key"            = ["orchestrator"]
+    "gh-app-orchestrator-webhook-secret" = ["orchestrator"]
+    "postgres-password"                  = ["postgres"]
+    "backstage-db-password"              = ["backstage", "postgres"]
+    "orchestrator-db-password"           = ["orchestrator", "postgres"]
   }
+  secret_grants = merge([
+    for secret, readers in local.secrets : { for r in readers : "${secret}/${r}" => { secret = secret, reader = r } }
+  ]...)
 }
 
 resource "azurerm_role_assignment" "secret_reader" {
-  for_each             = var.secrets_created ? local.secrets : {}
-  scope                = "${module.key_vault.id}/secrets/${each.key}"
+  for_each             = var.secrets_created ? local.secret_grants : {}
+  scope                = "${module.key_vault.id}/secrets/${each.value.secret}"
   role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_user_assigned_identity.service[each.value].principal_id
+  principal_id         = azurerm_user_assigned_identity.service[each.value.reader].principal_id
   principal_type       = "ServicePrincipal"
 }
 
@@ -508,6 +517,7 @@ output "client_ids" {
     backstage       = azurerm_user_assigned_identity.service["backstage"].client_id
     discovery       = azurerm_user_assigned_identity.service["discovery"].client_id
     orchestrator    = azurerm_user_assigned_identity.service["orchestrator"].client_id
+    postgres        = azurerm_user_assigned_identity.service["postgres"].client_id
   }
 }
 

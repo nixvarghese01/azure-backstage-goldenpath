@@ -2,6 +2,9 @@ image:
   repository: acridpdev.azurecr.io/idp/backstage
   tag: latest
 replicas: 2
+database:
+  # true (dev): PostgreSQL inside the cluster (deploy/charts/postgres).
+  inCluster: false
 workloadIdentity:
   clientId: ""             # id-idp-backstage-<env>
 keyVault:

@@ -11,6 +11,9 @@ keyVault:
   name: kv-idp-plat-dev
   tenantId: ""
 database:
+  # true (dev): PostgreSQL inside the cluster (deploy/charts/postgres), password login.
+  # false: Azure Database for PostgreSQL with Entra authentication (url below).
+  inCluster: false
   url: ""                 # postgresql+psycopg://id-idp-orchestrator-dev@<server>.postgres.database.azure.com:5432/orchestrator?sslmode=require
 auth:
   tenantId: ""

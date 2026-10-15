@@ -14,6 +14,9 @@ def _env(name: str, default: str | None = None) -> str | None:
 class Settings:
     database_url: str
     database_entra_auth: bool
+    # Password read from a file (Key Vault via the CSI driver) for each new connection; for the dev
+    # in-cluster PostgreSQL. None with Entra authentication.
+    database_password_file: str | None
     discovery_base_url: str
     discovery_scope: str | None  # Entra scope for discovery (None in static/dev mode)
     github_mode: str  # "app" | "mock"
@@ -42,6 +45,7 @@ class Settings:
         return cls(
             database_url=_env("ORCHESTRATOR_DATABASE_URL", "sqlite:///./orchestrator.db") or "",
             database_entra_auth=(_env("ORCHESTRATOR_DATABASE_ENTRA_AUTH", "false") or "").lower() == "true",
+            database_password_file=_env("ORCHESTRATOR_DATABASE_PASSWORD_FILE"),
             discovery_base_url=(_env("DISCOVERY_BASE_URL", "http://azure-discovery:8001") or "").rstrip("/"),
             discovery_scope=_env("DISCOVERY_ENTRA_SCOPE"),
             github_mode=(_env("ORCHESTRATOR_GITHUB_MODE", "app") or "app").lower(),

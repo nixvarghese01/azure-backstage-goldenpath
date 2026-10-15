@@ -63,7 +63,11 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
     configure_tracing("provisioning-orchestrator")
     if sessions is None:
         sessions = make_session_factory(
-            make_engine(settings.database_url, entra_auth=settings.database_entra_auth)
+            make_engine(
+                settings.database_url,
+                entra_auth=settings.database_entra_auth,
+                password_file=settings.database_password_file,
+            )
         )
 
     app = FastAPI(title="provisioning-orchestrator", version="1.0.0")

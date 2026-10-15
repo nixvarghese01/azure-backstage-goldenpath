@@ -13,3 +13,11 @@ vulnerabilities:
       basic-ftp 5.x comes only through get-uri (mockttp proxy support and openapi-generator-cli dev tooling);
       the portal never fetches ftp:// URLs. The fix is 6.x, a breaking major; wait for upstream.
     expired_at: 2026-12-15
+misconfigurations:
+  - id: KSV-0109
+    paths: ["postgres.yaml", "deploy/charts/postgres/templates/all.yaml"]
+    statement: >-
+      False positive: the dev in-cluster PostgreSQL init script (ConfigMap postgres-init) contains the SQL
+      keyword PASSWORD, not a password. The values come from Key Vault at runtime through the CSI driver
+      (/mnt/secrets/*-db-password); no secret is stored in the ConfigMap or the chart.
+    expired_at: 2027-04-15
