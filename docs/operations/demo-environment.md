@@ -70,8 +70,12 @@ before relying on them.
 **Nothing is left running by accident:**
 
 1. **Time-to-live.** Every `platform-provision` run sets `ttl_hours` (2, 4, 6, 8 or 24; default 4). The
-   hourly `platform-ttl` workflow destroys `30-cluster-config` and `20-shared-dev` once it expires. That
+   `platform-ttl` workflow destroys `30-cluster-config` and `20-shared-dev` once it expires. That
    run uses the `platform-teardown` environment, which has no reviewers, so it never waits for a person.
+   It starts on time because provisioning ends by starting `platform-ttl-timer`, which waits in the
+   environment `platform-ttl-<N>h` (a wait timer of N hours + 5 minutes; no runner is used while it
+   waits). GitHub doesn't guarantee scheduled runs (the hourly cron has run as rarely as every 5-6
+   hours), so the cron is only a backup.
    A 4-hour session costs about USD 0.50 of credit.
 2. **Spending limit.** `scripts/bootstrap-platform.sh` and `platform-provision` refuse to create
    resources unless the subscription's spending limit is on. Usage then comes out of the credit, and
