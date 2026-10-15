@@ -21,7 +21,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from provisioning_orchestrator.config import Settings
-from provisioning_orchestrator.db import make_engine, make_session_factory
+from provisioning_orchestrator.db import engine_from_settings, make_session_factory
 from provisioning_orchestrator.models import InboxEvent, Request
 from provisioning_orchestrator.schemas import (
     ApprovalDecision,
@@ -62,13 +62,7 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
     configure_logging("provisioning-orchestrator", settings.log_level)
     configure_tracing("provisioning-orchestrator")
     if sessions is None:
-        sessions = make_session_factory(
-            make_engine(
-                settings.database_url,
-                entra_auth=settings.database_entra_auth,
-                password_file=settings.database_password_file,
-            )
-        )
+        sessions = make_session_factory(engine_from_settings(settings))
 
     app = FastAPI(title="provisioning-orchestrator", version="1.0.0")
 

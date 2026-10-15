@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from alembic import context
 from provisioning_orchestrator.config import Settings
-from provisioning_orchestrator.db import make_engine
+from provisioning_orchestrator.db import engine_from_settings
 from provisioning_orchestrator.models import Base
 
 settings = Settings.from_env()
@@ -10,7 +10,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_online() -> None:
-    engine = make_engine(settings.database_url, entra_auth=settings.database_entra_auth)
+    engine = engine_from_settings(settings)
     with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
         with context.begin_transaction():

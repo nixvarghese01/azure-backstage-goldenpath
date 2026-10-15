@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
+
+if TYPE_CHECKING:
+    from provisioning_orchestrator.config import Settings
 
 _PG_SCOPE = "https://ossrdbms-aad.database.windows.net/.default"
 
@@ -47,6 +50,16 @@ def read_password(path: str) -> str:
     """The password in a mounted secret file, without the trailing newline."""
     with open(path, encoding="utf-8") as fh:
         return fh.read().rstrip("\r\n")
+
+
+def engine_from_settings(settings: Settings) -> Engine:
+    """The engine for the configured database and login method. API, worker and migrations all use
+    this, so they always authenticate the same way."""
+    return make_engine(
+        settings.database_url,
+        entra_auth=settings.database_entra_auth,
+        password_file=settings.database_password_file,
+    )
 
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:

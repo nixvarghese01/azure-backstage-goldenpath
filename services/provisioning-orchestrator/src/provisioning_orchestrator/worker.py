@@ -17,7 +17,7 @@ from provisioning_orchestrator.clients.backstage import HttpBackstageClient, Nul
 from provisioning_orchestrator.clients.discovery import HttpDiscoveryClient
 from provisioning_orchestrator.clients.github import AppGitHubClient, GitHubClient, MockGitHubClient
 from provisioning_orchestrator.config import Settings
-from provisioning_orchestrator.db import make_engine, make_session_factory, transaction
+from provisioning_orchestrator.db import engine_from_settings, make_session_factory, transaction
 from provisioning_orchestrator.engine import (
     UUID_RE,
     Context,
@@ -218,13 +218,7 @@ class Worker:
 
 
 def build_context(settings: Settings) -> Context:
-    sessions = make_session_factory(
-        make_engine(
-            settings.database_url,
-            entra_auth=settings.database_entra_auth,
-            password_file=settings.database_password_file,
-        )
-    )
+    sessions = make_session_factory(engine_from_settings(settings))
     github: GitHubClient
     if settings.github_mode == "mock":
         github = MockGitHubClient()
