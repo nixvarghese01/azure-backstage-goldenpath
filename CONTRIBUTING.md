@@ -29,10 +29,28 @@ A fix for something only on `develop` is a `bugfix/` branch, not a hotfix.
   Everyone else goes through pull requests; [`CODEOWNERS`](.github/CODEOWNERS) requests the
   maintainer's review on each one.
 
+### Releases
+
+Versions follow [Semantic Versioning](https://semver.org/): `MAJOR` for breaking changes (template
+parameters, APIs or Terraform inputs that need manual migration), `MINOR` for new features, `PATCH` for
+fixes. The version is the newest `## [X.Y.Z]` section of [`CHANGELOG.md`](CHANGELOG.md); add your
+change under `[Unreleased]` in the same pull request.
+
+1. On a `chore/release-X.Y.Z` branch, rename `[Unreleased]` in `CHANGELOG.md` to `[X.Y.Z] - <date>`
+   (and add a new empty `[Unreleased]`); merge it into `develop`.
+2. Open a pull request `develop` → `main` titled `Release vX.Y.Z`, with the changelog section as its
+   description, and merge it with a **merge commit**. `branch policy` fails if that version is already
+   tagged.
+3. The `release` workflow tags the merge commit `vX.Y.Z` and publishes the GitHub release with the
+   changelog section as notes; `platform-release` deploys from `main`. Nothing to do by hand.
+
+Terraform modules are versioned separately (`<module>/vX.Y.Z`, workflow `release-modules`).
+
 ### Hotfixes
 
-1. Branch `hotfix/<issue>-<topic>` from `main` and fix it, with tests.
-2. Open a pull request into `main`.
+1. Branch `hotfix/<issue>-<topic>` from `main`; fix it, with tests, and add a `PATCH` section
+   (`[X.Y.Z+1] - <date>`) to `CHANGELOG.md`.
+2. Open a pull request into `main`; merging it releases `vX.Y.Z+1`.
 3. Open a pull request `main` → `develop` so the fix isn't lost.
 
 ## Commits and pull requests
