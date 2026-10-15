@@ -67,8 +67,12 @@ variable "postgres_name" {
 }
 
 variable "postgres" {
-  description = "PostgreSQL size and zone. Change the zone (or size) if the region is out of capacity."
+  description = <<-EOT
+    Azure Database for PostgreSQL for platform state. enabled = false (dev) runs PostgreSQL inside the
+    cluster instead (deploy/charts/postgres); change the zone or size if the region is out of capacity.
+  EOT
   type = object({
+    enabled  = optional(bool, true)
     sku_name = optional(string, "B_Standard_B1ms")
     zone     = optional(string)
   })
@@ -207,6 +211,7 @@ locals {
 
 # ------------------------------------------------------------------ PostgreSQL (platform state)
 module "postgres" {
+  count               = var.postgres.enabled ? 1 : 0
   source              = "../../modules/postgresql-flexible"
   name                = var.postgres_name
   sku_name            = var.postgres.sku_name
@@ -286,7 +291,7 @@ output "acr_login_servers" {
 }
 
 output "postgres_fqdn" {
-  value = module.postgres.fqdn
+  value = var.postgres.enabled ? module.postgres[0].fqdn : null
 }
 
 output "dns_zone_name_servers" {

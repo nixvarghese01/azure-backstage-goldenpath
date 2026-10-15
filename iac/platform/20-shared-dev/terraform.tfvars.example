@@ -25,6 +25,7 @@ acr = {
 
 postgres_name        = "psql-idp-dev"
 # postgres = { sku_name = "B_Standard_B1ms", zone = "2" } # pin a zone if the region is out of capacity
+# postgres = { enabled = false }                            # dev: PostgreSQL inside the cluster instead
 postgres_allowed_ips = {} # e.g. { aks-egress = "20.0.0.1" } once the cluster exists
 dns_zone_name        = null
 shared_storage_name  = "stidpshareddev"
