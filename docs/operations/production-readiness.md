@@ -1,6 +1,6 @@
 # Production readiness gaps
 
-Installing successfully doesn't make this production-ready. This model project deliberately stops short of the items below. Each one says what a production rollout should add.
+Installing successfully doesn't make this production-ready. This model project deliberately stops short of the items below. Each one says what a production rollout should add. For every area, including why each free-tier deviation exists and the input that switches it, see [Best practice vs. this free-tier project](../best-practice-vs-free-tier.md).
 
 | Area | Model project | Production |
 |---|---|---|
@@ -12,7 +12,7 @@ Installing successfully doesn't make this production-ready. This model project d
 | Workflows | Callers pin reusable workflows to `@main` | Pin to release tags (`@workflows/v1`) and update `reusable_workflow_ref` |
 | Observability | Structured logs, optional OTLP traces | Azure Monitor / Managed Prometheus and Grafana dashboards, SLO alerting, audit log export to a SIEM |
 | Orchestration | PostgreSQL job table | Temporal (ADR-0001) once workflow types and volumes grow |
-| Data | Burstable PostgreSQL, 7-day backups | HA PostgreSQL (zone-redundant), longer retention, tested restore |
+| Data | Dev: PostgreSQL in the cluster (ADR-0009), no backup; optional Burstable Azure PostgreSQL, 7-day backups | HA PostgreSQL (zone-redundant), longer retention, tested restore |
 | Environments | `dev` only | `test`/`prod` with two approvers, HA default in prod, deploy approvals |
-| Supply chain | SHA-pinned actions, checksum-verified tools, Trivy/gitleaks/CodeQL | SBOMs, image signing (cosign/Notation), provenance attestations, private registry mirrors |
-| Cost | Manual teardown, budget alerts | Cost estimates on the approval card (configured pricing), budgets per team, automatic idle-resource cleanup |
+| Supply chain | SHA-pinned actions, checksum-verified tools, Trivy/gitleaks/CodeQL, SBOMs and build provenance attestations | Image signing (cosign/Notation) verified at admission (Ratify), private registry mirrors |
+| Cost | Spending-limit guard, time-to-live teardown (environment wait timer), sizes estimated before creation | Cost estimates on the approval card (configured pricing), budgets per team, automatic idle-resource cleanup |
