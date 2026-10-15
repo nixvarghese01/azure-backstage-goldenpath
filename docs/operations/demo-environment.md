@@ -39,8 +39,8 @@ Options the subscription can't support are **disabled in the form, with the reas
 
 | Resource | Demo choice | Why |
 |---|---|---|
-| Region | One allowlisted region with AKS 1.36 and enough quota, for example `uksouth` | Single region keeps cost and quota simple |
-| AKS | **Free tier** control plane (no uptime SLA), **1 system node: `Standard_B2s`** (2 vCPU / 4 GiB, the minimum AKS accepts for a system pool) with a **30 GB OS disk**, Azure CNI Overlay | Fits a small vCPU quota. The platform and the demo app share the node; services run one replica each |
+| Region | One allowlisted region with AKS 1.36 and enough quota: `swedencentral` in the first run, because the landing zone policy allows only that region | Single region keeps cost and quota simple |
+| AKS | **Free tier** control plane (no uptime SLA), **1 system node: `Standard_B2s_v2`** (2 vCPU / 8 GiB; Sweden Central has no v1 B-series) with a **30 GB OS disk**, Azure CNI Overlay | Fits a small vCPU quota. **Not enough on its own:** AKS add-ons request ~1.5 vCPU and the App Routing ingress (Istio Gateway controller and nginx) ~2 vCPU more, so the Gateway stays unprogrammed. Plan for **2 nodes (4 vCPU)**, which needs 4 free regional vCPUs |
 | Ingress | App Routing Gateway API with **one** shared Gateway, so one public IP and load balancer | [ADR-0003](../adr/0003-ingress-gateway-api.md) |
 | ACR | **Basic** | Enough for a few images |
 | PostgreSQL | Azure Database for PostgreSQL flexible server, **smallest Burstable** size, no HA, minimum storage | Platform state for Backstage and the orchestrator |
@@ -51,7 +51,7 @@ Options the subscription can't support are **disabled in the form, with the reas
 
 ## 5. Cost estimate and lifecycle
 
-Public retail prices for `uksouth`, checked on 2026-10-14 (USD, before any free-service allowance). They
+Public retail prices, checked on 2026-10-14 (USD, before any free-service allowance; `swedencentral` is similar, with `Standard_B2s_v2` at 0.086/h). They
 change; re-check with the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/)
 before relying on them.
 
@@ -65,7 +65,7 @@ before relying on them.
 | Container registry | Basic (0.17 per day) | 0.007 |
 | PostgreSQL | B1ms and 32 GB; may be covered by the free-services allowance | 0.025 |
 | Key Vault, storage, identities | Per operation; state is a few KB | ~0 |
-| **While running** | | **≈ 0.12 (≈ 2.90 per day)** |
+| **While running** | | **≈ 0.12 (≈ 2.90 per day)**; ≈ 0.16 with B2s_v2 in Sweden Central, ≈ 0.25 with two nodes |
 
 **Nothing is left running by accident:**
 

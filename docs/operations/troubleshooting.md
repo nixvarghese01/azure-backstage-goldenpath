@@ -32,6 +32,27 @@ Start with the request's **Provisioning** tab in Backstage. It shows the failed 
 | Backstage → services 401/403 | Audience/scope config (`service_auth` output of stack 10) and `IDP_ALLOWED_CALLERS` |
 | Notifications not arriving | Outbox backlog (`outbox_messages` with `last_error`), Backstage `externalAccess` JWKS config |
 
+## Platform provisioning (bootstrap and `platform-provision`)
+
+Found during the first real provisioning on an Azure Free Trial inside a CAF landing zone. Each row
+names the fix that is now in the code, so a recurrence points at configuration rather than design.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `az login` device code: `AADSTS530035` "blocked by security defaults" | Security defaults block the device-code flow | Interactive sign-in for the tenant: `az login --tenant <id>` (a private window helps when another account is signed in) |
+| Bootstrap `state`: `RequestDisallowedByPolicy` on the resource group | Landing zone policy: allowed locations, required tags | Deploy in the allowed region; the stacks set CAF tags (`workload`, `environment`, `owner`, ...). [bootstrap-record.md](bootstrap-record.md#what-the-landing-zone-required) |
+| Bootstrap on Windows: `MissingSubscription`, 403 on state migration, empty `PLATFORM_TFVARS_JSON` | Git Bash path conversion; Windows Python can't open `/e/...` or `/tmp` | Fixed in `bootstrap-platform.sh` (`MSYS_NO_PATHCONV`, `cygpath`, values through the environment, empty values refused) |
+| Pipeline `azure/login`: `AADSTS700213` "No matching federated identity record" | The repository sends GitHub's immutable subject `repo:<owner>@<id>/<repo>@<id>:environment:<env>` | Set `github_repo_id` in `10-identities` and apply |
+| Checkov plan gate fails on AKS with waivers already in the module | Enrichment matched `azurerm_kubernetes_cluster.this` to a data source of the same name in another stack | `--repo-root-for-plan-enrichment` is `iac/modules` |
+| AKS create: VM scale set `RequestDisallowedByPolicy` | "Require a tag on resources": the scale set takes the node pool's tags | `default_node_pool.tags` set |
+| PostgreSQL: `RegionalAllocationFailed` | The zone Azure picked had no capacity for the size | Pin another zone: `postgres = { zone = "2" }` in `20-shared-dev` |
+| A plan proposes removing `web_app_routing` from AKS | App Routing is enabled through `azapi_update_resource` | The cluster ignores `web_app_routing` |
+| `30-cluster-config`: `cannot list customresourcedefinitions` | Kubernetes RBAC with Entra ID: only `admin_group_object_ids` are cluster-admin | `idp-aks-platform-<env>` group (platform identity) in `admin_group_object_ids` |
+| `30-cluster-config`: 403 writing federated identity credentials | The platform identity is Reader on the identities group | Custom role *IDP Workload Identity Federation* on the three service identities |
+| Release: `cannot delete resource jobs` (orchestrator migration hook) | `platform-deploy` had only the application deployer role | Namespaced `platform-jobs` role in `idp-platform` |
+| Gateway has no address; `istiod` and `nginx` pods `Pending` | One 2-vCPU node: AKS add-ons already request ~1.5 vCPU, the ingress add-ons ~2 vCPU more | Free regional vCPU quota for a second node, or a leaner dev profile; see [demo-environment.md](demo-environment.md) |
+| Backstage / orchestrator pods can't start | Key Vault has no GitHub App secrets yet; PostgreSQL roles not created | GitHub Apps (#19), `scripts/create-platform-secrets.sh`, then `postgres-grant-identities.sql` |
+
 ## Useful queries (orchestrator database)
 
 ```sql
