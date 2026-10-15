@@ -85,7 +85,7 @@ skus:
   storage_account: [Standard_LRS, Standard_ZRS, Standard_GZRS] # GZRS: Terraform state account only
   key_vault: [standard]
   container_registry: [Basic, Standard]
-  aks_node_vm: [Standard_D2s_v5, Standard_D2as_v5, Standard_B2s, Standard_B2s_v2]
+  aks_node_vm: [Standard_D2s_v5, Standard_D2as_v5, Standard_B2s, Standard_B2s_v2, Standard_B4as_v2]
 
 roles:
   # Roles the provisioning identity may assign to application runtime identities.
