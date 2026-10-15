@@ -25,5 +25,5 @@ env:
   ORCHESTRATOR_ENTRA_SCOPE: ""
   BACKSTAGE_ENTRA_AUDIENCE: ""
 resources:
-  requests: { cpu: 200m, memory: 512Mi }
+  requests: { cpu: 100m, memory: 512Mi }   # measured ~10m idle; bursts to the limit at start-up
   limits: { cpu: "1", memory: 1Gi }

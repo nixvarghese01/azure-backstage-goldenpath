@@ -51,7 +51,13 @@ boundary; see [terraform-state.md](terraform-state.md) for the state side.
   repository): `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, the client IDs (`PLATFORM_CLIENT_ID`,
   `PLATFORM_PLAN_CLIENT_ID`, `PLATFORM_DEPLOY_CLIENT_ID`, `VENDING_CLIENT_ID`, `BACKSTAGE_CLIENT_ID`,
   `DISCOVERY_CLIENT_ID`, `ORCHESTRATOR_CLIENT_ID`), `PLATFORM_BACKEND_HCL`, `PLATFORM_TFVARS_JSON`,
-  `PLATFORM_CHART_VALUES_JSON`. Nothing is hardcoded in the repository.
+  `PLATFORM_CHART_VALUES_JSON`, `PLATFORM_ALLOWLIST_JSON`. Nothing is hardcoded in the repository.
+- **`PLATFORM_ALLOWLIST_JSON`**: `policies/allowlist.yaml` holds example IDs only. This secret holds the
+  environment's real tenant, subscription, registry, storage account and gateway domain; platform-release
+  merges it over the file (`scripts/render-allowlist.sh`) before deploying azure-discovery, and fails if
+  an example ID is left. Without it, discovery in `sdk` mode offers no subscription. Refresh it alone with
+  `scripts/bootstrap-platform.sh allowlist --base-domain <gateway-ip>.nip.io` (add
+  `--management-groups <a,b>` in a landing zone; a free-tier subscription has none).
 - **Variables** (plain names and switches): `ACR_NAME`, `AKS_NAME`, `AKS_RESOURCE_GROUP`,
   `PLATFORM_AZURE_READY` (`true` once the secrets exist; job conditions can't read secrets).
 - **Environments** (deployments only from `develop` and `main`): `platform` and `platform-deploy`
