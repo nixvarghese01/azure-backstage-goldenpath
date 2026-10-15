@@ -3,7 +3,9 @@ image:
   tag: 17-alpine
 storage:
   size: 8Gi
-  className: ""          # cluster default (AKS: managed-csi, Standard SSD)
+  # Standard SSD with the landing zone's required tags (30-cluster-config); AKS's own classes create
+  # untagged disks, which a "require tags on resources" policy denies.
+  className: managed-csi-tagged
 workloadIdentity:
   clientId: ""          # id-idp-postgres-<env> (reads only its Key Vault secrets)
 keyVault:
