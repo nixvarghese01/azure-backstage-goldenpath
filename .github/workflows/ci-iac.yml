@@ -56,7 +56,8 @@ jobs:
         run: |
           # Placeholder identifiers; the release pipeline supplies real ones.
           common=(--set-string workloadIdentity.clientId=00000000-0000-0000-0000-000000000000
-                  --set database.url=postgresql://db.example/app --set image.repository=acr.example/app --set image.tag=ci)
+                  --set database.url=postgresql://db.example/app --set image.repository=acr.example/app --set image.tag=ci
+                  --set keyVault.name=kv-example --set-string keyVault.tenantId=00000000-0000-0000-0000-000000000000)
           mkdir -p "$RUNNER_TEMP/rendered"
           for chart in azure-discovery provisioning-orchestrator backstage postgres; do
             extra=(); [[ "$chart" == "azure-discovery" ]] && extra=(--set-file allowlist=policies/allowlist.yaml)

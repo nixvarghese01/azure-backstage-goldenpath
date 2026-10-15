@@ -308,15 +308,20 @@ EOF
   local me; me="$(gh api user -q .id)"
   # platform-plan: read-only. platform-teardown: destroy-only, no reviewers, so TTL teardown never waits.
   for e in platform platform-deploy platform-plan platform-teardown; do
-    if [[ "$e" == platform-plan || "$e" == platform-teardown ]]; then
+    if [[ "$e" == platform-plan ]]; then
+      # Plans pull requests (refs/pull/N/merge) with the read-only identity: any branch may use it.
+      body='{"deployment_branch_policy":null}'
+    elif [[ "$e" == platform-teardown ]]; then
       body='{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
     else
       body="{\"reviewers\":[{\"type\":\"User\",\"id\":${me}}],\"deployment_branch_policy\":{\"protected_branches\":false,\"custom_branch_policies\":true}}"
     fi
     gh api -X PUT "repos/${REPO}/environments/${e}" --input - <<< "$body" >/dev/null
-    for b in develop main; do
-      gh api -X POST "repos/${REPO}/environments/${e}/deployment-branch-policies" -f name="$b" -f type=branch >/dev/null 2>&1 || true
-    done
+    if [[ "$e" != platform-plan ]]; then
+      for b in develop main; do
+        gh api -X POST "repos/${REPO}/environments/${e}/deployment-branch-policies" -f name="$b" -f type=branch >/dev/null 2>&1 || true
+      done
+    fi
     case "$e" in
       platform-plan) ok "$e (read-only)" ;;
       platform-teardown) ok "$e (destroy only, no approval)" ;;
