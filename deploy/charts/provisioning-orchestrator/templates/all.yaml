@@ -59,12 +59,21 @@ metadata:
   name: provisioning-orchestrator
   annotations:
     azure.workload.identity/client-id: {{ required "workloadIdentity.clientId" .Values.workloadIdentity.clientId | quote }}
+    # The migration Job is a pre-install hook, so it runs before ordinary resources exist: create
+    # the ServiceAccount (and the SecretProviderClass below) as earlier hooks.
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
 ---
 # Only this workload's own secrets (per-secret RBAC in Key Vault); no secretObjects -> no K8s Secrets.
 apiVersion: secrets-store.csi.x-k8s.io/v1
 kind: SecretProviderClass
 metadata:
   name: provisioning-orchestrator
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
 spec:
   provider: azure
   parameters:
