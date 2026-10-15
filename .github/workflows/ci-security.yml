@@ -53,12 +53,14 @@ jobs:
       - name: Vulnerabilities, secrets and Dockerfile misconfiguration (HIGH and CRITICAL fail)
         # --offline-scan reads lockfiles without fetching remote Maven POMs (rate limited).
         # iac/ is covered by Checkov in ci-iac; trivy would report the same findings under other IDs.
+        # The same goes for the tagged modules the application skeleton pins (iac/modules/*?ref=<tag>),
+        # which trivy downloads and would otherwise scan without their documented waivers.
         run: |
           trivy fs --offline-scan --scanners vuln,secret --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --ignorefile .trivyignore.yaml .
-          trivy config --severity HIGH,CRITICAL --exit-code 1 --skip-dirs iac .
+          trivy config --severity HIGH,CRITICAL --exit-code 1 --skip-dirs iac --tf-exclude-downloaded-modules .
       - name: Full report for code scanning
         if: always()
-        run: trivy fs --offline-scan --scanners vuln,secret,misconfig --skip-dirs iac --ignorefile .trivyignore.yaml --format sarif --output trivy.sarif .
+        run: trivy fs --offline-scan --scanners vuln,secret,misconfig --skip-dirs iac --tf-exclude-downloaded-modules --ignorefile .trivyignore.yaml --format sarif --output trivy.sarif .
       - uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         # Forked PRs get a read-only token, so only same-repository runs upload.
         if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
