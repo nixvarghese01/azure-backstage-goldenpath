@@ -27,7 +27,7 @@ on:
       ttl_hours:
         description: Hours until platform-ttl destroys the platform again
         type: choice
-        options: ["2", "4", "8", "24"]
+        options: ["2", "4", "6", "8", "24"]
         default: "4"
   workflow_call:   # platform-ttl.yml calls this with action=teardown
     inputs:
