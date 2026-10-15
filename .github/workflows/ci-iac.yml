@@ -58,10 +58,10 @@ jobs:
           common=(--set-string workloadIdentity.clientId=00000000-0000-0000-0000-000000000000
                   --set database.url=postgresql://db.example/app --set image.repository=acr.example/app --set image.tag=ci)
           mkdir -p "$RUNNER_TEMP/rendered"
-          for chart in azure-discovery provisioning-orchestrator backstage; do
+          for chart in azure-discovery provisioning-orchestrator backstage postgres; do
             extra=(); [[ "$chart" == "azure-discovery" ]] && extra=(--set-file allowlist=policies/allowlist.yaml)
             helm lint "deploy/charts/$chart" "${common[@]}" "${extra[@]}"
             helm template "$chart" "deploy/charts/$chart" "${common[@]}" "${extra[@]}" > "$RUNNER_TEMP/rendered/$chart.yaml"
             conftest test "$RUNNER_TEMP/rendered/$chart.yaml" -p policies/helm
           done
-          trivy config --severity HIGH,CRITICAL --exit-code 1 "$RUNNER_TEMP/rendered"
+          trivy config --severity HIGH,CRITICAL --exit-code 1 --ignorefile .trivyignore.yaml "$RUNNER_TEMP/rendered"

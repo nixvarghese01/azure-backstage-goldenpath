@@ -9,7 +9,9 @@
 #   <dir> must contain one file per secret, named exactly as the secret:
 #     gh-app-backstage-key  gh-app-backstage-client-secret  backstage-session-secret
 #     gh-app-orchestrator-key  gh-app-orchestrator-webhook-secret
-#   Missing session/webhook secrets are generated randomly.
+#   Missing session/webhook secrets and database passwords are generated randomly. The database
+#   passwords (postgres-password, backstage-db-password, orchestrator-db-password) are used by the dev
+#   in-cluster PostgreSQL (deploy/charts/postgres); hex, so they are safe in any connection string.
 set -euo pipefail
 VAULT="${1:?usage: create-platform-secrets.sh <vault-name> <dir>}"
 DIR="${2:?usage: create-platform-secrets.sh <vault-name> <dir>}"
@@ -21,9 +23,16 @@ for name in backstage-session-secret gh-app-orchestrator-webhook-secret; do
     echo "generated ${name}"
   fi
 done
+for name in postgres-password backstage-db-password orchestrator-db-password; do
+  if [[ ! -s "${DIR}/${name}" ]]; then
+    (umask 077 && openssl rand -hex 32 > "${DIR}/${name}")
+    echo "generated ${name}"
+  fi
+done
 
 for name in gh-app-backstage-key gh-app-backstage-client-secret backstage-session-secret \
-            gh-app-orchestrator-key gh-app-orchestrator-webhook-secret; do
+            gh-app-orchestrator-key gh-app-orchestrator-webhook-secret \
+            postgres-password backstage-db-password orchestrator-db-password; do
   [[ -s "${DIR}/${name}" ]] || { echo "missing ${DIR}/${name}" >&2; exit 1; }
   az keyvault secret set --vault-name "${VAULT}" --name "${name}" --file "${DIR}/${name}" \
     --expires "${EXPIRES}" --tags owner=platform-team rotation-days=90 --output none

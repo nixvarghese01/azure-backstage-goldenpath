@@ -1,6 +1,13 @@
 {{- define "orch.env" -}}
+{{- if .Values.database.inCluster }}
+{{- /* dev: PostgreSQL inside the cluster (deploy/charts/postgres); password from Key Vault (CSI mount) */}}
+- { name: ORCHESTRATOR_DATABASE_URL, value: "postgresql+psycopg://orchestrator@postgres:5432/orchestrator" }
+- { name: ORCHESTRATOR_DATABASE_PASSWORD_FILE, value: /mnt/secrets/orchestrator-db-password }
+- { name: ORCHESTRATOR_DATABASE_ENTRA_AUTH, value: "false" }
+{{- else }}
 - { name: ORCHESTRATOR_DATABASE_URL, value: {{ required "database.url" .Values.database.url | quote }} }
 - { name: ORCHESTRATOR_DATABASE_ENTRA_AUTH, value: "true" }
+{{- end }}
 - { name: DISCOVERY_BASE_URL, value: "http://azure-discovery:8001" }
 - { name: DISCOVERY_ENTRA_SCOPE, value: {{ .Values.config.discoveryScope | quote }} }
 - { name: ORCHESTRATOR_BACKSTAGE_BASE_URL, value: "http://backstage:7007" }
@@ -73,6 +80,11 @@ spec:
         - |
           objectName: gh-app-orchestrator-webhook-secret
           objectType: secret
+        {{- if .Values.database.inCluster }}
+        - |
+          objectName: orchestrator-db-password
+          objectType: secret
+        {{- end }}
 ---
 # Schema migrations before the new version starts.
 apiVersion: batch/v1

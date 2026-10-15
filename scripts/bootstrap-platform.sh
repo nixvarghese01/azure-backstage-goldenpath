@@ -18,6 +18,9 @@
 # is disabled, not billed, when the credit ends. Set IDP_ALLOW_BILLED_SUBSCRIPTION=true to lift it.
 #
 # Usage: scripts/bootstrap-platform.sh <step> [--env dev] [--location uksouth]
+#   github also takes --base-domain <domain> (public hostnames: backstage.<domain>, platform-hooks.<domain>;
+#   e.g. <gateway-ip>.nip.io) and the GitHub App IDs once the apps exist (#19): --backstage-app-id,
+#   --backstage-client-id, --orchestrator-app-id, --orchestrator-installation-id. IDs only, no secrets.
 # Needs: az, gh, terraform ~> 1.16, python3. Inputs: iac/platform/{10-identities,20-shared-dev,
 # 30-cluster-config}/terraform.tfvars, copied from the .example files with your IDs.
 set -euo pipefail
@@ -28,10 +31,17 @@ export MSYS_NO_PATHCONV=1
 STEP="${1:-}"; shift || true
 ENVIRONMENT="dev"
 LOCATION="uksouth"
+BASE_DOMAIN=""
+GH_BACKSTAGE_APP_ID="" GH_BACKSTAGE_CLIENT_ID="" GH_ORCH_APP_ID="" GH_ORCH_INSTALLATION_ID=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --env) ENVIRONMENT="$2"; shift 2 ;;
     --location) LOCATION="$2"; shift 2 ;;
+    --base-domain) BASE_DOMAIN="$2"; shift 2 ;;
+    --backstage-app-id) GH_BACKSTAGE_APP_ID="$2"; shift 2 ;;
+    --backstage-client-id) GH_BACKSTAGE_CLIENT_ID="$2"; shift 2 ;;
+    --orchestrator-app-id) GH_ORCH_APP_ID="$2"; shift 2 ;;
+    --orchestrator-installation-id) GH_ORCH_INSTALLATION_ID="$2"; shift 2 ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
 done
@@ -236,31 +246,57 @@ EOF
   setvar AKS_NAME "$(sed -nE '/^aks *=/,/^}/ s/^ *name *= *"([^"]+)".*/\1/p' "$tfv" | head -1)"
   setvar AKS_RESOURCE_GROUP "rg-idp-aks-${ENVIRONMENT}"
   # Terraform outputs go through the environment: on Windows, Python can't open Git Bash's /tmp paths.
-  setsecret PLATFORM_CHART_VALUES_JSON "$(TF_OUTPUTS="$out" "$PY" - "$(native "$tfv")" "$ENVIRONMENT" <<'EOF'
+  # Dev without Azure PostgreSQL (postgres = { enabled = false }): the database runs in the cluster.
+  local in_cluster=false
+  grep -Eq '^postgres[[:space:]]*=.*enabled[[:space:]]*=[[:space:]]*false' "$tfv" && in_cluster=true
+  setsecret PLATFORM_CHART_VALUES_JSON "$(TF_OUTPUTS="$out" IN_CLUSTER="$in_cluster" BASE_DOMAIN="$BASE_DOMAIN" \
+    GH_BACKSTAGE_APP_ID="$GH_BACKSTAGE_APP_ID" GH_BACKSTAGE_CLIENT_ID="$GH_BACKSTAGE_CLIENT_ID" \
+    GH_ORCH_APP_ID="$GH_ORCH_APP_ID" GH_ORCH_INSTALLATION_ID="$GH_ORCH_INSTALLATION_ID" \
+    "$PY" - "$(native "$tfv")" "$ENVIRONMENT" <<'EOF'
 import json, os, re, sys
 out = json.loads(os.environ["TF_OUTPUTS"])
 tfvars, env = open(sys.argv[1], encoding="utf-8").read(), sys.argv[2]
+in_cluster = os.environ["IN_CLUSTER"] == "true"
+domain = os.environ["BASE_DOMAIN"]
 pg = re.search(r'^postgres_name\s*=\s*"([^"]+)"', tfvars, re.M).group(1) + ".postgres.database.azure.com"
 auth, pid, tenant = out["service_auth"]["value"], out["principal_ids"]["value"], out["tenant_id"]["value"]
 kv = out["key_vault_name"]["value"]
-# Single-node dev cluster: one replica each. GitHub App IDs are added once the apps exist (#19).
-print(json.dumps({
-  "backstage": json.dumps({"replicas": 1, "keyVault": {"name": kv, "tenantId": tenant}, "env": {
-      "POSTGRES_HOST": pg, "POSTGRES_USER": f"id-idp-backstage-{env}", "AZURE_TENANT_ID": tenant,
-      "DISCOVERY_ENTRA_SCOPE": auth["discovery"]["scope"], "ORCHESTRATOR_ENTRA_SCOPE": auth["orchestrator"]["scope"],
-      "BACKSTAGE_ENTRA_AUDIENCE": auth["backstage"]["audience"]}}),
-  "azure-discovery": json.dumps({"replicas": 1, "auth": {"tenantId": tenant, "audience": auth["discovery"]["audience"],
-      "allowedCallers": f'{pid["backstage"]},{pid["orchestrator"]}'}}),
-  "provisioning-orchestrator": json.dumps({"api": {"replicas": 1}, "worker": {"replicas": 1},
-      "keyVault": {"name": kv, "tenantId": tenant},
-      "database": {"url": f"postgresql+psycopg://id-idp-orchestrator-{env}@{pg}:5432/orchestrator?sslmode=require"},
-      "auth": {"tenantId": tenant, "audience": auth["orchestrator"]["audience"], "allowedCallers": pid["backstage"]},
-      # Single-person demo: the requester may approve in dev only (never prod), recorded as self_approved.
-      "config": {"discoveryScope": auth["discovery"]["scope"], "backstageScope": auth["backstage"]["scope"],
-                 "selfApprovalEnvironments": env if env != "prod" else ""}}),
-}))
+# Single-node dev cluster: one replica each. GitHub App IDs come from the options once the apps exist.
+backstage = {"replicas": 1, "keyVault": {"name": kv, "tenantId": tenant}, "database": {"inCluster": in_cluster},
+             "env": {"POSTGRES_HOST": "postgres" if in_cluster else pg,
+                     "POSTGRES_USER": "backstage" if in_cluster else f"id-idp-backstage-{env}",
+                     "AZURE_TENANT_ID": tenant,
+                     "DISCOVERY_ENTRA_SCOPE": auth["discovery"]["scope"],
+                     "ORCHESTRATOR_ENTRA_SCOPE": auth["orchestrator"]["scope"],
+                     "BACKSTAGE_ENTRA_AUDIENCE": auth["backstage"]["audience"],
+                     "GITHUB_APP_BACKSTAGE_ID": os.environ["GH_BACKSTAGE_APP_ID"],
+                     "GITHUB_APP_BACKSTAGE_CLIENT_ID": os.environ["GH_BACKSTAGE_CLIENT_ID"],
+                     "GITHUB_APP_ORCHESTRATOR_ID": os.environ["GH_ORCH_APP_ID"]}}
+orchestrator = {"api": {"replicas": 1}, "worker": {"replicas": 1},
+                "keyVault": {"name": kv, "tenantId": tenant},
+                "database": {"inCluster": in_cluster,
+                             "url": "" if in_cluster else
+                             f"postgresql+psycopg://id-idp-orchestrator-{env}@{pg}:5432/orchestrator?sslmode=require"},
+                "auth": {"tenantId": tenant, "audience": auth["orchestrator"]["audience"], "allowedCallers": pid["backstage"]},
+                # Single-person demo: the requester may approve in dev only (never prod), recorded as self_approved.
+                "config": {"discoveryScope": auth["discovery"]["scope"], "backstageScope": auth["backstage"]["scope"],
+                           "githubAppId": os.environ["GH_ORCH_APP_ID"],
+                           "githubInstallationId": os.environ["GH_ORCH_INSTALLATION_ID"],
+                           "selfApprovalEnvironments": env if env != "prod" else ""}}
+if domain:  # public hostnames on the shared Gateway, e.g. <gateway-ip>.nip.io
+    backstage["host"] = f"backstage.{domain}"
+    backstage["env"]["BACKSTAGE_BASE_URL"] = f"http://backstage.{domain}"
+    orchestrator["hooks"] = {"host": f"platform-hooks.{domain}"}
+# Dev in-cluster PostgreSQL: its own identity reads its passwords from Key Vault (CSI driver).
+postgres = {"workloadIdentity": {"clientId": out["client_ids"]["value"].get("postgres", "")},
+            "keyVault": {"name": kv, "tenantId": tenant}}
+print(json.dumps({"backstage": json.dumps(backstage), "postgres": json.dumps(postgres), "azure-discovery": json.dumps(
+    {"replicas": 1, "auth": {"tenantId": tenant, "audience": auth["discovery"]["audience"],
+                             "allowedCallers": f'{pid["backstage"]},{pid["orchestrator"]}'}}),
+    "provisioning-orchestrator": json.dumps(orchestrator)}))
 EOF
 )"
+  setvar PLATFORM_POSTGRES_IN_CLUSTER "$in_cluster"
 
   setvar PLATFORM_AZURE_READY true
   # Earlier versions stored the identifiers as variables; remove those copies.

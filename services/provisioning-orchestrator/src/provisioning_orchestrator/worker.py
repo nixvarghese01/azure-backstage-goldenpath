@@ -219,7 +219,11 @@ class Worker:
 
 def build_context(settings: Settings) -> Context:
     sessions = make_session_factory(
-        make_engine(settings.database_url, entra_auth=settings.database_entra_auth)
+        make_engine(
+            settings.database_url,
+            entra_auth=settings.database_entra_auth,
+            password_file=settings.database_password_file,
+        )
     )
     github: GitHubClient
     if settings.github_mode == "mock":

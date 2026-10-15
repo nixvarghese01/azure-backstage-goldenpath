@@ -137,6 +137,7 @@ jobs:
           PLATFORM_CHART_VALUES_JSON: ${{ secrets.PLATFORM_CHART_VALUES_JSON }}
           AKS_RESOURCE_GROUP: ${{ vars.AKS_RESOURCE_GROUP }}
           AKS_NAME: ${{ vars.AKS_NAME }}
+          POSTGRES_IN_CLUSTER: ${{ vars.PLATFORM_POSTGRES_IN_CLUSTER || 'false' }}
           DISCOVERY_CLIENT_ID: ${{ secrets.DISCOVERY_CLIENT_ID }}
           ORCHESTRATOR_CLIENT_ID: ${{ secrets.ORCHESTRATOR_CLIENT_ID }}
           BACKSTAGE_CLIENT_ID: ${{ secrets.BACKSTAGE_CLIENT_ID }}
@@ -156,6 +157,12 @@ jobs:
               --set-string workloadIdentity.clientId="$client_id" \
               --atomic --wait --timeout 10m
           }
+          # dev without Azure PostgreSQL: the database runs in the cluster and must be up first.
+          if [[ "$POSTGRES_IN_CLUSTER" == true ]]; then
+            jq -er '.postgres' <<< "$PLATFORM_CHART_VALUES_JSON" > "$RUNNER_TEMP/postgres.yaml"
+            helm upgrade --install postgres deploy/charts/postgres -n idp-platform \
+              -f "$RUNNER_TEMP/postgres.yaml" --atomic --wait --timeout 10m
+          fi
           deploy azure-discovery "$DISCOVERY_CLIENT_ID" "$DISCOVERY_DIGEST" --set-file allowlist=policies/allowlist.yaml
           deploy provisioning-orchestrator "$ORCHESTRATOR_CLIENT_ID" "$ORCHESTRATOR_DIGEST"
           deploy backstage "$BACKSTAGE_CLIENT_ID" "$BACKSTAGE_DIGEST"

@@ -76,7 +76,7 @@ provider "kubernetes" {
 }
 
 data "azurerm_user_assigned_identity" "id" {
-  for_each            = toset(["provisioning", "deployment", "platform-deploy", "backstage", "discovery", "orchestrator"])
+  for_each            = toset(["provisioning", "deployment", "platform-deploy", "backstage", "discovery", "orchestrator", "postgres"])
   name                = "id-idp-${each.key}-${var.environment}"
   resource_group_name = var.identity_resource_group
 }
@@ -229,9 +229,10 @@ resource "kubernetes_role_binding_v1" "platform_deployer" {
   }
 }
 
-# The platform charts also run a database migration Job (a Helm pre-install/pre-upgrade hook, deleted
-# and re-created on each release). Applications don't need Jobs, so this stays out of idp-app-deployer
-# and is granted to the platform release identity in idp-platform only.
+# What the platform charts need beyond an application's deployer role, in idp-platform only: the
+# orchestrator's migration Job (a Helm hook, deleted and re-created per release) and, in dev, the
+# in-cluster PostgreSQL (StatefulSet, its volume claim, and its generated credentials Secret, which
+# Helm reads back with lookup so the passwords survive upgrades).
 resource "kubernetes_role_v1" "platform_jobs" {
   metadata {
     name      = "platform-jobs"
@@ -240,6 +241,16 @@ resource "kubernetes_role_v1" "platform_jobs" {
   rule {
     api_groups = ["batch"]
     resources  = ["jobs"]
+    verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
+  }
+  rule {
+    api_groups = ["apps"]
+    resources  = ["statefulsets"]
+    verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
+  }
+  rule {
+    api_groups = [""]
+    resources  = ["persistentvolumeclaims", "secrets"]
     verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
   }
 }
@@ -263,7 +274,7 @@ resource "kubernetes_role_binding_v1" "platform_jobs" {
 
 # ------------------------------------------------------------------ Workload Identity for platform services
 resource "azurerm_federated_identity_credential" "service" {
-  for_each                  = toset(["backstage", "discovery", "orchestrator"])
+  for_each                  = toset(["backstage", "discovery", "orchestrator", "postgres"])
   name                      = "k8s-idp-platform-${each.key}"
   user_assigned_identity_id = data.azurerm_user_assigned_identity.id[each.key].id
   issuer                    = data.azurerm_kubernetes_cluster.this.oidc_issuer_url

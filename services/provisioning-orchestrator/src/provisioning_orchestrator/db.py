@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
 
@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 _PG_SCOPE = "https://ossrdbms-aad.database.windows.net/.default"
 
 
-def make_engine(url: str, *, entra_auth: bool = False) -> Engine:
+def make_engine(url: str, *, entra_auth: bool = False, password_file: str | None = None) -> Engine:
     kwargs: dict[str, Any] = {"pool_pre_ping": True}
     if url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
@@ -27,7 +27,26 @@ def make_engine(url: str, *, entra_auth: bool = False) -> Engine:
             # Short-lived token as the password; never logged, never stored.
             cparams["password"] = credential.get_token(_PG_SCOPE).token
 
+    elif password_file:
+        event.listen(engine, "do_connect", password_injector(password_file))
+
     return engine
+
+
+def password_injector(path: str) -> Callable[..., None]:
+    """A do_connect hook that reads the password file for each new connection, so a rotated Key Vault
+    secret is picked up without a restart."""
+
+    def _inject(dialect: Any, conn_rec: Any, cargs: Any, cparams: dict[str, Any]) -> None:
+        cparams["password"] = read_password(path)
+
+    return _inject
+
+
+def read_password(path: str) -> str:
+    """The password in a mounted secret file, without the trailing newline."""
+    with open(path, encoding="utf-8") as fh:
+        return fh.read().rstrip("\r\n")
 
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:
