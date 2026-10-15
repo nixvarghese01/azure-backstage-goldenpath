@@ -119,17 +119,19 @@ preflight() {
   vm="$(sed -nE 's/^ *vm_size *= *"([^"]+)".*/\1/p' "${PLATFORM}/20-shared-dev/terraform.tfvars" 2>/dev/null | head -1)"
   vm="${vm:-Standard_D2s_v5}"
   case "$vm" in
+    Standard_B*as_v2) family=standardBasv2Family ;;
     Standard_B*_v2) family=standardBsv2Family ;;
     Standard_B*) family=standardBSFamily ;;
     Standard_D*as_v5) family=standardDASv5Family ;;
     *) family=standardDSv5Family ;;
   esac
-  echo "vCPU quota in ${LOCATION} (AKS node: ${vm} = 2 vCPU)"
+  local vcpus; vcpus="$(sed -nE 's/^Standard_[A-Za-z]+([0-9]+).*/\1/p' <<< "$vm")"; vcpus="${vcpus:-2}"
+  echo "vCPU quota in ${LOCATION} (AKS node: ${vm} = ${vcpus} vCPU)"
   usage="$(az vm list-usage -l "$LOCATION" -o json 2>/dev/null || echo '[]')"
   read -r used limit < <(json "' '.join(str(u[k]) for u in d if u['name']['value']=='cores' for k in ('currentValue','limit')) or '0 0'" <<< "$usage")
-  if (( limit - used >= 2 )); then ok "total regional vCPUs ${used}/${limit}"; else fail "total regional vCPUs ${used}/${limit}: request a quota increase or choose another region"; fi
+  if (( limit - used >= vcpus )); then ok "total regional vCPUs ${used}/${limit}"; else fail "total regional vCPUs ${used}/${limit}: request a quota increase or choose another region"; fi
   read -r used limit < <(json "' '.join(str(u[k]) for u in d if u['name']['value']=='${family}' for k in ('currentValue','limit')) or '0 0'" <<< "$usage")
-  if (( limit - used >= 2 )); then ok "${family} ${used}/${limit}"; else fail "${family} ${used}/${limit}: request an increase, or set another vm_size in 20-shared-dev"; fi
+  if (( limit - used >= vcpus )); then ok "${family} ${used}/${limit}"; else fail "${family} ${used}/${limit}: request an increase, or set another vm_size in 20-shared-dev"; fi
 
   echo "Stack inputs (git-ignored; IDs only)"
   for s in 10-identities 20-shared-dev; do

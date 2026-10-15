@@ -192,6 +192,9 @@ resource "azapi_update_resource" "gateway_api" {
         webAppRouting = {
           enabled                   = true
           gatewayAPIImplementations = { appRoutingIstio = { mode = "Enabled" } }
+          # The platform uses the Gateway API (Istio); the default nginx Ingress controller would
+          # reserve another ~1 vCPU for nothing on a small cluster.
+          nginx = { defaultIngressControllerType = "None" }
         }
       }
     }
