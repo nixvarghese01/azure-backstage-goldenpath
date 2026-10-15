@@ -55,6 +55,8 @@ on:
         required: false
       PLATFORM_CHART_VALUES_JSON:
         required: false
+      PLATFORM_ALLOWLIST_JSON:
+        required: false
       PLATFORM_CLIENT_ID:
         required: false
       PLATFORM_DEPLOY_CLIENT_ID:
@@ -167,6 +169,7 @@ jobs:
       DISCOVERY_CLIENT_ID: ${{ secrets.DISCOVERY_CLIENT_ID }}
       ORCHESTRATOR_CLIENT_ID: ${{ secrets.ORCHESTRATOR_CLIENT_ID }}
       PLATFORM_CHART_VALUES_JSON: ${{ secrets.PLATFORM_CHART_VALUES_JSON }}
+      PLATFORM_ALLOWLIST_JSON: ${{ secrets.PLATFORM_ALLOWLIST_JSON }}
     permissions:
       contents: read
       id-token: write

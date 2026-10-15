@@ -6,7 +6,7 @@ name: platform-release
 on:
   push:
     branches: [main]
-    paths: ["portal/**", "services/**", "templates/applications/**", "deploy/charts/**", "policies/allowlist.yaml", ".dockerignore", ".github/workflows/platform-release.yml"]
+    paths: ["portal/**", "services/**", "templates/applications/**", "deploy/charts/**", "policies/allowlist.yaml", "scripts/render-allowlist.sh", ".dockerignore", ".github/workflows/platform-release.yml"]
   workflow_dispatch:
   # platform-provision.yml calls this after the cluster stacks, from develop (dev) or main.
   workflow_call:
@@ -24,6 +24,8 @@ on:
       ORCHESTRATOR_CLIENT_ID:
         required: false
       PLATFORM_CHART_VALUES_JSON:
+        required: false
+      PLATFORM_ALLOWLIST_JSON:
         required: false
 
 permissions:
@@ -135,6 +137,7 @@ jobs:
         env:
           # {"<chart>": "<values YAML with environment IDs>"}; identifiers only, no secrets.
           PLATFORM_CHART_VALUES_JSON: ${{ secrets.PLATFORM_CHART_VALUES_JSON }}
+          PLATFORM_ALLOWLIST_JSON: ${{ secrets.PLATFORM_ALLOWLIST_JSON }}
           AKS_RESOURCE_GROUP: ${{ vars.AKS_RESOURCE_GROUP }}
           AKS_NAME: ${{ vars.AKS_NAME }}
           POSTGRES_IN_CLUSTER: ${{ vars.PLATFORM_POSTGRES_IN_CLUSTER || 'false' }}
@@ -163,6 +166,8 @@ jobs:
             helm upgrade --install postgres deploy/charts/postgres -n idp-platform \
               -f "$RUNNER_TEMP/postgres.yaml" --atomic --wait --timeout 10m
           fi
-          deploy azure-discovery "$DISCOVERY_CLIENT_ID" "$DISCOVERY_DIGEST" --set-file allowlist=policies/allowlist.yaml
+          # The committed allowlist has example IDs; this environment's real ones come from a secret.
+          scripts/render-allowlist.sh policies/allowlist.yaml "$RUNNER_TEMP/allowlist.yaml"
+          deploy azure-discovery "$DISCOVERY_CLIENT_ID" "$DISCOVERY_DIGEST" --set-file allowlist="$RUNNER_TEMP/allowlist.yaml"
           deploy provisioning-orchestrator "$ORCHESTRATOR_CLIENT_ID" "$ORCHESTRATOR_DIGEST"
           deploy backstage "$BACKSTAGE_CLIENT_ID" "$BACKSTAGE_DIGEST"

@@ -12,6 +12,7 @@
 #   state        00-bootstrap: Terraform state storage, then migrate its own state into it
 #   identities   10-identities: GitHub-federated identities, service identities, Key Vault, Entra apps
 #   github       repository variables and environments the pipelines read (IDs only, no secrets)
+#   allowlist    only the PLATFORM_ALLOWLIST_JSON secret (also part of github): real IDs for the allowlist
 #
 # Cost guard: every step that touches Azure stops unless the subscription is a Free Trial (or other
 # credit-based offer) with its spending limit on, so usage comes out of the credit and the subscription
@@ -21,6 +22,7 @@
 #   github also takes --base-domain <domain> (public hostnames: backstage.<domain>, platform-hooks.<domain>;
 #   e.g. <gateway-ip>.nip.io) and the GitHub App IDs once the apps exist (#19): --backstage-app-id,
 #   --backstage-client-id, --orchestrator-app-id, --orchestrator-installation-id. IDs only, no secrets.
+#   github and allowlist take --management-groups <a,b> (landing zone groups apps may use; default: any).
 # Needs: az, gh, terraform ~> 1.16, python3. Inputs: iac/platform/{10-identities,20-shared-dev,
 # 30-cluster-config}/terraform.tfvars, copied from the .example files with your IDs.
 set -euo pipefail
@@ -32,12 +34,14 @@ STEP="${1:-}"; shift || true
 ENVIRONMENT="dev"
 LOCATION="uksouth"
 BASE_DOMAIN=""
+MGMT_GROUPS=""
 GH_BACKSTAGE_APP_ID="" GH_BACKSTAGE_CLIENT_ID="" GH_ORCH_APP_ID="" GH_ORCH_INSTALLATION_ID=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --env) ENVIRONMENT="$2"; shift 2 ;;
     --location) LOCATION="$2"; shift 2 ;;
     --base-domain) BASE_DOMAIN="$2"; shift 2 ;;
+    --management-groups) MGMT_GROUPS="$2"; shift 2 ;;
     --backstage-app-id) GH_BACKSTAGE_APP_ID="$2"; shift 2 ;;
     --backstage-client-id) GH_BACKSTAGE_CLIENT_ID="$2"; shift 2 ;;
     --orchestrator-app-id) GH_ORCH_APP_ID="$2"; shift 2 ;;
@@ -61,6 +65,14 @@ warn() { printf '  \033[33mwarn\033[0m %s\n' "$*"; }
 fail() { printf '  \033[31mfail\033[0m %s\n' "$*"; FAILED=1; }
 # Strip carriage returns: Python on Windows (Git Bash) prints CRLF, which breaks arithmetic and tests.
 json() { "$PY" -c "import json,sys; d=json.load(sys.stdin); print(eval(sys.argv[1], {'d': d}))" "$1" | tr -d '\r'; }
+setsecret() {
+  [[ -n "$2" && "$2" != "{}" ]] || { fail "$1: no value computed (see the error above)"; exit 1; }
+  printf '%s' "$2" | gh secret set "$1" --repo "$REPO" >/dev/null && ok "$1"
+}
+setvar() {
+  [[ -n "$2" ]] || { fail "$1: no value computed"; exit 1; }
+  gh variable set "$1" --repo "$REPO" --body "$2" >/dev/null && ok "$1 (variable)"
+}
 
 # State storage name, from 10-identities' inputs (the single place it is configured).
 state_account() {
@@ -212,14 +224,6 @@ github() {
   # Identifiers and configuration go in as secrets: GitHub masks them in logs, which are public for a
   # public repository. Plain names and switches stay as variables.
   echo "Repository secrets on ${REPO} (identifiers and configuration; masked in logs)"
-  setsecret() {
-    [[ -n "$2" && "$2" != "{}" ]] || { fail "$1: no value computed (see the error above)"; exit 1; }
-    printf '%s' "$2" | gh secret set "$1" --repo "$REPO" >/dev/null && ok "$1"
-  }
-  setvar() {
-    [[ -n "$2" ]] || { fail "$1: no value computed"; exit 1; }
-    gh variable set "$1" --repo "$REPO" --body "$2" >/dev/null && ok "$1 (variable)"
-  }
   setsecret AZURE_TENANT_ID "$tenant"
   setsecret AZURE_SUBSCRIPTION_ID "$sub"
   setsecret PLATFORM_CLIENT_ID "$(cid platform)"
@@ -297,6 +301,7 @@ print(json.dumps({"backstage": json.dumps(backstage), "postgres": json.dumps(pos
 EOF
 )"
   setvar PLATFORM_POSTGRES_IN_CLUSTER "$in_cluster"
+  allowlist
 
   setvar PLATFORM_AZURE_READY true
   # Earlier versions stored the identifiers as variables; remove those copies.
@@ -332,11 +337,51 @@ EOF
   echo "platform-ttl tears the platform down when ttl_hours expires; check it hourly in Actions."
 }
 
+# policies/allowlist.yaml holds example IDs only. This environment's real ones (tenant, subscription,
+# registry, storage, gateway domain) go into a secret that platform-release merges over the file
+# (scripts/render-allowlist.sh), so no subscription or tenant ID is committed.
+allowlist() {
+  FAILED=0
+  local tfv="${PLATFORM}/20-shared-dev/terraform.tfvars" acc
+  acc="$(az account show --query '{tenant:tenantId,id:id,name:name}' -o json)"
+  setsecret PLATFORM_ALLOWLIST_JSON "$(ACCOUNT="$acc" BASE_DOMAIN="$BASE_DOMAIN" MGMT_GROUPS="$MGMT_GROUPS" \
+    "$PY" - "$(native "$tfv")" "$ENVIRONMENT" <<'EOF'
+import json, os, re, sys
+tfvars, env = open(sys.argv[1], encoding="utf-8").read(), sys.argv[2]
+acc = json.loads(os.environ["ACCOUNT"])
+def block_name(block):  # name = "..." inside `<block> = { ... }`
+    m = re.search(rf'^{block}\s*=\s*\{{[^}}]*?\bname\s*=\s*"([^"]+)"', tfvars, re.M | re.S)
+    return m.group(1) if m else sys.exit(f"{block}.name not found in {sys.argv[1]}")
+storage = re.search(r'^shared_storage_name\s*=\s*"([^"]+)"', tfvars, re.M)
+sub, envs = acc["id"], [env]
+overlay = {
+    # No management groups listed: accept the subscription wherever it sits (a free-tier subscription
+    # sits directly under the Tenant Root Group). With landing zones, pass --management-groups.
+    "hierarchy": {"tenant_id": acc["tenant"],
+                  "application_management_groups": [g for g in os.environ["MGMT_GROUPS"].split(",") if g]},
+    "subscriptions": [{"id": sub, "name": acc["name"], "environments": envs}],
+    "resource_groups": [{"name": f"rg-idp-apps-{env}", "subscription": sub, "environments": envs}],
+    "aks_clusters": [{"name": block_name("aks"), "resource_group": f"rg-idp-aks-{env}", "subscription": sub,
+                      "environments": envs,
+                      "gateway": {"name": "idp-gateway", "namespace": "idp-gateway",
+                                  "base_domain": os.environ["BASE_DOMAIN"] or f"{env}.internal"}}],
+    "container_registries": [{"name": block_name("acr"), "resource_group": f"rg-idp-registry-{env}",
+                              "subscription": sub, "environments": envs}],
+    "data_resources": [] if not storage else [
+        {"name": storage.group(1), "type": "microsoft.storage/storageaccounts",
+         "resource_group": f"rg-idp-apps-{env}", "subscription": sub, "environments": envs}],
+}
+print(json.dumps(overlay))
+EOF
+)"
+}
+
 case "$STEP" in
   preflight) preflight ;;
   providers) providers ;;
   state) state ;;
   identities) identities ;;
   github) github ;;
-  *) sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  allowlist) allowlist ;;
+  *) sed -n '3,27p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
