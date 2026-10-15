@@ -9,7 +9,7 @@ An Internal Developer Platform (IDP) built on [Backstage](https://backstage.io),
 
 The IDP lets developers request a production-shaped service through a self-service portal. The platform then validates the request, creates a dedicated repository, provisions or reuses approved Azure infrastructure behind an approval gate, and deploys the application to a shared AKS cluster. Backstage reports the status of each stage.
 
-> **This is a model project.** It is a reference design that shows how an enterprise-grade IDP on Backstage and Azure can be structured, secured and operated. The implementation is deliberately scoped to one golden path, to demonstrate the design end to end. It is not intended for wide production rollout as-is. Where a production platform would make a different trade-off, the [ADRs](docs/adr/) say so.
+> **This is a model project.** It is a reference design that shows how an enterprise-grade IDP on Backstage and Azure can be structured, secured and operated. The implementation is deliberately scoped to one golden path, to demonstrate the design end to end. It is not intended for wide production rollout as-is. Where a production platform would make a different trade-off, the [ADRs](docs/adr/) say so, and [Best practice vs. this free-tier project](docs/best-practice-vs-free-tier.md) lists every deviation with its reason and the switch.
 
 > **Work in progress.** The platform code, pipelines and local environment are built and tested:
 > CI runs on every pull request, and the full platform runs locally with `make up` and passes `make e2e`.
@@ -643,6 +643,7 @@ Repository documentation (TechDocs publication is unverified):
 - [`docs/developer-guide/golden-path.md`](docs/developer-guide/golden-path.md): the end-to-end golden path, approval in Backstage and the shared URLs
 - [`docs/operations/cleanup.md`](docs/operations/cleanup.md): cleanup and teardown; troubleshooting and recovery procedures will follow
 - [`docs/operations/demo-environment.md`](docs/operations/demo-environment.md): running the first demo on a free Azure subscription
+- [`docs/best-practice-vs-free-tier.md`](docs/best-practice-vs-free-tier.md): enterprise best practice vs. what this free-tier project does, why each deviation exists, and how to switch
 
 ## Contributing and security
 
