@@ -11,9 +11,10 @@ The IDP lets developers request a production-shaped service through a self-servi
 
 > **This is a model project.** It is a reference design that shows how an enterprise-grade IDP on Backstage and Azure can be structured, secured and operated. The implementation is deliberately scoped to one golden path, to demonstrate the design end to end. It is not intended for wide production rollout as-is. Where a production platform would make a different trade-off, the [ADRs](docs/adr/) say so, and [Best practice vs. this free-tier project](docs/best-practice-vs-free-tier.md) lists every deviation with its reason and the switch.
 
-> **Work in progress.** The platform code, pipelines and local environment are built and tested:
-> CI runs on every pull request, and the full platform runs locally with `make up` and passes `make e2e`.
-> Still ahead: GitHub App integration, the Azure deployment and the first end-to-end golden path on AKS.
+> **Work in progress.** The platform runs on AKS in a free Azure subscription: Backstage, discovery and
+> the orchestrator are deployed by the pipelines, with the GitHub Apps connected. CI runs on every pull
+> request, and the full platform also runs locally with `make up` and passes `make e2e`.
+> Still ahead: the first end-to-end golden path on AKS and the v1.0.0 release.
 > Progress is tracked on the [roadmap board](https://github.com/users/nixvarghese01/projects/4) and in the
 > [milestones](https://github.com/nixvarghese01/azure-backstage-goldenpath/milestones); the
 > [Implementation status](#implementation-status) table distinguishes code written from verified behaviour.
@@ -27,6 +28,7 @@ container design, CI coverage and current capability limits.
 
 ## Contents
 
+- [Why Backstage](#why-backstage)
 - [Why this project](#why-this-project)
 - [The first golden path](#the-first-golden-path)
 - [Architecture](#architecture)
@@ -45,6 +47,31 @@ container design, CI coverage and current capability limits.
 - [Contributing and security](#contributing-and-security)
 
 ---
+
+## Why Backstage
+
+**Where it comes from.** [Backstage](https://backstage.io) was built inside Spotify to tame the sprawl of
+thousands of services, pipelines and docs owned by hundreds of squads: one portal with a software
+catalog, templates for new services ("golden paths") and docs next to the code. Spotify open-sourced it
+in **March 2020** under the Apache 2.0 licence.
+
+**Open-source status.** Backstage was accepted into the Cloud Native Computing Foundation (CNCF) as a
+Sandbox project in **September 2020** and moved to **Incubating** in **March 2022**, the year it reached
+1.0. It is governed in the open by maintainers from Spotify and other companies, with monthly releases
+(this project uses **1.55**). Spotify also sells commercial add-ons (Spotify Portal and plugins); the
+core framework stays free and vendor-neutral.
+
+**Adoption.** It has become the most widely used open-source framework for internal developer portals:
+thousands of organisations use it, with public adopters across retail, finance, travel, gaming and
+government (for example Expedia, American Airlines, Zalando, Booking.com, HelloFresh and Siemens), and
+it is the reference portal in the CNCF platform engineering community.
+
+**Why it fits this project.** Backstage is a framework, not a finished product, which is exactly what an
+enterprise platform needs: its scaffolder runs templates with custom actions and form fields (used here
+for the Azure resource picker and the approval flow), its catalog tracks what each golden path creates,
+and plugins connect it to GitHub, Kubernetes and Azure. Everything that is not portal logic (Azure
+discovery, provisioning, approvals) lives in separate Python services, so the platform doesn't depend
+on Backstage internals ([ADR-0001](docs/adr/0001-python-platform-services.md)).
 
 ## Why this project
 
