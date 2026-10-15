@@ -1,0 +1,61 @@
+# Release (CONTRIBUTING.md "Releases"): every merge into main is a release, from develop or a hotfix/*
+# branch. The version is the newest "## [X.Y.Z]" section of CHANGELOG.md. This tags the merge commit
+# vX.Y.Z and publishes the GitHub release with that changelog section as its notes. Images are built
+# and deployed by platform-release; Terraform modules have their own tags (release-modules).
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: tag and publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # the tag and the release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the existing tags
+          persist-credentials: false # the token is passed to the push only
+
+      - name: Version from CHANGELOG.md
+        id: version
+        run: |
+          version="$(bash scripts/ci/changelog-version.sh)"
+          tag="v$version"
+          if existing="$(git rev-parse -q --verify "refs/tags/$tag^{commit}")"; then
+            if [[ "$existing" == "$GITHUB_SHA" ]]; then
+              echo "$tag already points at this commit: nothing to do"
+              echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            echo "::error::$tag is already released ($existing). Add a new version section to CHANGELOG.md."; exit 1
+          fi
+          bash scripts/ci/changelog-version.sh --notes "$version" > "$RUNNER_TEMP/notes.md"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Tag the commit and publish the release
+        if: steps.version.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG" "$GITHUB_SHA"
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic ${auth}" push origin "refs/tags/$TAG"
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md"
+          echo "Released $TAG" >> "$GITHUB_STEP_SUMMARY"
