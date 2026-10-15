@@ -441,6 +441,33 @@ resource "azuread_service_principal" "audience" {
   owners    = [data.azuread_client_config.current.object_id]
 }
 
+# ------------------------------------------------------------------ Workload Identity federation
+# 30-cluster-config links the platform services' identities to their Kubernetes service accounts. That
+# needs the cluster's OIDC issuer (known only after 20-shared-dev), so the platform identity creates
+# those federated credentials, and may do only that, only on these three identities.
+resource "azurerm_role_definition" "workload_identity_federation" {
+  name        = "IDP Workload Identity Federation (${var.environment})"
+  scope       = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+  description = "Manage federated credentials on a user-assigned identity; nothing else."
+  permissions {
+    actions = [
+      "Microsoft.ManagedIdentity/userAssignedIdentities/read",
+      "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/read",
+      "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/write",
+      "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/delete",
+    ]
+  }
+  assignable_scopes = ["/subscriptions/${data.azurerm_client_config.current.subscription_id}"]
+}
+
+resource "azurerm_role_assignment" "platform_workload_identity_federation" {
+  for_each           = azurerm_user_assigned_identity.service
+  scope              = each.value.id
+  role_definition_id = azurerm_role_definition.workload_identity_federation.role_definition_resource_id
+  principal_id       = module.platform.principal_id
+  principal_type     = "ServicePrincipal"
+}
+
 # ------------------------------------------------------------------ AKS admin group for automation
 # The clusters use Kubernetes RBAC with Entra ID: cluster-admin comes only from the groups in
 # admin_group_object_ids (20-shared-dev). The platform identity applies 30-cluster-config (namespaces,
