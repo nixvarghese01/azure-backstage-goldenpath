@@ -46,6 +46,7 @@
   "resolutions": {
     "@yarnpkg/core": "4.9.1",
     "adm-zip@npm:0.6.0": "0.6.1",
+    "prismjs@npm:~1.27.0": "1.30.0",
     "undici@npm:7.29.0": "7.29.1"
   }
 }
