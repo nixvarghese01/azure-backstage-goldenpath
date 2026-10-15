@@ -57,7 +57,7 @@ token, organization, resource limits or PostgreSQL administrator password, copy 
 `deploy/local/`. Application database passwords remain the throwaway values in `postgres-init.sql`.
 Changing a password in an environment variable does not rotate a role in an existing database volume.
 
-The local portal signs in as catalog user `alex`, a member of `team-orders`. Guest authentication
+The local portal signs in as catalog user `nixvarghese01` (shown as Nixon), a member of `team-orders` and `platform-approvers`. Guest authentication
 requires both `IDP_LOCAL_GUEST_AUTH=true` and `app-config.docker.yaml`. The normal image command
 loads the production config, where GitHub sign-in and Entra service authentication are used.
 Only Backstage and PostgreSQL are published to host loopback; Python APIs remain inside the network.
