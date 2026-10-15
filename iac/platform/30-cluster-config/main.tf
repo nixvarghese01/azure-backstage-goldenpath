@@ -90,10 +90,17 @@ locals {
 }
 
 # ------------------------------------------------------------------ namespaces
+# The Gateway's proxy pods are created and managed by AKS App Routing (Istio). Their istio-proxy
+# container sets no seccomp profile, which "restricted" rejects, so this namespace enforces
+# "baseline" (no privileged pods, host access or added capabilities) and still warns and audits
+# against "restricted". Nothing else runs here.
 resource "kubernetes_namespace_v1" "gateway" {
   metadata {
-    name   = "idp-gateway"
-    labels = local.restricted
+    name = "idp-gateway"
+    labels = merge(local.restricted, {
+      "pod-security.kubernetes.io/enforce" = "baseline"
+      "pod-security.kubernetes.io/warn"    = "restricted"
+    })
   }
 }
 
