@@ -222,6 +222,38 @@ resource "kubernetes_role_binding_v1" "platform_deployer" {
   }
 }
 
+# The platform charts also run a database migration Job (a Helm pre-install/pre-upgrade hook, deleted
+# and re-created on each release). Applications don't need Jobs, so this stays out of idp-app-deployer
+# and is granted to the platform release identity in idp-platform only.
+resource "kubernetes_role_v1" "platform_jobs" {
+  metadata {
+    name      = "platform-jobs"
+    namespace = kubernetes_namespace_v1.platform.metadata[0].name
+  }
+  rule {
+    api_groups = ["batch"]
+    resources  = ["jobs"]
+    verbs      = ["get", "list", "watch", "create", "update", "patch", "delete"]
+  }
+}
+
+resource "kubernetes_role_binding_v1" "platform_jobs" {
+  metadata {
+    name      = "platform-jobs"
+    namespace = kubernetes_namespace_v1.platform.metadata[0].name
+  }
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Role"
+    name      = kubernetes_role_v1.platform_jobs.metadata[0].name
+  }
+  subject {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "User"
+    name      = data.azurerm_user_assigned_identity.id["platform-deploy"].principal_id
+  }
+}
+
 # ------------------------------------------------------------------ Workload Identity for platform services
 resource "azurerm_federated_identity_credential" "service" {
   for_each                  = toset(["backstage", "discovery", "orchestrator"])
