@@ -21,5 +21,5 @@ clients:
   - provisioning-orchestrator-worker
   - provisioning-orchestrator-migrate
 resources:
-  requests: { cpu: 250m, memory: 256Mi }
+  requests: { cpu: 100m, memory: 256Mi }   # measured ~10m idle on the dev node
   limits: { cpu: "1", memory: 512Mi }
