@@ -52,6 +52,7 @@ names the fix that is now in the code, so a recurrence points at configuration r
 | Release: `cannot delete resource jobs` (orchestrator migration hook) | `platform-deploy` had only the application deployer role | Namespaced `platform-jobs` role in `idp-platform` |
 | Gateway has no address; `istiod` and `nginx` pods `Pending` | One 2-vCPU node: AKS add-ons already request ~1.5 vCPU, the ingress add-ons ~2 vCPU more | Free regional vCPU quota for a second node, or a leaner dev profile; see [demo-environment.md](demo-environment.md) |
 | Gateway `Programmed=False`, `AddressNotAssigned`; gateway pods `FailedCreate` "violates PodSecurity restricted" | AKS App Routing's managed `istio-proxy` sets no seccomp profile | `idp-gateway` enforces `baseline` and warns/audits `restricted` (`30-cluster-config`) |
+| Volume claim `Pending`; `ProvisioningFailed ... RequestDisallowedByPolicy` (StatefulSet `Ready: 0/1`) | The disk CSI driver creates untagged disks; the landing zone requires tags on every resource | Storage class `managed-csi-tagged` (`30-cluster-config`) tags each disk; use it for platform and app volumes. Delete the stuck claim before retrying |
 | Backstage / orchestrator pods can't start | Key Vault has no GitHub App secrets yet; PostgreSQL roles not created | GitHub Apps (#19), `scripts/create-platform-secrets.sh`, then `postgres-grant-identities.sql` |
 
 ## Useful queries (orchestrator database)
