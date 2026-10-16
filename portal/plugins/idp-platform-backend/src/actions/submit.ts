@@ -74,6 +74,11 @@ export function createSubmitAction(opts: { client: PlatformClient; config: Confi
         requestId: z => z.string(),
         githubOrg: z => z.string(),
         githubOwnerType: z => z.enum(['user', 'organization']),
+        tenantId: z => z.string(),
+        provisioningClientId: z => z.string(),
+        deploymentClientId: z => z.string(),
+        callbackUrl: z => z.string(),
+        stateStorageAccount: z => z.string(),
         subscriptionId: z => z.string(),
         acrName: z => z.string(),
         aksName: z => z.string(),
@@ -128,6 +133,14 @@ export function createSubmitAction(opts: { client: PlatformClient; config: Confi
       ctx.output('requestId', requestId);
       ctx.output('githubOrg', config.getString('idp.githubOrg'));
       ctx.output('githubOwnerType', config.getOptionalString('idp.githubOwnerType') === 'user' ? 'user' : 'organization');
+      // Identifiers the platform's reusable workflows read as repository variables (no secrets).
+      ctx.output('tenantId', infra.tenantId ?? '');
+      ctx.output('provisioningClientId', config.getOptionalString('idp.generatedRepository.provisioningClientId') ?? '');
+      ctx.output('deploymentClientId', config.getOptionalString('idp.generatedRepository.deploymentClientId') ?? '');
+      ctx.output('callbackUrl', config.getOptionalString('idp.generatedRepository.callbackUrl') ?? '');
+      // 00-bootstrap's state account (stidptfstate<env><suffix>); names are global, so never derived here.
+      ctx.output('stateStorageAccount',
+        config.getOptionalString('idp.generatedRepository.stateStorageAccount') ?? `stidptfstate${ctx.input.environment}`);
       ctx.output('subscriptionId', infra.subscription.id ?? '');
       ctx.output('acrName', infra.containerRegistry.name ?? '');
       ctx.output('aksName', infra.aksCluster.name ?? '');

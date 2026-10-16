@@ -52,6 +52,12 @@ on:
         required: false
       ORCHESTRATOR_CLIENT_ID:
         required: false
+      PROVISIONING_CLIENT_ID:
+        required: false
+      DEPLOYMENT_CLIENT_ID:
+        required: false
+      TFSTATE_STORAGE_ACCOUNT:
+        required: false
       PLATFORM_BACKEND_HCL:
         required: false
       PLATFORM_CHART_VALUES_JSON:
@@ -170,6 +176,9 @@ jobs:
       BACKSTAGE_CLIENT_ID: ${{ secrets.BACKSTAGE_CLIENT_ID }}
       DISCOVERY_CLIENT_ID: ${{ secrets.DISCOVERY_CLIENT_ID }}
       ORCHESTRATOR_CLIENT_ID: ${{ secrets.ORCHESTRATOR_CLIENT_ID }}
+      PROVISIONING_CLIENT_ID: ${{ secrets.PROVISIONING_CLIENT_ID }}
+      DEPLOYMENT_CLIENT_ID: ${{ secrets.DEPLOYMENT_CLIENT_ID }}
+      TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TFSTATE_STORAGE_ACCOUNT }}
       PLATFORM_CHART_VALUES_JSON: ${{ secrets.PLATFORM_CHART_VALUES_JSON }}
       PLATFORM_ALLOWLIST_JSON: ${{ secrets.PLATFORM_ALLOWLIST_JSON }}
     permissions:

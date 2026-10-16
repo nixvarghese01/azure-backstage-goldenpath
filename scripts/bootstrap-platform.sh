@@ -250,6 +250,10 @@ EOF
   setvar ACR_NAME "$(sed -nE '/^acr *=/,/^}/ s/^ *name *= *"([^"]+)".*/\1/p' "$tfv" | head -1)"
   setvar AKS_NAME "$(sed -nE '/^aks *=/,/^}/ s/^ *name *= *"([^"]+)".*/\1/p' "$tfv" | head -1)"
   setvar AKS_RESOURCE_GROUP "rg-idp-aks-${ENVIRONMENT}"
+  # Generated repositories' identities: the portal writes them into each new repository's variables.
+  setsecret PROVISIONING_CLIENT_ID "$(cid provisioning)"
+  setsecret DEPLOYMENT_CLIENT_ID "$(cid deployment)"
+  setsecret TFSTATE_STORAGE_ACCOUNT "$(state_account)"   # generated repos' Terraform state backend
   # Terraform outputs go through the environment: on Windows, Python can't open Git Bash's /tmp paths.
   # Dev without Azure PostgreSQL (postgres = { enabled = false }): the database runs in the cluster.
   local in_cluster=false

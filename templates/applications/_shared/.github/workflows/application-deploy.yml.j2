@@ -29,6 +29,7 @@ jobs:
       contents: read
       id-token: write
     with:
+      platform_ref: [[ values.platform_ref ]]
       environment: [[ values.environment ]]
       action: ${{ inputs.action || 'deploy' }}
       release: [[ values.app ]]

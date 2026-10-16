@@ -83,6 +83,13 @@ idp:
   githubOrg: ${GITHUB_ORG}
   githubOwnerType: ${GITHUB_OWNER_TYPE}   # user (personal account) or organization
   platformRef: ${CATALOG_BRANCH}          # platform branch for templates and generated repos' workflows
+  # Repository variables of every generated repository (identifiers only). In an organization these could
+  # be organization variables; a personal account has none, so the template sets them per repository.
+  generatedRepository:
+    provisioningClientId: ${PROVISIONING_CLIENT_ID}
+    deploymentClientId: ${DEPLOYMENT_CLIENT_ID}
+    callbackUrl: ${IDP_CALLBACK_URL}
+    stateStorageAccount: ${TFSTATE_STORAGE_ACCOUNT}
   orchestratorGithubAppId: ${GITHUB_APP_ORCHESTRATOR_ID}
   discovery:
     baseUrl: http://azure-discovery.idp-platform.svc.cluster.local:8001

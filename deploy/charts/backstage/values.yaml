@@ -20,6 +20,9 @@ env:
   AZURE_TENANT_ID: ""
   GITHUB_ORG: nixvarghese01
   GITHUB_OWNER_TYPE: user   # user (personal account) or organization; see idp.githubOwnerType
+  PROVISIONING_CLIENT_ID: ""   # generated repos' Terraform identity (10-identities output; platform-release sets it)
+  DEPLOYMENT_CLIENT_ID: ""     # generated repos' build/deploy identity
+  TFSTATE_STORAGE_ACCOUNT: ""  # generated repos' Terraform state account (00-bootstrap, with its name suffix)
   CATALOG_BRANCH: main      # repository branch for catalog templates; platform-release sets the deploying branch
   GITHUB_APP_BACKSTAGE_ID: ""
   GITHUB_APP_BACKSTAGE_CLIENT_ID: ""

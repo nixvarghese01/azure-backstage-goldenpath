@@ -8,10 +8,13 @@ const REF = /^[A-Za-z0-9._/-]{1,100}$/;
 /** Calls of the platform repository's reusable workflows, with their ref. */
 const USES = /(azure-backstage-goldenpath\/\.github\/workflows\/[\w.-]+\.ya?ml)@[A-Za-z0-9._/-]+/g;
 
-/** Point the platform's reusable-workflow calls in the given file texts at `ref`. */
+/** Point the platform's reusable-workflow calls (uses: ...@ref and the platform_ref input) at `ref`. */
+/** The reusable workflows' platform_ref input: they check out the platform's scripts and policies at it. */
+const INPUT = /^(\s+platform_ref:\s*)[A-Za-z0-9._/-]+/gm;
+
 export function pinWorkflowRefs(text: string, ref: string): string {
   if (!REF.test(ref)) throw new Error(`invalid platform ref: ${ref}`);
-  return text.replace(USES, `$1@${ref}`);
+  return text.replace(USES, `$1@${ref}`).replace(INPUT, `$1${ref}`);
 }
 
 /**

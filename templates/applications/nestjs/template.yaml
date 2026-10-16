@@ -87,14 +87,6 @@ spec:
           ui:enumNames: [Public (default, recommended), Private]
           default: public
           ui:help: See the README section "Repository visibility" before choosing private.
-        includeSampleEndpoint:
-          title: Include the sample /v1/orders endpoint
-          type: boolean
-          default: true
-        includeOpenApi:
-          title: Publish OpenAPI (Swagger) docs at /docs
-          type: boolean
-          default: true
 
   steps:
     # 1. Validate on the server BEFORE anything is created (waits for platform resources if needed).
@@ -133,6 +125,8 @@ spec:
           infrastructure: ${{ parameters.infrastructure }}
           availabilityTier: ${{ parameters.availability.tier }}
           endpointHost: ${{ steps.submit.output.endpointHost }}
+          stateStorageAccount: ${{ steps.submit.output.stateStorageAccount }}
+          ownerType: ${{ steps.submit.output.githubOwnerType }}
 
     # 2b. The skeleton's workflows call the platform's reusable workflows: pin them to the platform ref.
     - id: workflow-refs
@@ -152,6 +146,8 @@ spec:
         protectDefaultBranch: true
         protectEnforceAdmins: false
         requireCodeOwnerReviews: false
+        # The orchestrator merges the application PR once its CI passes; a required review would block it.
+        requiredApprovingReviewCount: 0
         requiredStatusCheckContexts: []
         repoVariables:
           IDP_REQUEST_ID: ${{ steps.submit.output.requestId }}
@@ -159,6 +155,11 @@ spec:
           ACR_NAME: ${{ steps.submit.output.acrName }}
           AKS_NAME: ${{ steps.submit.output.aksName }}
           AKS_RESOURCE_GROUP: ${{ steps.submit.output.aksResourceGroup }}
+          # Read by the platform's reusable workflows (Azure sign-in, orchestrator callbacks).
+          AZURE_TENANT_ID: ${{ steps.submit.output.tenantId }}
+          PROVISIONING_CLIENT_ID: ${{ steps.submit.output.provisioningClientId }}
+          DEPLOYMENT_CLIENT_ID: ${{ steps.submit.output.deploymentClientId }}
+          IDP_CALLBACK_URL: ${{ steps.submit.output.callbackUrl }}
 
     # 4. GitHub environments used by the reusable workflows (ADR-0005).
     - id: env-validate

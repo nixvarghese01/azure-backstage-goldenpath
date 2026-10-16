@@ -11,6 +11,10 @@ name: reusable-application-ci
 on:
   workflow_call:
     inputs:
+      platform_ref:
+        description: Platform ref the caller calls this workflow at (scripts and policies come from the same ref)
+        type: string
+        default: main
       environment:
         type: string
         default: dev
@@ -106,6 +110,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository_owner }}/azure-backstage-goldenpath
+          ref: ${{ inputs.platform_ref }}
           path: ${{ env.PLATFORM }}
           persist-credentials: false
           sparse-checkout: scripts/ci
@@ -161,6 +166,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository_owner }}/azure-backstage-goldenpath
+          ref: ${{ inputs.platform_ref }}
           path: ${{ env.PLATFORM }}
           persist-credentials: false
           sparse-checkout: scripts/ci
