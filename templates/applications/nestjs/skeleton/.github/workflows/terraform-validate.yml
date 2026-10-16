@@ -19,6 +19,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      actions: read   # GitHub checks every job of the called workflow; its apply job reads the plan artifact
     with:
       operation: validate
       request_id: ${{ inputs.request_id || '' }}
