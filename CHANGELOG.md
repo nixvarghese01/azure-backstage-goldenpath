@@ -46,6 +46,8 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   frontend polyfills `crypto.randomUUID`, which browsers offer only in secure contexts.
 - **Portal:** the golden-path template is read from the branch that deployed the portal (develop for the
   dev platform) instead of `main`, which has no release yet, so the Create page lists it.
+- **Portal:** the template form no longer crashes on open (`Cannot read properties of undefined (reading
+  'mode')`): the Azure resource and availability pickers fill their defaults when the form starts them as `{}`.
 
 ### Security
 - Pod Security `restricted` for platform workloads, network policies, no Kubernetes Secrets in charts,

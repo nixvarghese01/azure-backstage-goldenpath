@@ -27,12 +27,13 @@ export const AvailabilityPicker = (props: FieldExtensionComponentProps<Availabil
   const { formData, onChange, formContext } = props;
   const environment: string = (formContext as any)?.formData?.environment ?? 'dev';
   const defaultTier = HA_DEFAULT[environment] ? 'ha' : 'standard';
-  const value: AvailabilitySelection = formData ?? { tier: defaultTier };
+  // The form starts an object field as {} (not undefined): the environment default fills a missing tier.
+  const value: AvailabilitySelection = { ...formData, tier: formData?.tier ?? defaultTier };
   const set = (patch: Partial<AvailabilitySelection>) => onChange({ ...value, ...patch });
   const needsJustification = deviates(value, environment);
 
   useEffect(() => {
-    if (!formData) onChange({ tier: defaultTier });
+    if (!formData?.tier) onChange({ ...formData, tier: defaultTier });
   }, [formData, defaultTier]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
