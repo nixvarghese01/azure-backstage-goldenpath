@@ -136,10 +136,12 @@ export const AzureResourcePicker = (props: FieldExtensionComponentProps<Infrastr
   const app = appName || 'orders-api';
   const demoOnly = ['fastapi', 'go', 'dotnet', 'springboot', 'nextjs', 'react', 'vue'].includes(ctx.stack);
   const api = useApi(idpApiRef);
-  const value = useMemo<InfrastructureSelection>(() => formData ?? {
+  // The form starts an object field as {} (not undefined), so the defaults fill whatever is missing.
+  const value = useMemo<InfrastructureSelection>(() => ({
     ...defaults(appName),
     ...(demoOnly ? { runtimeCapability: { type: 'none' as const, mode: 'existing' as const } } : {}),
-  }, [formData, appName, demoOnly]);
+    ...formData,
+  }), [formData, appName, demoOnly]);
   const set = (key: Key, s: Selection | RuntimeCapability) => onChange({ ...value, [key]: s });
 
   // ---- tenant -> management group -> subscription ----
