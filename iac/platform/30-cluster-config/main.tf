@@ -303,6 +303,36 @@ resource "kubernetes_role_binding_v1" "platform_jobs" {
   }
 }
 
+# platform-release reads the shared Gateway's public IP for <gateway-ip>.nip.io hostnames: read only, Gateways only.
+resource "kubernetes_role_v1" "gateway_reader" {
+  metadata {
+    name      = "gateway-reader"
+    namespace = kubernetes_namespace_v1.gateway.metadata[0].name
+  }
+  rule {
+    api_groups = ["gateway.networking.k8s.io"]
+    resources  = ["gateways"]
+    verbs      = ["get"]
+  }
+}
+
+resource "kubernetes_role_binding_v1" "gateway_reader" {
+  metadata {
+    name      = "gateway-reader"
+    namespace = kubernetes_namespace_v1.gateway.metadata[0].name
+  }
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Role"
+    name      = kubernetes_role_v1.gateway_reader.metadata[0].name
+  }
+  subject {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "User"
+    name      = data.azurerm_user_assigned_identity.id["platform-deploy"].principal_id
+  }
+}
+
 # ------------------------------------------------------------------ Workload Identity for platform services
 resource "azurerm_federated_identity_credential" "service" {
   for_each                  = toset(["backstage", "discovery", "orchestrator", "postgres"])

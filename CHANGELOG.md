@@ -29,6 +29,8 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 ### Fixed
 - **Pipelines:** teardown of an already empty stack no longer fails the plan check (a plan with no
   resource changes), and a destroy that stops part-way (an AKS delete that times out) retries what is left.
+- **Pipelines:** `<gateway-ip>.nip.io` hostnames follow the Gateway's current public IP at release, so a
+  re-provisioned platform (new IP) is reachable without re-running the bootstrap.
 
 ### Security
 - Pod Security `restricted` for platform workloads, network policies, no Kubernetes Secrets in charts,
