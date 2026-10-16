@@ -17,9 +17,9 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: provision (create or update) or teardown (destroy, reverse order)
+        description: provision (create or update), teardown (destroy, reverse order) or extend (keep the running platform for ttl_hours from now; no Terraform)
         type: choice
-        options: [provision, teardown]
+        options: [provision, teardown, extend]
         default: provision
       release:
         description: Deploy Backstage and the platform services after provisioning
@@ -28,7 +28,7 @@ on:
       ttl_hours:
         description: Hours until platform-ttl destroys the platform again
         type: choice
-        options: ["2", "4", "6", "8", "24"]
+        options: ["2", "4", "6", "8", "24", "48"]
         default: "4"
   workflow_call:   # platform-ttl.yml calls this with action=teardown
     inputs:
@@ -179,10 +179,13 @@ jobs:
 
   # The deadline: platform-ttl's hourly cron alone is unreliable (GitHub skips scheduled runs), so start
   # a timer run that checks the TTL right when it expires. Runs whenever the cluster stacks were applied,
-  # even if the release failed: the cost is in the cluster.
+  # even if the release failed: the cost is in the cluster. extend only restarts the clock: platform-ttl
+  # counts from this run, and the earlier timer finds the platform not yet expired.
   ttl-timer:
-    needs: [cluster-config, release]
-    if: inputs.action == 'provision' && !cancelled() && needs.cluster-config.result == 'success'
+    needs: [preflight, cluster-config, release]
+    if: >-
+      !cancelled() && needs.preflight.result == 'success' &&
+      ((inputs.action == 'provision' && needs.cluster-config.result == 'success') || inputs.action == 'extend')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
