@@ -335,7 +335,7 @@ EOF
     esac
   done
   # Wait-timer environments for platform-ttl-timer.yml: N hours + 5 minutes, no reviewers.
-  for h in 2 4 6 8 24; do
+  for h in 2 4 6 8 24 48; do
     gh api -X PUT "repos/${REPO}/environments/platform-ttl-${h}h" --input - >/dev/null <<< \
       "{\"wait_timer\":$((h * 60 + 5)),\"deployment_branch_policy\":{\"protected_branches\":false,\"custom_branch_policies\":true}}"
     for b in develop main; do

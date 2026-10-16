@@ -69,7 +69,10 @@ before relying on them.
 
 **Nothing is left running by accident:**
 
-1. **Time-to-live.** Every `platform-provision` run sets `ttl_hours` (2, 4, 6, 8 or 24; default 4). The
+1. **Time-to-live.** Every `platform-provision` run sets `ttl_hours` (2, 4, 6, 8, 24 or 48; default 4). To keep a
+   running platform longer, run it with `action: extend`: it changes nothing in Azure and restarts the
+   clock at `ttl_hours` from now (48 h uses about 48 × $0.17 for the node, roughly $10 of credit with the
+   rest). The
    `platform-ttl` workflow destroys `30-cluster-config` and `20-shared-dev` once it expires. That
    run uses the `platform-teardown` environment, which has no reviewers, so it never waits for a person.
    It starts on time because provisioning ends by starting `platform-ttl-timer`, which waits in the

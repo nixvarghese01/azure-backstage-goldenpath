@@ -26,6 +26,10 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 - **Docs:** ADRs 0001-0009, operations guides (bootstrap record, Terraform state, demo environment,
   troubleshooting, validation checklist) and this changelog with a release workflow.
 
+### Changed
+- **Pipelines:** `platform-provision` has a 48 h time-to-live and an `extend` action that keeps the
+  running platform for `ttl_hours` from now without running Terraform.
+
 ### Fixed
 - **Pipelines:** teardown of an already empty stack no longer fails the plan check (a plan with no
   resource changes), and a destroy that stops part-way (an AKS delete that times out) retries what is left.

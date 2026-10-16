@@ -1,7 +1,7 @@
 # Destroys the dev platform when its time-to-live expires, so a forgotten AKS cluster doesn't keep using
 # the subscription's credit. Hourly: if an AKS cluster exists in rg-idp-aks-<env> (teardown empties the
 # group but keeps it), the lifetime starts at the later of the cluster's creation time and the last
-# platform-provision run, and lasts that run's ttl_hours
+# platform-provision provision or extend run, and lasts that run's ttl_hours
 # (default 4). Expired -> platform-provision teardown (30-cluster-config, then 20-shared-dev), which runs
 # in the platform-teardown environment and needs no approval. State and identities are kept.
 name: platform-ttl
@@ -51,7 +51,7 @@ jobs:
           fi
           last="$(gh run list -R "$GITHUB_REPOSITORY" --workflow platform-provision.yml --limit 20 \
             --json displayTitle,createdAt \
-            --jq '[.[] | select(.displayTitle | startswith("platform-provision provision"))][0] // {}')"
+            --jq '[.[] | select(.displayTitle | test("^platform-provision (provision|extend) "))][0] // {}')"
           ttl="$(jq -r '.displayTitle // "" | capture("ttl=(?<h>[0-9]+)h").h // "4"' <<< "$last")"
           started="$(jq -r --arg c "$created" '[$c, (.createdAt // $c)] | max' <<< "$last")"
           expires="$(date -u -d "${started} + ${ttl} hours" +%Y-%m-%dT%H:%M:%SZ)"
