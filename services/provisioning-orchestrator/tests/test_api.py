@@ -22,13 +22,23 @@ def test_duplicate_submission_returns_same_request(client) -> None:
     assert a["state"] == "REQUESTED"
 
 
-def test_second_active_request_for_same_app_conflicts(client) -> None:
+def test_another_users_active_request_for_same_app_conflicts(client) -> None:
     client.post("/v1/requests", json=submission(), headers=REQUESTER)
-    res = client.post(
-        "/v1/requests", json=submission(idempotency_key="scaffolder-task-0002"), headers=REQUESTER
-    )
+    other = {**REQUESTER, "X-IDP-User": "user:default/kim"}
+    res = client.post("/v1/requests", json=submission(idempotency_key="scaffolder-task-0002"), headers=other)
     assert res.status_code == 409
     assert res.json()["detail"]["code"] == "duplicate_application"
+
+
+def test_requesters_retry_supersedes_a_request_without_repository(client) -> None:
+    # A scaffolder run that failed after submitting (e.g. at "Create repository") must not block a retry.
+    first = client.post("/v1/requests", json=submission(), headers=REQUESTER).json()
+    second = client.post(
+        "/v1/requests", json=submission(idempotency_key="scaffolder-task-0002"), headers=REQUESTER
+    )
+    assert second.status_code == 201
+    assert second.json()["id"] != first["id"]
+    assert client.get(f"/v1/requests/{first['id']}", headers=REQUESTER).json()["state"] == "CANCELLED"
 
 
 def test_repository_cannot_be_recorded_before_validation(client) -> None:
