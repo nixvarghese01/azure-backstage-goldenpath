@@ -4,8 +4,9 @@ import { scaffolderActionsExtensionPoint } from '@backstage/plugin-scaffolder-no
 import { PlatformClient } from './client';
 import { createRepositoryCreatedAction } from './actions/repositoryCreated';
 import { createSubmitAction } from './actions/submit';
+import { createWorkflowRefsAction } from './actions/workflowRefs';
 
-/** Scaffolder module adding the two IDP actions. */
+/** Scaffolder module adding the IDP actions. */
 export const idpScaffolderModule = createBackendModule({
   pluginId: 'scaffolder',
   moduleId: 'idp-actions',
@@ -21,6 +22,7 @@ export const idpScaffolderModule = createBackendModule({
         scaffolder.addActions(
           createSubmitAction({ client, config }),
           createRepositoryCreatedAction({ client, config, integrations }),
+          createWorkflowRefsAction({ config }),
         );
       },
     });

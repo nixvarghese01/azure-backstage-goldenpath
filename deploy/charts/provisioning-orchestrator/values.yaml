@@ -24,6 +24,7 @@ config:
   githubAppId: ""
   githubInstallationId: ""
   platformRepo: azure-backstage-goldenpath
+  platformRepoRef: main   # platform PRs' base and generated repos' workflow ref; platform-release sets the deploying branch
   discoveryScope: ""      # api://idp-discovery/.default
   backstageScope: ""      # api://idp-backstage/.default
   approverGroup: group:default/platform-approvers

@@ -40,12 +40,13 @@ The platform repository's own workflows keep repository-based subjects (`repo:<o
 
 | Environment | Purpose | Protection |
 |---|---|---|
+| `<env>-validate` | Terraform validate (also on pull requests); no Azure trust. It exists because the OIDC subject includes the environment, and the job's orchestrator callback token needs one | None |
 | `<env>-infra-plan` | Terraform plan | Branch policy |
 | `<env>-infra` | Terraform apply | **Custom deployment protection rule** owned by the orchestrator (approval in Backstage) |
 | `<env>-build` | Image push | Protected branches only |
 | `<env>` | Deploy | Protected branches only |
 
-The scaffolder creates these environments (`github:environment:create`). The bridge action attaches the protection rule.
+The scaffolder creates these environments (`github:environment:create`). The bridge action attaches the protection rule. Before the repository's first workflow the orchestrator sets its OIDC subject template (`repository_owner_id`, `environment`, `job_workflow_ref`), per repository, so this also works in a personal account, which has no organization-wide template.
 
 ### 4. Helm stores releases in ConfigMaps
 

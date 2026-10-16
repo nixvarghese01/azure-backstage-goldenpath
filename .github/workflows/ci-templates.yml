@@ -75,6 +75,9 @@ jobs:
         run: |
           cd services && uv sync --package provisioning-orchestrator
           uv run python ../templates/applications/nestjs/render_fixture.py "$RUNNER_TEMP/orders-api" --stack "$STACK"
+      # GitHub fails a run at startup when a calling job grants less than ANY job of the called workflow asks.
+      - name: Generated workflows grant what the platform's reusable workflows need
+        run: cd services && uv run --with pyyaml python ../scripts/ci/check-reusable-permissions.py "$RUNNER_TEMP/orders-api" "$GITHUB_WORKSPACE"
       - name: Checkov on the generated Terraform (as terraform-validate runs it, before sources are rewritten)
         working-directory: ${{ runner.temp }}/orders-api
         run: pipx run checkov==3.3.26 -d infra/terraform --framework terraform --skip-check CKV_TF_1 --quiet --compact

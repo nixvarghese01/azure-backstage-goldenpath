@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from provisioning_orchestrator.clients.backstage import BackstageClient
 from provisioning_orchestrator.clients.discovery import DiscoveryClient
-from provisioning_orchestrator.clients.github import GitHubClient
+from provisioning_orchestrator.clients.github import OIDC_SUBJECT_CLAIMS, GitHubClient
 from provisioning_orchestrator.config import Settings
 from provisioning_orchestrator.models import InboxEvent, OutboxMessage, Request, Step
 from provisioning_orchestrator.service import audit, enqueue, fail, record_run, transition
@@ -202,6 +202,11 @@ def h_platform_request(ctx: Context, s: Session, step: Step, req: Request) -> No
 
 def h_dispatch(ctx: Context, s: Session, step: Step, req: Request) -> None:
     p = step.payload
+    if p["repo"] == req.repository.get("name") and not req.repository.get("oidc_subject"):
+        # Before the generated repository's first workflow: the subject its Azure federated credentials match.
+        ctx.github.set_oidc_subject(p["repo"], OIDC_SUBJECT_CLAIMS)
+        req.repository = {**req.repository, "oidc_subject": OIDC_SUBJECT_CLAIMS}
+        audit(s, req.id, ACTOR, "oidc_subject_set", repo=p["repo"], claims=OIDC_SUBJECT_CLAIMS)
     ctx.github.dispatch_workflow(p["repo"], p["workflow"], p.get("ref", "main"), p["inputs"])
     record_run(req, stage=p["workflow"], run_id=None, url=None, status="dispatched")
     audit(s, req.id, ACTOR, "workflow_dispatched", repo=p["repo"], workflow=p["workflow"])
@@ -231,6 +236,7 @@ def h_open_app_pr(ctx: Context, s: Session, step: Step, req: Request) -> None:
         "environment": req.environment,
         "request_id": req.id,
         "org": ctx.settings.github_org,
+        "platform_ref": ctx.settings.platform_repo_ref,
         "repo": _app_repo(req),
         "namespace": req.spec["namespace"]["name"],
         "endpoint_host": req.spec.get("endpoint_host", ""),

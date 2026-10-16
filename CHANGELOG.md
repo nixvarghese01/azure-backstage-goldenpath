@@ -57,6 +57,19 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   only in organizations, and GitHub answered `POST /user/repos` with "Rate Limit Exceeded". For an
   organization the platform's GitHub App creates it, as before. `idp.githubOwnerType` is declared in the frontend plugin's
   config schema, so the browser receives it.
+- **Golden path:** generated repositories call the platform's reusable workflows at the platform ref (the
+  branch that deployed the portal: develop for dev, main for releases) instead of `@main`, which has no release
+  yet ("workflow was not found"). The same ref is the orchestrator's platform PR base. New `idp:workflow-refs`
+  action for the untemplated skeleton workflows.
+- **Golden path:** generated `terraform-validate`/`terraform-plan` grant `actions: read`: GitHub checks every job of a
+  called workflow, so they failed at startup on the apply job's need. `scripts/ci/check-reusable-permissions.py`
+  checks every generated caller against the reusable workflows in template CI.
+- **Orchestrator:** sets each generated repository's OIDC subject template (`repository_owner_id`, `environment`,
+  `job_workflow_ref`) before its first workflow, so Azure federation works in personal accounts too, where there
+  is no organization-wide template.
+- **Golden path:** the Terraform validate job runs in a `<env>-validate` environment (no Azure trust): with the
+  environment in the OIDC subject, its orchestrator callback token was refused ("the claim 'environment' cannot be
+  null"). The template creates it, and the reusable-permissions check now flags token requests without an environment.
 - **Orchestrator:** a requester's retry supersedes their earlier request for the same application while it has
   no repository yet (a scaffolder run that failed after submitting), instead of failing as a duplicate.
 

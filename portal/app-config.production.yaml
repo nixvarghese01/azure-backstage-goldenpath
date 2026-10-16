@@ -82,6 +82,7 @@ catalog:
 idp:
   githubOrg: ${GITHUB_ORG}
   githubOwnerType: ${GITHUB_OWNER_TYPE}   # user (personal account) or organization
+  platformRef: ${CATALOG_BRANCH}          # platform branch for templates and generated repos' workflows
   orchestratorGithubAppId: ${GITHUB_APP_ORCHESTRATOR_ID}
   discovery:
     baseUrl: http://azure-discovery.idp-platform.svc.cluster.local:8001

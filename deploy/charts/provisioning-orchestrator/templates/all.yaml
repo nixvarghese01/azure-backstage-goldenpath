@@ -17,6 +17,7 @@
 - { name: ORCHESTRATOR_GITHUB_APP_ID, value: {{ .Values.config.githubAppId | quote }} }
 - { name: ORCHESTRATOR_GITHUB_APP_INSTALLATION_ID, value: {{ .Values.config.githubInstallationId | quote }} }
 - { name: ORCHESTRATOR_PLATFORM_REPO, value: {{ .Values.config.platformRepo | quote }} }
+- { name: ORCHESTRATOR_PLATFORM_REPO_REF, value: {{ .Values.config.platformRepoRef | default "main" | quote }} }
 - { name: ORCHESTRATOR_APPROVER_GROUP, value: {{ .Values.config.approverGroup | quote }} }
 - { name: ORCHESTRATOR_SELF_APPROVAL_ENVIRONMENTS, value: {{ .Values.config.selfApprovalEnvironments | quote }} }
 # Paths to CSI-mounted secret files (values never in env): secret-management.md §5

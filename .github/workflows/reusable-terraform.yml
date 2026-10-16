@@ -53,6 +53,9 @@ jobs:
   validate:
     if: inputs.operation == 'validate' || inputs.operation == 'plan'
     runs-on: ubuntu-24.04
+    # The repository's OIDC subject includes the environment (ADR-0005), so the callback token needs one.
+    # Azure trusts only <env>-infra-plan and <env>-infra: this environment gets no Azure access (PRs run here).
+    environment: ${{ inputs.environment }}-validate
     permissions:
       contents: read
       id-token: write   # only for the orchestrator callback token; no Azure access in this job
