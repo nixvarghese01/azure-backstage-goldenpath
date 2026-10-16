@@ -18,7 +18,7 @@ const api = {
   capabilities: async () => ({ create_new: {} }),
 } as unknown as IdpApi;
 
-const props = (formData: unknown, onChange = jest.fn()) => ({
+const props = (formData: unknown, onChange: (v: unknown) => void) => ({
   formData, onChange, rawErrors: [], schema: {}, uiSchema: {}, idSchema: { $id: 'f' }, required: true,
   formContext: { formData: { name: 'orders-api', environment: 'dev', stack: 'nestjs' } },
 }) as any;
