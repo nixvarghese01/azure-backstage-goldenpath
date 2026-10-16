@@ -363,11 +363,9 @@ export const AzureResourcePicker = (props: FieldExtensionComponentProps<Infrastr
 const RG = /^rg-[a-z0-9-]{2,80}$/;
 const NS = /^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$/;
 
-export const validateInfrastructure = (value: InfrastructureSelection, validation: FieldValidation) => {
-  if (!value) {
-    validation.addError('Choose the Azure resources.');
-    return;
-  }
+export const validateInfrastructure = (input: InfrastructureSelection, validation: FieldValidation) => {
+  // Validation can run before the picker's first change (the form's {}): judge it with the same defaults.
+  const value: InfrastructureSelection = { ...defaults(''), ...input };
   const need = (s: Selection, label: string) => {
     if (s.mode === 'existing' && !s.name) validation.addError(`${label}: select an approved resource.`);
     if (s.mode === 'new' && !s.name) validation.addError(`${label}: enter a name.`);
