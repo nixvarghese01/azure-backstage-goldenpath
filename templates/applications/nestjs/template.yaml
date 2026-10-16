@@ -40,7 +40,9 @@ spec:
         githubAccess:
           title: GitHub access
           type: string
-          description: Repositories in a personal account are created with your GitHub sign-in.
+          description: >-
+            Personal account (idp.githubOwnerType user): the repository is created with your GitHub sign-in.
+            Organization: the platform's GitHub App creates it and this field is skipped.
           ui:field: IdpGithubAccess
 
     # ------------------------------------------------------------------ 2. Defaults (change only if needed)
@@ -137,7 +139,7 @@ spec:
       name: Create repository
       action: publish:github
       input:
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        token: ${{ secrets.USER_OAUTH_TOKEN if steps.submit.output.githubOwnerType == 'user' }}
         repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
         description: ${{ parameters.description }}
         repoVisibility: ${{ parameters.repoVisibility }}
@@ -158,14 +160,14 @@ spec:
       name: Environment (plan)
       action: github:environment:create
       input:
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        token: ${{ secrets.USER_OAUTH_TOKEN if steps.submit.output.githubOwnerType == 'user' }}
         repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
         name: ${{ parameters.environment }}-infra-plan
     - id: env-infra
       name: Environment (apply, held for approval in Backstage)
       action: github:environment:create
       input:
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        token: ${{ secrets.USER_OAUTH_TOKEN if steps.submit.output.githubOwnerType == 'user' }}
         repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
         name: ${{ parameters.environment }}-infra
         deploymentBranchPolicy:
@@ -175,7 +177,7 @@ spec:
       name: Environment (build)
       action: github:environment:create
       input:
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        token: ${{ secrets.USER_OAUTH_TOKEN if steps.submit.output.githubOwnerType == 'user' }}
         repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
         name: ${{ parameters.environment }}-build
         deploymentBranchPolicy:
@@ -185,7 +187,7 @@ spec:
       name: Environment (deploy)
       action: github:environment:create
       input:
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        token: ${{ secrets.USER_OAUTH_TOKEN if steps.submit.output.githubOwnerType == 'user' }}
         repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
         name: ${{ parameters.environment }}
         deploymentBranchPolicy:

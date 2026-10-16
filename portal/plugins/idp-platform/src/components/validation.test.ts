@@ -115,5 +115,8 @@ describe('validateGithubAccess', () => {
     const granted = collector();
     validateGithubAccess('granted', granted.validation);
     expect(granted.errors).toEqual([]);
+    const organization = collector();
+    validateGithubAccess('not-needed', organization.validation);
+    expect(organization.errors).toEqual([]);
   });
 });
