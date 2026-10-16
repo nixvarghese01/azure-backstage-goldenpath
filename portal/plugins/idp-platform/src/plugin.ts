@@ -12,6 +12,7 @@ import { IdpClient, idpApiRef } from './api';
 import { AvailabilityPicker, validateAvailability } from './components/AvailabilityPicker';
 import { AzureResourcePicker, validateInfrastructure } from './components/AzureResourcePicker';
 import { EndpointHostPicker, validateEndpointHost } from './components/EndpointHostPicker';
+import { GithubAccess, validateGithubAccess } from './components/GithubAccess';
 import { StackPicker } from './components/StackPicker';
 
 export const approvalsRouteRef = createRouteRef({ id: 'idp-approvals' });
@@ -71,5 +72,13 @@ export const IdpEndpointHostPickerExtension = idpPlugin.provide(
     name: 'IdpEndpointHostPicker',
     component: EndpointHostPicker,
     validation: validateEndpointHost,
+  }),
+);
+
+export const IdpGithubAccessExtension = idpPlugin.provide(
+  createScaffolderFieldExtension({
+    name: 'IdpGithubAccess',
+    component: GithubAccess,
+    validation: validateGithubAccess,
   }),
 );

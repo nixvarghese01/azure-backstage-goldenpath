@@ -33,6 +33,7 @@ auth:
       ownershipEntityRefs: [user:default/nixvarghese01, group:default/team-orders]
 idp:
   githubOrg: ${ORCHESTRATOR_GITHUB_ORG}
+  githubOwnerType: user
   orchestratorGithubAppId: 0
   discovery:
     baseUrl: http://azure-discovery:8001

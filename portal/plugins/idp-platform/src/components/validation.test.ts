@@ -3,6 +3,7 @@ import type { InfrastructureSelection } from '@internal/plugin-idp-platform-comm
 import { validateAvailability } from './AvailabilityPicker';
 import { validateInfrastructure } from './AzureResourcePicker';
 import { defaultEndpointHost, validateEndpointHost } from './EndpointHostPicker';
+import { validateGithubAccess } from './GithubAccess';
 
 function collector() {
   const errors: string[] = [];
@@ -103,5 +104,19 @@ describe('endpoint host', () => {
     const { validation, errors } = collector();
     validateEndpointHost('Not A Host', validation);
     expect(errors).toHaveLength(1);
+  });
+});
+
+describe('validateGithubAccess', () => {
+  it('requires the granted GitHub token before the repository step', () => {
+    const missing = collector();
+    validateGithubAccess(undefined, missing.validation);
+    expect(missing.errors).toEqual(['Grant GitHub access to create the repository.']);
+    const granted = collector();
+    validateGithubAccess('granted', granted.validation);
+    expect(granted.errors).toEqual([]);
+    const organization = collector();
+    validateGithubAccess('not-needed', organization.validation);
+    expect(organization.errors).toEqual([]);
   });
 });

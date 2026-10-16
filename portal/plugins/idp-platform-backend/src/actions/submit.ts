@@ -73,6 +73,7 @@ export function createSubmitAction(opts: { client: PlatformClient; config: Confi
       output: {
         requestId: z => z.string(),
         githubOrg: z => z.string(),
+        githubOwnerType: z => z.enum(['user', 'organization']),
         subscriptionId: z => z.string(),
         acrName: z => z.string(),
         aksName: z => z.string(),
@@ -126,6 +127,7 @@ export function createSubmitAction(opts: { client: PlatformClient; config: Confi
 
       ctx.output('requestId', requestId);
       ctx.output('githubOrg', config.getString('idp.githubOrg'));
+      ctx.output('githubOwnerType', config.getOptionalString('idp.githubOwnerType') === 'user' ? 'user' : 'organization');
       ctx.output('subscriptionId', infra.subscription.id ?? '');
       ctx.output('acrName', infra.containerRegistry.name ?? '');
       ctx.output('aksName', infra.aksCluster.name ?? '');

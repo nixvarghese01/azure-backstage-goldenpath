@@ -15,6 +15,7 @@ import {
   IdpAzureResourcePickerExtension,
   IdpStackPickerExtension,
   IdpEndpointHostPickerExtension,
+  IdpGithubAccessExtension,
 } from '@internal/plugin-idp-platform';
 import React from 'react';
 import { Navigate, Route } from 'react-router-dom';
@@ -58,6 +59,7 @@ const routes = (
         <IdpAvailabilityPickerExtension />
         <IdpStackPickerExtension />
         <IdpEndpointHostPickerExtension />
+        <IdpGithubAccessExtension />
       </ScaffolderFieldExtensions>
     </Route>
     <Route path="/docs" element={<TechDocsIndexPage />} />

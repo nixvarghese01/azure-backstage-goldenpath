@@ -51,6 +51,11 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 - **Discovery:** the Azure resource picker lists the real tenant, subscription and resources again. On Python
   3.11+ `str()` of an Azure SDK enum gave `SubscriptionState.ENABLED`, so every subscription looked disabled and
   the form found no tenant. Form validation no longer throws on the picker's initial `{}`.
+- **Golden path:** works with a personal GitHub account or an organization (`idp.githubOwnerType`: `user` or
+  `organization`). For a personal account the repository is created with the signed-in user's GitHub token
+  (new `IdpGithubAccess` field, kept as a template secret): a GitHub App installation can create repositories
+  only in organizations, and GitHub answered `POST /user/repos` with "Rate Limit Exceeded". For an
+  organization the platform's GitHub App creates it, as before.
 
 ### Security
 - Pod Security `restricted` for platform workloads, network policies, no Kubernetes Secrets in charts,
