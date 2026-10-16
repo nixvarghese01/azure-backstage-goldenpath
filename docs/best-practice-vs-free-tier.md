@@ -85,7 +85,7 @@ uses. A golden-path app requests 100m by default: **3-5 small apps fit**.
 
 | Area | Best practice | This project | Why | To switch |
 |---|---|---|---|---|
-| DNS | Your own domain and an Azure DNS zone | ⚠️ `<name>.<gateway-ip>.nip.io` | No domain to buy; works instantly | `--base-domain` and `dns_zone_name` |
+| DNS | Your own domain and an Azure DNS zone | ⚠️ Backstage and the GitHub hooks on the Gateway's Azure DNS label (`<label>.<region>.cloudapp.azure.com`, the same across provisions); apps on `<app>.<gateway-ip>.nip.io`, rewritten to the current IP at release | No domain to buy; works instantly; no static IP to pay for between provisions | `--base-domain` and `dns_zone_name`; `public_dns_label` names the label |
 | TLS | HTTPS everywhere (Key Vault certificates or cert-manager), WAF | ⚠️ HTTP | nip.io can't get a public certificate | `gateway_tls_secret` and cert-manager; Application Gateway for Containers for WAF |
 
 ## Delivery and supply chain

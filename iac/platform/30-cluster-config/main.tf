@@ -53,6 +53,12 @@ variable "gateway_hostname" {
   default     = null
 }
 
+variable "public_dns_label" {
+  description = "Azure DNS label on the Gateway's public IP: <label>.<region>.cloudapp.azure.com, unique per region. The name stays when the IP changes (each provision), so the GitHub App URLs don't. null = idp-<environment>-<hash of the cluster ID>."
+  type        = string
+  default     = null
+}
+
 variable "gateway_tls_secret" {
   description = "Name of a TLS Secret/certificate reference for an HTTPS listener. null = HTTP only (demo)."
   type        = string
@@ -120,6 +126,10 @@ resource "kubernetes_storage_class_v1" "tagged" {
   }
 }
 
+locals {
+  public_dns_label = coalesce(var.public_dns_label, "idp-${var.environment}-${substr(sha1(data.azurerm_kubernetes_cluster.this.id), 0, 6)}")
+}
+
 # ------------------------------------------------------------------ namespaces
 # The Gateway's proxy pods are created and managed by AKS App Routing (Istio). Their istio-proxy
 # container sets no seccomp profile, which "restricted" rejects, so this namespace enforces
@@ -153,6 +163,8 @@ resource "kubernetes_manifest" "gateway" {
     }
     spec = {
       gatewayClassName = "approuting-istio"
+      # App Routing copies these to the Gateway's LoadBalancer Service; Azure puts the label on its public IP.
+      infrastructure = { annotations = { "service.beta.kubernetes.io/azure-dns-label-name" = local.public_dns_label } }
       listeners = concat(
         [{
           name     = "http"
@@ -341,6 +353,11 @@ resource "azurerm_federated_identity_credential" "service" {
   issuer                    = data.azurerm_kubernetes_cluster.this.oidc_issuer_url
   subject                   = "system:serviceaccount:idp-platform:${each.key == "discovery" ? "azure-discovery" : each.key == "orchestrator" ? "provisioning-orchestrator" : each.key}"
   audience                  = ["api://AzureADTokenExchange"]
+}
+
+output "public_host" {
+  description = "Stable public name for Backstage and the GitHub hooks (the GitHub App callback and webhook URLs)."
+  value       = "${local.public_dns_label}.${data.azurerm_kubernetes_cluster.this.location}.cloudapp.azure.com"
 }
 
 output "gateway" {
