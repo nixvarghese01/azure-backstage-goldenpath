@@ -38,6 +38,8 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   the AKS resource group), so the preview plan works once the cluster exists.
 - **Portal:** served over plain HTTP (`dns.tls: false`), Backstage no longer sends the CSP directive
   `upgrade-insecure-requests`, which made browsers load its scripts over https and left a blank page.
+- **Portal:** signed-in pages no longer crash over plain HTTP (`crypto.randomUUID is not a function`): the
+  frontend polyfills `crypto.randomUUID`, which browsers offer only in secure contexts.
 
 ### Security
 - Pod Security `restricted` for platform workloads, network policies, no Kubernetes Secrets in charts,
