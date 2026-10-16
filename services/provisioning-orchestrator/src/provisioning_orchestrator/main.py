@@ -31,7 +31,7 @@ from provisioning_orchestrator.schemas import (
     RequestOut,
 )
 from provisioning_orchestrator.service import audit, enqueue, transition
-from provisioning_orchestrator.states import ACTIVE, CANCELLABLE, CLEANABLE, State
+from provisioning_orchestrator.states import ACTIVE, CANCELLABLE, CLEANABLE, SUPERSEDABLE, State
 from provisioning_orchestrator.views import to_out
 
 
@@ -116,6 +116,12 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
                 Request.state.in_([st.value for st in ACTIVE]),
             )
         )
+        if active and active.requested_by == user.user_ref and State(active.state) in SUPERSEDABLE:
+            # The requester's earlier attempt never got a repository (its scaffolder run failed): retire it.
+            transition(
+                s, active, State.CANCELLED, actor=user.user_ref, reason="superseded by a new submission"
+            )
+            active = None
         if active:
             raise _conflict(
                 "duplicate_application",

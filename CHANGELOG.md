@@ -56,6 +56,8 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   (new `IdpGithubAccess` field, kept as a template secret): a GitHub App installation can create repositories
   only in organizations, and GitHub answered `POST /user/repos` with "Rate Limit Exceeded". For an
   organization the platform's GitHub App creates it, as before.
+- **Orchestrator:** a requester's retry supersedes their earlier request for the same application while it has
+  no repository yet (a scaffolder run that failed after submitting), instead of failing as a duplicate.
 
 ### Security
 - Pod Security `restricted` for platform workloads, network policies, no Kubernetes Secrets in charts,

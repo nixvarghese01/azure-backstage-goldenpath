@@ -56,6 +56,9 @@ CANCELLABLE = frozenset(
     }
 )
 CLEANABLE = frozenset({S.SUCCEEDED, S.FAILED, S.CANCELLED})
+# Before the repository exists nothing has been created for the request, so the requester's retry may
+# replace it (a scaffolder run that failed after submitting leaves the request here).
+SUPERSEDABLE = frozenset({S.REQUESTED, S.VALIDATING, S.PLATFORM_PROVISIONING})
 
 # The outcome groups reported separately in Backstage ("honest status").
 OUTCOMES: dict[str, tuple[State, ...]] = {
