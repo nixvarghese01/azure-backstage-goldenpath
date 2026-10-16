@@ -47,6 +47,8 @@
     "@testing-library/react": "^16.0.0"
   },
   "files": [
-    "dist"
-  ]
+    "dist",
+    "config.d.ts"
+  ],
+  "configSchema": "config.d.ts"
 }

@@ -55,7 +55,8 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   `organization`). For a personal account the repository is created with the signed-in user's GitHub token
   (new `IdpGithubAccess` field, kept as a template secret): a GitHub App installation can create repositories
   only in organizations, and GitHub answered `POST /user/repos` with "Rate Limit Exceeded". For an
-  organization the platform's GitHub App creates it, as before.
+  organization the platform's GitHub App creates it, as before. `idp.githubOwnerType` is declared in the frontend plugin's
+  config schema, so the browser receives it.
 - **Orchestrator:** a requester's retry supersedes their earlier request for the same application while it has
   no repository yet (a scaffolder run that failed after submitting), instead of failing as a duplicate.
 
