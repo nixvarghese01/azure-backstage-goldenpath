@@ -439,6 +439,19 @@ resource "azurerm_role_assignment" "provisioning_rbac_admin" {
   condition            = local.rbac_condition
 }
 
+# The application root module reads two shared resources outside the apps group: the registry (its
+# login server for the Helm values) and the deployment identity (bound to the app namespace). Read only.
+resource "azurerm_role_assignment" "provisioning_reads" {
+  for_each = {
+    registries          = azurerm_resource_group.workload["registry"].id # ACRs are created later, in 20-shared
+    deployment_identity = module.deployment.id
+  }
+  scope                = each.value
+  role_definition_name = "Reader"
+  principal_id         = module.provisioning.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
 # ------------------------------------------------------------------ Entra app registrations (token audiences)
 # Service-to-service calls use Entra access tokens from workload identities. A token needs an audience,
 # which must be an app registration exposing an identifier URI. v2 tokens: aud = the app's client ID.

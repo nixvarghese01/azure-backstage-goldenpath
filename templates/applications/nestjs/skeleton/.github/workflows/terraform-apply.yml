@@ -26,6 +26,7 @@ jobs:
       id-token: write
       actions: read
     with:
+      platform_ref: main   # pinned with the uses: ref by idp:workflow-refs
       operation: apply
       request_id: ${{ inputs.request_id }}
       mode: ${{ inputs.mode }}

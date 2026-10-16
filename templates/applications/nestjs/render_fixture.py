@@ -26,6 +26,8 @@ FIXTURE = {
     "org": "nixvarghese01",
     "availabilityTier": "standard",
     "endpointHost": "orders-api.dev.xycorp.local",
+    "stateStorageAccount": "stidptfstatedev",
+    "ownerType": "user",
     "infrastructure.region": "uksouth",
     "infrastructure.subscription.id": "00000000-0000-0000-0000-000000000000",
     "infrastructure.resourceGroup.mode": "existing",
@@ -42,6 +44,10 @@ FIXTURE = {
     "infrastructure.runtimeCapability.resourceGroup": "rg-idp-apps-dev",
 }
 EXPR = re.compile(r"\$\{\{\s*values\.([a-zA-Z0-9_.]+)\s*(\|[^}]*)?\}\}")
+# The one block form the skeleton uses: {%- if values.x == 'y' %}...{%- else %}...{%- endif %}
+IF_ELSE = re.compile(
+    r"\{%-? if values\.([a-zA-Z0-9_.]+) == '([^']*)' -?%\}(.*?)\{%-? else -?%\}(.*?)\{%-? endif -?%\}", re.S
+)
 COPY_ONLY = (".github/workflows/", "deploy/helm/", "infra/terraform/main.tf", "infra/terraform/versions.tf",
              "infra/terraform/providers.tf", "infra/terraform/variables.tf", "infra/terraform/outputs.tf")
 
@@ -67,7 +73,8 @@ def render_skeleton(out: Path) -> None:
                 return json.dumps(value)
             return value
 
-        target.write_text(EXPR.sub(sub, path.read_text(encoding="utf-8")), encoding="utf-8")
+        text = IF_ELSE.sub(lambda m: m.group(3) if FIXTURE[m.group(1)] == m.group(2) else m.group(4), path.read_text(encoding="utf-8"))
+        target.write_text(EXPR.sub(sub, text), encoding="utf-8")
 
 
 def main() -> None:
@@ -91,7 +98,8 @@ def main() -> None:
     values = {
         "app": "orders-api", "description": "Order management REST API", "owner": "group:default/team-orders",
         "stack": args.stack,
-        "environment": "dev", "request_id": FIXTURE["requestId"], "org": "nixvarghese01", "platform_ref": "main", "repo": "orders-api",
+        "environment": "dev", "request_id": FIXTURE["requestId"], "org": "nixvarghese01", "repo": "orders-api",
+        "platform_ref": "main",
         "namespace": "orders-api", "endpoint_host": FIXTURE["endpointHost"],
         "availability": {"tier": "standard"}, "runtime_capability": {"type": "storage", "mode": "existing"},
         "outputs": {"identity_client_id": "11111111-1111-1111-1111-111111111111",

@@ -22,6 +22,7 @@ jobs:
       id-token: write
       actions: read   # GitHub checks every job of the called workflow; its apply job reads the plan artifact
     with:
+      platform_ref: main   # pinned with the uses: ref by idp:workflow-refs
       operation: plan
       request_id: ${{ inputs.request_id }}
       mode: ${{ inputs.mode }}

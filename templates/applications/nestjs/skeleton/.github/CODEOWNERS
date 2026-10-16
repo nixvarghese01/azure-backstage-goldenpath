@@ -1,3 +1,8 @@
-# Workflow and infrastructure changes need platform review.
+# Workflow and infrastructure changes need platform review. A personal account has no teams: its owner.
+{%- if values.ownerType == 'user' %}
+/.github/workflows/  @${{ values.org }}
+/infra/              @${{ values.org }}
+{%- else %}
 /.github/workflows/  @${{ values.org }}/platform-team
 /infra/              @${{ values.org }}/platform-team
+{%- endif %}

@@ -15,6 +15,14 @@ export interface Config {
      * Default "main".
      */
     platformRef?: string;
+    /** Repository variables of every generated repository (client IDs and the orchestrator callback URL). */
+    generatedRepository?: {
+      provisioningClientId?: string;
+      deploymentClientId?: string;
+      callbackUrl?: string;
+      /** 00-bootstrap's Terraform state storage account (globally unique name, with its suffix). */
+      stateStorageAccount?: string;
+    };
     /** GitHub App ID of the orchestrator (App #2), used as the custom deployment protection rule. */
     orchestratorGithubAppId: number;
     discovery: { baseUrl: string };

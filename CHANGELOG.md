@@ -70,6 +70,13 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 - **Golden path:** the Terraform validate job runs in a `<env>-validate` environment (no Azure trust): with the
   environment in the OIDC subject, its orchestrator callback token was refused ("the claim 'environment' cannot be
   null"). The template creates it, and the reusable-permissions check now flags token requests without an environment.
+- **Golden path (end-to-end review):** generated repositories get the variables the reusable workflows read
+  (`AZURE_TENANT_ID`, `PROVISIONING_CLIENT_ID`, `DEPLOYMENT_CLIENT_ID`, `IDP_CALLBACK_URL`), which a personal
+  account can't inherit from an organization; the state backend uses the real (suffixed) state account; the
+  reusable workflows check out the platform's scripts and policies at the ref they are called at
+  (`platform_ref`); `main` needs no review so the orchestrator can merge the application PR after CI;
+  `CODEOWNERS` names the owner of a personal account; the provisioning identity may read the shared registries
+  and the deployment identity; the form's unused "sample endpoint" and "OpenAPI" switches are gone.
 - **Orchestrator:** a requester's retry supersedes their earlier request for the same application while it has
   no repository yet (a scaffolder run that failed after submitting), instead of failing as a duplicate.
 

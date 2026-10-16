@@ -70,7 +70,8 @@ spec:
           ports: [{ name: http, containerPort: 7007 }]
           env:
             - { name: BACKSTAGE_BASE_URL, value: {{ include "backstage.url" . | quote }} }
-            {{- range $k, $v := omit .Values.env "BACKSTAGE_BASE_URL" }}
+            - { name: IDP_CALLBACK_URL, value: {{ include "backstage.callbackUrl" . | quote }} }
+            {{- range $k, $v := omit .Values.env "BACKSTAGE_BASE_URL" "IDP_CALLBACK_URL" }}
             - { name: {{ $k }}, value: {{ $v | quote }} }
             {{- end }}
           volumeMounts:

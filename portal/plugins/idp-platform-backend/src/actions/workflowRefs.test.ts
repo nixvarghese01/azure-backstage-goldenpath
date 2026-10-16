@@ -5,6 +5,8 @@ describe('pinWorkflowRefs', () => {
     'jobs:',
     '  plan:',
     '    uses: nixvarghese01/azure-backstage-goldenpath/.github/workflows/reusable-terraform.yml@main',
+    '    with:',
+    '      platform_ref: main   # pinned',
     '  other:',
     '    uses: actions/checkout@v4',
   ].join('\n');
@@ -12,6 +14,7 @@ describe('pinWorkflowRefs', () => {
   it('points platform reusable workflows at the platform ref, nothing else', () => {
     const out = pinWorkflowRefs(wf, 'develop');
     expect(out).toContain('reusable-terraform.yml@develop');
+    expect(out).toContain('platform_ref: develop   # pinned');
     expect(out).toContain('actions/checkout@v4');
   });
 

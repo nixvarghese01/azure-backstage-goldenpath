@@ -23,6 +23,12 @@ on:
         required: false
       ORCHESTRATOR_CLIENT_ID:
         required: false
+      PROVISIONING_CLIENT_ID:
+        required: false
+      DEPLOYMENT_CLIENT_ID:
+        required: false
+      TFSTATE_STORAGE_ACCOUNT:
+        required: false
       PLATFORM_CHART_VALUES_JSON:
         required: false
       PLATFORM_ALLOWLIST_JSON:
@@ -144,6 +150,10 @@ jobs:
           DISCOVERY_CLIENT_ID: ${{ secrets.DISCOVERY_CLIENT_ID }}
           ORCHESTRATOR_CLIENT_ID: ${{ secrets.ORCHESTRATOR_CLIENT_ID }}
           BACKSTAGE_CLIENT_ID: ${{ secrets.BACKSTAGE_CLIENT_ID }}
+          # Generated repositories' identities (10-identities client_ids); secrets here only for log masking.
+          PROVISIONING_CLIENT_ID: ${{ secrets.PROVISIONING_CLIENT_ID }}
+          DEPLOYMENT_CLIENT_ID: ${{ secrets.DEPLOYMENT_CLIENT_ID }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TFSTATE_STORAGE_ACCOUNT }}
           BACKSTAGE_DIGEST: ${{ steps.push.outputs.backstage_digest }}
           DISCOVERY_DIGEST: ${{ steps.push.outputs.azure_discovery_digest }}
           ORCHESTRATOR_DIGEST: ${{ steps.push.outputs.provisioning_orchestrator_digest }}
@@ -178,7 +188,7 @@ jobs:
           scripts/render-allowlist.sh policies/allowlist.yaml "$RUNNER_TEMP/allowlist.yaml"
           deploy azure-discovery "$DISCOVERY_CLIENT_ID" "$DISCOVERY_DIGEST" --set-file allowlist="$RUNNER_TEMP/allowlist.yaml"
           deploy provisioning-orchestrator "$ORCHESTRATOR_CLIENT_ID" "$ORCHESTRATOR_DIGEST" --set-string config.platformRepoRef="$GITHUB_REF_NAME"
-          deploy backstage "$BACKSTAGE_CLIENT_ID" "$BACKSTAGE_DIGEST" --set-string env.CATALOG_BRANCH="$GITHUB_REF_NAME"
+          deploy backstage "$BACKSTAGE_CLIENT_ID" "$BACKSTAGE_DIGEST" --set-string env.CATALOG_BRANCH="$GITHUB_REF_NAME"             --set-string env.PROVISIONING_CLIENT_ID="$PROVISIONING_CLIENT_ID" --set-string env.DEPLOYMENT_CLIENT_ID="$DEPLOYMENT_CLIENT_ID"             --set-string env.TFSTATE_STORAGE_ACCOUNT="$TFSTATE_STORAGE_ACCOUNT"
           host="$(kubectl -n idp-platform get httproute backstage -o jsonpath='{.spec.hostnames[0]}')"
           {
             echo "### Public URLs"

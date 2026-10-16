@@ -19,5 +19,6 @@ jobs:
       security-events: write   # CodeQL results
       attestations: write      # build provenance
     with:
+      platform_ref: [[ values.platform_ref ]]
       environment: [[ values.environment ]]
       image_name: [[ values.app ]]
