@@ -150,30 +150,13 @@ jobs:
         run: |
           az aks get-credentials -g "$AKS_RESOURCE_GROUP" -n "$AKS_NAME" --overwrite-existing
           kubelogin convert-kubeconfig -l azurecli
-          # Each provision gives the Gateway a new public IP. Application hostnames (<app>.<gateway-ip>.nip.io)
-          # follow it; own domains are left as set.
-          gateway="$(kubectl -n idp-gateway get gateway idp-gateway -o json)"
-          ip="$(jq -r '.status.addresses[0].value // ""' <<< "$gateway")"
+          # Each provision gives the Gateway a new public IP. The platform charts read their hosts from the
+          # Gateway (dns.mode auto); application hostnames in the allowlist (<app>.<gateway-ip>.nip.io) follow
+          # it here. Own domains are left as set.
+          ip="$(kubectl -n idp-gateway get gateway idp-gateway -o jsonpath='{.status.addresses[0].value}')"
           if [[ "$ip" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
-            nip='[0-9]+(\.[0-9]+){3}\.nip\.io'
-            PLATFORM_CHART_VALUES_JSON="$(sed -E "s/$nip/$ip.nip.io/g" <<< "$PLATFORM_CHART_VALUES_JSON")"
-            PLATFORM_ALLOWLIST_JSON="$(sed -E "s/$nip/$ip.nip.io/g" <<< "$PLATFORM_ALLOWLIST_JSON")"
+            PLATFORM_ALLOWLIST_JSON="$(sed -E "s/[0-9]+(\.[0-9]+){3}\.nip\.io/$ip.nip.io/g" <<< "$PLATFORM_ALLOWLIST_JSON")"
             export PLATFORM_ALLOWLIST_JSON
-          fi
-          # Backstage and the GitHub hooks share the Gateway's DNS label (30-cluster-config), which stays
-          # the same across provisions, so the GitHub App callback and webhook URLs never change.
-          label="$(jq -r '.spec.infrastructure.annotations["service.beta.kubernetes.io/azure-dns-label-name"] // ""' <<< "$gateway")"
-          backstage_host=(); hooks_host=()
-          if [[ -n "$label" ]]; then
-            host="$label.$(az aks show -g "$AKS_RESOURCE_GROUP" -n "$AKS_NAME" --query location -o tsv).cloudapp.azure.com"
-            backstage_host=(--set-string host="$host" --set-string env.BACKSTAGE_BASE_URL="http://$host")
-            hooks_host=(--set-string hooks.host="$host")
-            {
-              echo "### Public URLs"
-              echo "- Backstage: http://$host"
-              echo "- GitHub App callback (Backstage app): http://$host/api/auth/github/handler/frame"
-              echo "- GitHub App webhook (orchestrator app): http://$host/v1/webhooks/github"
-            } >> "$GITHUB_STEP_SUMMARY"
           fi
           deploy() { # <chart> <workload identity client id> <digest> [extra helm args...]
             local chart="$1" client_id="$2" digest="$3"; shift 3
@@ -194,5 +177,12 @@ jobs:
           # The committed allowlist has example IDs; this environment's real ones come from a secret.
           scripts/render-allowlist.sh policies/allowlist.yaml "$RUNNER_TEMP/allowlist.yaml"
           deploy azure-discovery "$DISCOVERY_CLIENT_ID" "$DISCOVERY_DIGEST" --set-file allowlist="$RUNNER_TEMP/allowlist.yaml"
-          deploy provisioning-orchestrator "$ORCHESTRATOR_CLIENT_ID" "$ORCHESTRATOR_DIGEST" "${hooks_host[@]}"
-          deploy backstage "$BACKSTAGE_CLIENT_ID" "$BACKSTAGE_DIGEST" "${backstage_host[@]}"
+          deploy provisioning-orchestrator "$ORCHESTRATOR_CLIENT_ID" "$ORCHESTRATOR_DIGEST"
+          deploy backstage "$BACKSTAGE_CLIENT_ID" "$BACKSTAGE_DIGEST"
+          host="$(kubectl -n idp-platform get httproute backstage -o jsonpath='{.spec.hostnames[0]}')"
+          {
+            echo "### Public URLs"
+            echo "- Backstage: http://$host"
+            echo "- GitHub App callback (Backstage app): http://$host/api/auth/github/handler/frame"
+            echo "- GitHub App webhook (orchestrator app): http://$(kubectl -n idp-platform get httproute provisioning-orchestrator-hooks -o jsonpath='{.spec.hostnames[0]}')/v1/webhooks/github"
+          } >> "$GITHUB_STEP_SUMMARY"

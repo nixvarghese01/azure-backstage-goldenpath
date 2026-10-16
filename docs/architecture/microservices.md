@@ -125,7 +125,7 @@ There is no message broker. The orchestrator uses **PostgreSQL-backed patterns**
 | GitHub webhooks (`workflow_run`, `deployment_status`, `deployment_protection_rule`, `pull_request`) | `POST /v1/webhooks/github` | HMAC-SHA256 (`X-Hub-Signature-256`) with the App's webhook secret; installation ID allowlist |
 | Actions callbacks (plan summary, plan hash, outputs) | `POST /v1/callbacks/actions` | **GitHub OIDC token** from the job: issuer `token.actions.githubusercontent.com`, expected audience, and `repository`/`environment` claims that must match the request's repository and stage |
 
-Only these two paths are exposed publicly, through an `HTTPRoute` on a separate host (for example `platform-hooks.dev.xycorp.local`). Every other orchestrator endpoint is reachable only inside the cluster.
+Only these two paths are exposed publicly, through an `HTTPRoute` with exact path matches. Its host comes from the chart's `dns` values: by default (`auto`) it is read from the Gateway at deploy time, so it is the Gateway's stable Azure DNS name (shared with Backstage) or `platform-hooks.<gateway-ip>.nip.io`. With an own domain it is `platform-hooks.<domain>`. Every other orchestrator endpoint is reachable only inside the cluster.
 
 ## 5. Identities and trust boundaries
 
@@ -163,8 +163,8 @@ flowchart TB
         GW["Gateway (approuting-istio)"]
     end
     subgraph NS["namespace: idp-platform"]
-        R1["HTTPRoute backstage.dev.xycorp.local"] --> SBS[Service backstage]
-        R2["HTTPRoute platform-hooks.dev.xycorp.local<br/>/v1/webhooks/github · /v1/callbacks/actions"] --> SOA[Service orchestrator-api]
+        R1["HTTPRoute backstage (stable DNS name)"] --> SBS[Service backstage]
+        R2["HTTPRoute hooks (same name, exact paths)<br/>/v1/webhooks/github · /v1/callbacks/actions"] --> SOA[Service orchestrator-api]
         SBS --> PBS["Deployment backstage ×2"]
         SOA --> POA["Deployment orchestrator-api ×2"]
         SD[Service azure-discovery] --> PD["Deployment azure-discovery ×2"]

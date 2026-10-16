@@ -10,10 +10,11 @@ workloadIdentity:
 keyVault:
   name: kv-idp-plat-dev
   tenantId: ""
-host: backstage.dev.xycorp.local
+# Public name on the shared Gateway. auto: read from the Gateway at deploy time (its stable Azure DNS
+# name, else backstage.<gateway-ip>.nip.io); domain: backstage.<domain>; host: exactly dns.host. tls: https URLs.
+dns: { mode: auto, domain: "", host: "", tls: false }
 gateway: { name: idp-gateway, namespace: idp-gateway }
 env:
-  BACKSTAGE_BASE_URL: http://backstage.dev.xycorp.local
   POSTGRES_HOST: ""
   POSTGRES_USER: id-idp-backstage-dev
   AZURE_TENANT_ID: ""

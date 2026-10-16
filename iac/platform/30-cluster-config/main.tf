@@ -128,6 +128,7 @@ resource "kubernetes_storage_class_v1" "tagged" {
 
 locals {
   public_dns_label = coalesce(var.public_dns_label, "idp-${var.environment}-${substr(sha1(data.azurerm_kubernetes_cluster.this.id), 0, 6)}")
+  public_host      = "${local.public_dns_label}.${data.azurerm_kubernetes_cluster.this.location}.cloudapp.azure.com"
 }
 
 # ------------------------------------------------------------------ namespaces
@@ -160,6 +161,8 @@ resource "kubernetes_manifest" "gateway" {
     metadata = {
       name      = "idp-gateway"
       namespace = kubernetes_namespace_v1.gateway.metadata[0].name
+      # The platform charts read this at deploy time (dns.mode auto) for Backstage and the GitHub hooks.
+      annotations = { "idp.io/public-host" = local.public_host }
     }
     spec = {
       gatewayClassName = "approuting-istio"
@@ -357,7 +360,7 @@ resource "azurerm_federated_identity_credential" "service" {
 
 output "public_host" {
   description = "Stable public name for Backstage and the GitHub hooks (the GitHub App callback and webhook URLs)."
-  value       = "${local.public_dns_label}.${data.azurerm_kubernetes_cluster.this.location}.cloudapp.azure.com"
+  value       = local.public_host
 }
 
 output "gateway" {
