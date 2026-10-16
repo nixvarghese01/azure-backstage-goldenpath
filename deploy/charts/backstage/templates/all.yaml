@@ -77,7 +77,8 @@ spec:
           {{- end }}
           ports: [{ name: http, containerPort: 7007 }]
           env:
-            {{- range $k, $v := .Values.env }}
+            - { name: BACKSTAGE_BASE_URL, value: {{ include "backstage.url" . | quote }} }
+            {{- range $k, $v := omit .Values.env "BACKSTAGE_BASE_URL" }}
             - { name: {{ $k }}, value: {{ $v | quote }} }
             {{- end }}
           volumeMounts:
@@ -119,7 +120,7 @@ metadata:
 spec:
   parentRefs:
     - { name: {{ .Values.gateway.name }}, namespace: {{ .Values.gateway.namespace }} }
-  hostnames: [{{ .Values.host | quote }}]
+  hostnames: [{{ include "backstage.host" . | quote }}]
   rules:
     - backendRefs:
         - { name: backstage, port: 7007 }

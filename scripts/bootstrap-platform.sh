@@ -19,8 +19,9 @@
 # is disabled, not billed, when the credit ends. Set IDP_ALLOW_BILLED_SUBSCRIPTION=true to lift it.
 #
 # Usage: scripts/bootstrap-platform.sh <step> [--env dev] [--location uksouth]
-#   github also takes --base-domain <domain> (public hostnames: backstage.<domain>, platform-hooks.<domain>;
-#   e.g. <gateway-ip>.nip.io) and the GitHub App IDs once the apps exist (#19): --backstage-app-id,
+#   github also takes --base-domain <domain> (application hostnames <app>.<domain>, e.g. <gateway-ip>.nip.io;
+#   an own domain also names backstage.<domain> and platform-hooks.<domain>, otherwise the charts read
+#   the Gateway's stable Azure DNS name) and the GitHub App IDs once the apps exist (#19): --backstage-app-id,
 #   --backstage-client-id, --orchestrator-app-id, --orchestrator-installation-id. IDs only, no secrets.
 #   github and allowlist take --management-groups <a,b> (landing zone groups apps may use; default: any).
 # Needs: az, gh, terraform ~> 1.16, python3. Inputs: iac/platform/{10-identities,20-shared-dev,
@@ -287,10 +288,10 @@ orchestrator = {"api": {"replicas": 1}, "worker": {"replicas": 1},
                            "githubAppId": os.environ["GH_ORCH_APP_ID"],
                            "githubInstallationId": os.environ["GH_ORCH_INSTALLATION_ID"],
                            "selfApprovalEnvironments": env if env != "prod" else ""}}
-if domain:  # public hostnames on the shared Gateway, e.g. <gateway-ip>.nip.io
-    backstage["host"] = f"backstage.{domain}"
-    backstage["env"]["BACKSTAGE_BASE_URL"] = f"http://backstage.{domain}"
-    orchestrator["hooks"] = {"host": f"platform-hooks.{domain}"}
+# Public hostnames: the charts read them from the Gateway (dns.mode auto: its Azure DNS name, else
+# <gateway-ip>.nip.io). Only an own domain is set here.
+if domain and not re.fullmatch(r"(\d+\.){4}nip\.io", domain):
+    backstage["dns"] = orchestrator["dns"] = {"mode": "domain", "domain": domain}
 # Dev in-cluster PostgreSQL: its own identity reads its passwords from Key Vault (CSI driver).
 postgres = {"workloadIdentity": {"clientId": out["client_ids"]["value"].get("postgres", "")},
             "keyVault": {"name": kv, "tenantId": tenant}}

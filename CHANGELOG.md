@@ -29,6 +29,11 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 ### Fixed
 - **Pipelines:** teardown of an already empty stack no longer fails the plan check (a plan with no
   resource changes), and a destroy that stops part-way (an AKS delete that times out) retries what is left.
+- **Platform charts:** public hostnames are picked up automatically. `dns.mode: auto` (default) reads
+  the Gateway at deploy time: its Azure DNS name (`<label>.<region>.cloudapp.azure.com`, the same across
+  re-provisions, so the GitHub App URLs never change), else `<name>.<gateway-ip>.nip.io`. `domain` and
+  `host` set an own name; `dns.tls` gives https URLs. Application hostnames in the allowlist follow the
+  current Gateway IP at release.
 
 ### Security
 - Pod Security `restricted` for platform workloads, network policies, no Kubernetes Secrets in charts,

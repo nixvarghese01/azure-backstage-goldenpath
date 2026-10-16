@@ -177,7 +177,7 @@ spec:
   selector: { app.kubernetes.io/name: provisioning-orchestrator-api }
   ports: [{ name: http, port: 8002, targetPort: http }]
 ---
-# Only the two GitHub-facing paths are public, on a separate host.
+# Only the two GitHub-facing paths are public (Exact matches, so they can share a host with Backstage).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -185,7 +185,7 @@ metadata:
 spec:
   parentRefs:
     - { name: {{ .Values.hooks.gateway.name }}, namespace: {{ .Values.hooks.gateway.namespace }} }
-  hostnames: [{{ .Values.hooks.host | quote }}]
+  hostnames: [{{ include "provisioning-orchestrator.host" . | quote }}]
   rules:
     - matches:
         - path: { type: Exact, value: /v1/webhooks/github }

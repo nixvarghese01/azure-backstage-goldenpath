@@ -53,6 +53,12 @@ variable "gateway_hostname" {
   default     = null
 }
 
+variable "public_dns_label" {
+  description = "Azure DNS label on the Gateway's public IP: <label>.<region>.cloudapp.azure.com, unique per region. The name stays when the IP changes (each provision), so the GitHub App URLs don't. null = idp-<environment>-<hash of the cluster ID>."
+  type        = string
+  default     = null
+}
+
 variable "gateway_tls_secret" {
   description = "Name of a TLS Secret/certificate reference for an HTTPS listener. null = HTTP only (demo)."
   type        = string
@@ -120,6 +126,11 @@ resource "kubernetes_storage_class_v1" "tagged" {
   }
 }
 
+locals {
+  public_dns_label = coalesce(var.public_dns_label, "idp-${var.environment}-${substr(sha1(data.azurerm_kubernetes_cluster.this.id), 0, 6)}")
+  public_host      = "${local.public_dns_label}.${data.azurerm_kubernetes_cluster.this.location}.cloudapp.azure.com"
+}
+
 # ------------------------------------------------------------------ namespaces
 # The Gateway's proxy pods are created and managed by AKS App Routing (Istio). Their istio-proxy
 # container sets no seccomp profile, which "restricted" rejects, so this namespace enforces
@@ -150,9 +161,13 @@ resource "kubernetes_manifest" "gateway" {
     metadata = {
       name      = "idp-gateway"
       namespace = kubernetes_namespace_v1.gateway.metadata[0].name
+      # The platform charts read this at deploy time (dns.mode auto) for Backstage and the GitHub hooks.
+      annotations = { "idp.io/public-host" = local.public_host }
     }
     spec = {
       gatewayClassName = "approuting-istio"
+      # App Routing copies these to the Gateway's LoadBalancer Service; Azure puts the label on its public IP.
+      infrastructure = { annotations = { "service.beta.kubernetes.io/azure-dns-label-name" = local.public_dns_label } }
       listeners = concat(
         [{
           name     = "http"
@@ -303,6 +318,36 @@ resource "kubernetes_role_binding_v1" "platform_jobs" {
   }
 }
 
+# platform-release reads the shared Gateway's public IP for <gateway-ip>.nip.io hostnames: read only, Gateways only.
+resource "kubernetes_role_v1" "gateway_reader" {
+  metadata {
+    name      = "gateway-reader"
+    namespace = kubernetes_namespace_v1.gateway.metadata[0].name
+  }
+  rule {
+    api_groups = ["gateway.networking.k8s.io"]
+    resources  = ["gateways"]
+    verbs      = ["get"]
+  }
+}
+
+resource "kubernetes_role_binding_v1" "gateway_reader" {
+  metadata {
+    name      = "gateway-reader"
+    namespace = kubernetes_namespace_v1.gateway.metadata[0].name
+  }
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Role"
+    name      = kubernetes_role_v1.gateway_reader.metadata[0].name
+  }
+  subject {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "User"
+    name      = data.azurerm_user_assigned_identity.id["platform-deploy"].principal_id
+  }
+}
+
 # ------------------------------------------------------------------ Workload Identity for platform services
 resource "azurerm_federated_identity_credential" "service" {
   for_each                  = toset(["backstage", "discovery", "orchestrator", "postgres"])
@@ -311,6 +356,11 @@ resource "azurerm_federated_identity_credential" "service" {
   issuer                    = data.azurerm_kubernetes_cluster.this.oidc_issuer_url
   subject                   = "system:serviceaccount:idp-platform:${each.key == "discovery" ? "azure-discovery" : each.key == "orchestrator" ? "provisioning-orchestrator" : each.key}"
   audience                  = ["api://AzureADTokenExchange"]
+}
+
+output "public_host" {
+  description = "Stable public name for Backstage and the GitHub hooks (the GitHub App callback and webhook URLs)."
+  value       = local.public_host
 }
 
 output "gateway" {

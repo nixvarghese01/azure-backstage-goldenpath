@@ -150,6 +150,14 @@ jobs:
         run: |
           az aks get-credentials -g "$AKS_RESOURCE_GROUP" -n "$AKS_NAME" --overwrite-existing
           kubelogin convert-kubeconfig -l azurecli
+          # Each provision gives the Gateway a new public IP. The platform charts read their hosts from the
+          # Gateway (dns.mode auto); application hostnames in the allowlist (<app>.<gateway-ip>.nip.io) follow
+          # it here. Own domains are left as set.
+          ip="$(kubectl -n idp-gateway get gateway idp-gateway -o jsonpath='{.status.addresses[0].value}')"
+          if [[ "$ip" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
+            PLATFORM_ALLOWLIST_JSON="$(sed -E "s/[0-9]+(\.[0-9]+){3}\.nip\.io/$ip.nip.io/g" <<< "$PLATFORM_ALLOWLIST_JSON")"
+            export PLATFORM_ALLOWLIST_JSON
+          fi
           deploy() { # <chart> <workload identity client id> <digest> [extra helm args...]
             local chart="$1" client_id="$2" digest="$3"; shift 3
             jq -er --arg c "$chart" '.[$c] // ""' <<< "$PLATFORM_CHART_VALUES_JSON" > "$RUNNER_TEMP/$chart.yaml"
@@ -171,3 +179,10 @@ jobs:
           deploy azure-discovery "$DISCOVERY_CLIENT_ID" "$DISCOVERY_DIGEST" --set-file allowlist="$RUNNER_TEMP/allowlist.yaml"
           deploy provisioning-orchestrator "$ORCHESTRATOR_CLIENT_ID" "$ORCHESTRATOR_DIGEST"
           deploy backstage "$BACKSTAGE_CLIENT_ID" "$BACKSTAGE_DIGEST"
+          host="$(kubectl -n idp-platform get httproute backstage -o jsonpath='{.spec.hostnames[0]}')"
+          {
+            echo "### Public URLs"
+            echo "- Backstage: http://$host"
+            echo "- GitHub App callback (Backstage app): http://$host/api/auth/github/handler/frame"
+            echo "- GitHub App webhook (orchestrator app): http://$(kubectl -n idp-platform get httproute provisioning-orchestrator-hooks -o jsonpath='{.spec.hostnames[0]}')/v1/webhooks/github"
+          } >> "$GITHUB_STEP_SUMMARY"
