@@ -36,6 +36,8 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   current Gateway IP at release.
 - **Identities:** the read-only plan identity may fetch the AKS user kubeconfig (Cluster User Role on
   the AKS resource group), so the preview plan works once the cluster exists.
+- **Portal:** served over plain HTTP (`dns.tls: false`), Backstage no longer sends the CSP directive
+  `upgrade-insecure-requests`, which made browsers load its scripts over https and left a blank page.
 
 ### Security
 - Pod Security `restricted` for platform workloads, network policies, no Kubernetes Secrets in charts,
