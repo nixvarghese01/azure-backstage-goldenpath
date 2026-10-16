@@ -18,7 +18,7 @@ spec:
     # ------------------------------------------------------------------ 1. What you must tell us
     - title: Your application
       description: Only these are needed. Everything on the next page is prefilled with platform defaults.
-      required: [name, owner]
+      required: [name, owner, githubAccess]
       properties:
         name:
           title: Name
@@ -37,6 +37,11 @@ spec:
           title: Description (optional)
           type: string
           maxLength: 300
+        githubAccess:
+          title: GitHub access
+          type: string
+          description: Repositories in a personal account are created with your GitHub sign-in.
+          ui:field: IdpGithubAccess
 
     # ------------------------------------------------------------------ 2. Defaults (change only if needed)
     - title: Platform settings
@@ -132,6 +137,7 @@ spec:
       name: Create repository
       action: publish:github
       input:
+        token: ${{ secrets.USER_OAUTH_TOKEN }}
         repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
         description: ${{ parameters.description }}
         repoVisibility: ${{ parameters.repoVisibility }}
@@ -152,12 +158,14 @@ spec:
       name: Environment (plan)
       action: github:environment:create
       input:
+        token: ${{ secrets.USER_OAUTH_TOKEN }}
         repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
         name: ${{ parameters.environment }}-infra-plan
     - id: env-infra
       name: Environment (apply, held for approval in Backstage)
       action: github:environment:create
       input:
+        token: ${{ secrets.USER_OAUTH_TOKEN }}
         repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
         name: ${{ parameters.environment }}-infra
         deploymentBranchPolicy:
@@ -167,6 +175,7 @@ spec:
       name: Environment (build)
       action: github:environment:create
       input:
+        token: ${{ secrets.USER_OAUTH_TOKEN }}
         repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
         name: ${{ parameters.environment }}-build
         deploymentBranchPolicy:
@@ -176,6 +185,7 @@ spec:
       name: Environment (deploy)
       action: github:environment:create
       input:
+        token: ${{ secrets.USER_OAUTH_TOKEN }}
         repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
         name: ${{ parameters.environment }}
         deploymentBranchPolicy:
