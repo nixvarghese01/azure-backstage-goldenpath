@@ -5,8 +5,8 @@ export interface Config {
     /**
      * Who owns githubOrg. "organization": the platform's GitHub App creates repositories (installation
      * token). "user": a personal account, where an App installation can't create repositories, so the
-     * template uses the signed-in user's GitHub token. Default "organization".
-     * @visibility frontend
+     * template uses the signed-in user's GitHub token. Default "organization". The frontend reads it
+     * through the idp-platform plugin's schema (frontend visibility must be declared there).
      */
     githubOwnerType?: 'user' | 'organization';
     /** GitHub App ID of the orchestrator (App #2), used as the custom deployment protection rule. */
