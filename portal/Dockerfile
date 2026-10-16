@@ -20,7 +20,7 @@ RUN tar -xzf /src/portal/packages/backend/dist/bundle.tar.gz -C /runtime
 FROM node:24-bookworm-slim AS runtime-base
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-ENV NODE_ENV=production NODE_OPTIONS="--no-node-snapshot"
+ENV NODE_ENV=production NODE_OPTIONS="--no-node-snapshot" CATALOG_BRANCH=main
 WORKDIR /app
 COPY --from=build --chown=node:node /runtime/ ./
 COPY --chown=node:node portal/app-config.container.yaml portal/app-config.docker.yaml portal/app-config.docs.yaml portal/app-config.lite.yaml portal/app-config.production.yaml ./

@@ -73,8 +73,9 @@ catalog:
         - allow: [Group, User]
     - type: file
       target: ./catalog/platform.yaml
+    # The branch that deployed this portal (platform-release sets it): develop for dev, main for releases.
     - type: url
-      target: https://github.com/${GITHUB_ORG}/azure-backstage-goldenpath/blob/main/templates/applications/nestjs/template.yaml
+      target: https://github.com/${GITHUB_ORG}/azure-backstage-goldenpath/blob/${CATALOG_BRANCH}/templates/applications/nestjs/template.yaml
       rules:
         - allow: [Template]
 

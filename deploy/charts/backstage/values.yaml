@@ -19,6 +19,7 @@ env:
   POSTGRES_USER: id-idp-backstage-dev
   AZURE_TENANT_ID: ""
   GITHUB_ORG: nixvarghese01
+  CATALOG_BRANCH: main      # repository branch for catalog templates; platform-release sets the deploying branch
   GITHUB_APP_BACKSTAGE_ID: ""
   GITHUB_APP_BACKSTAGE_CLIENT_ID: ""
   GITHUB_APP_ORCHESTRATOR_ID: ""
