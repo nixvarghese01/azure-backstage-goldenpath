@@ -34,6 +34,8 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   re-provisions, so the GitHub App URLs never change), else `<name>.<gateway-ip>.nip.io`. `domain` and
   `host` set an own name; `dns.tls` gives https URLs. Application hostnames in the allowlist follow the
   current Gateway IP at release.
+- **Identities:** the read-only plan identity may fetch the AKS user kubeconfig (Cluster User Role on
+  the AKS resource group), so the preview plan works once the cluster exists.
 
 ### Security
 - Pod Security `restricted` for platform workloads, network policies, no Kubernetes Secrets in charts,

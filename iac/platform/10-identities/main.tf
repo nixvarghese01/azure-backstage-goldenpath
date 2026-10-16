@@ -353,6 +353,16 @@ resource "azurerm_role_assignment" "platform_plan_reader" {
   principal_type       = "ServicePrincipal"
 }
 
+# The preview plan refreshes the AKS cluster, which reads its user kubeconfig (listClusterUserCredential).
+# Cluster User only fetches the Entra kubeconfig; Kubernetes access still needs RBAC in the cluster, which
+# the plan identity has none of. On the resource group, so it exists before the cluster does.
+resource "azurerm_role_assignment" "platform_plan_aks_user" {
+  scope                = azurerm_resource_group.workload["aks"].id
+  role_definition_name = "Azure Kubernetes Service Cluster User Role"
+  principal_id         = module.platform_plan.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
 # ------------------------------------------------------------------ provisioning identity scope
 # Applied by an admin with this stack (creating a role definition needs roleDefinitions/write, which
 # the pipeline identities don't have). Generated repositories use these rights through
