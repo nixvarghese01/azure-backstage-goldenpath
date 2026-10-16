@@ -161,6 +161,13 @@ spec:
           AKS_RESOURCE_GROUP: ${{ steps.submit.output.aksResourceGroup }}
 
     # 4. GitHub environments used by the reusable workflows (ADR-0005).
+    - id: env-validate
+      name: Environment (validate)
+      action: github:environment:create
+      input:
+        token: ${{ secrets.USER_OAUTH_TOKEN if steps.submit.output.githubOwnerType == 'user' }}
+        repoUrl: github.com?owner=${{ steps.submit.output.githubOrg }}&repo=${{ parameters.name }}
+        name: ${{ parameters.environment }}-validate
     - id: env-plan
       name: Environment (plan)
       action: github:environment:create

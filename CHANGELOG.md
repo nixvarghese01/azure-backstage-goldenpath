@@ -67,6 +67,9 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 - **Orchestrator:** sets each generated repository's OIDC subject template (`repository_owner_id`, `environment`,
   `job_workflow_ref`) before its first workflow, so Azure federation works in personal accounts too, where there
   is no organization-wide template.
+- **Golden path:** the Terraform validate job runs in a `<env>-validate` environment (no Azure trust): with the
+  environment in the OIDC subject, its orchestrator callback token was refused ("the claim 'environment' cannot be
+  null"). The template creates it, and the reusable-permissions check now flags token requests without an environment.
 - **Orchestrator:** a requester's retry supersedes their earlier request for the same application while it has
   no repository yet (a scaffolder run that failed after submitting), instead of failing as a duplicate.
 

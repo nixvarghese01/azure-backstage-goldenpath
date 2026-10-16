@@ -1,5 +1,9 @@
 """Check that generated workflows grant what the platform's reusable workflows ask for.
 
+Also: every reusable job that requests an OIDC token runs in an environment. The generated repositories'
+subject template includes the environment claim, and GitHub refuses a token without it ("the claim
+'environment' cannot be null or empty").
+
 GitHub validates every job of a called workflow against the calling job's permissions, including jobs
 that won't run, and fails the run at startup ("The nested job 'apply' is requesting 'actions: read', but
 is only allowed 'actions: none'"). Neither actionlint nor a render catches it, so this does.
@@ -40,6 +44,14 @@ def main() -> int:
             called = yaml.safe_load((platform / ".github/workflows" / m.group(1)).read_text(encoding="utf-8"))
             have = granted(job, wf)
             for nested_name, nested in (called.get("jobs") or {}).items():
+                # Generated repos' OIDC subject includes the environment: a token request without one fails.
+                if (nested.get("permissions") or {}).get("id-token") == "write" and not nested.get(
+                    "environment"
+                ):
+                    problems.append(
+                        f"{m.group(1)} job '{nested_name}' requests id-token without an environment "
+                        "(the OIDC subject needs the environment claim)"
+                    )
                 for scope, level in (nested.get("permissions") or {}).items():
                     got = have.get(scope, have.get("*", "none"))
                     if LEVEL[got] < LEVEL[level]:
@@ -47,6 +59,7 @@ def main() -> int:
                             f"{caller.name} job '{name}' -> {m.group(1)} job '{nested_name}' needs "
                             f"{scope}: {level}, caller grants {scope}: {got}"
                         )
+    problems = list(dict.fromkeys(problems))  # one report per problem, not per caller
     for p in problems:
         print(f"::error::{p}")
     print(f"checked {len(callers)} generated workflows: {len(problems)} problem(s)")
