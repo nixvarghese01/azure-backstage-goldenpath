@@ -177,7 +177,7 @@ jobs:
           # The committed allowlist has example IDs; this environment's real ones come from a secret.
           scripts/render-allowlist.sh policies/allowlist.yaml "$RUNNER_TEMP/allowlist.yaml"
           deploy azure-discovery "$DISCOVERY_CLIENT_ID" "$DISCOVERY_DIGEST" --set-file allowlist="$RUNNER_TEMP/allowlist.yaml"
-          deploy provisioning-orchestrator "$ORCHESTRATOR_CLIENT_ID" "$ORCHESTRATOR_DIGEST"
+          deploy provisioning-orchestrator "$ORCHESTRATOR_CLIENT_ID" "$ORCHESTRATOR_DIGEST" --set-string config.platformRepoRef="$GITHUB_REF_NAME"
           deploy backstage "$BACKSTAGE_CLIENT_ID" "$BACKSTAGE_DIGEST" --set-string env.CATALOG_BRANCH="$GITHUB_REF_NAME"
           host="$(kubectl -n idp-platform get httproute backstage -o jsonpath='{.spec.hostnames[0]}')"
           {

@@ -36,6 +36,7 @@ def test_description_is_serialized_in_generated_sources(description: str) -> Non
             "description": description,
             "namespace": "orders-api",
             "org": "nixvarghese01",
+            "platform_ref": "develop",
             "repo": "orders-api",
             "owner": "group:default/team-orders",
             "environment": "dev",
@@ -55,3 +56,7 @@ def test_description_is_serialized_in_generated_sources(description: str) -> Non
     assert 'AZURE_STORAGE_ACCOUNT: ""' in files["docker-compose.yml"]
     assert "git clone https://github.com/nixvarghese01/orders-api.git" in files["README.md"]
     assert "[[" not in "".join(files.values())
+    # Generated workflows call the platform's reusable workflows at the platform ref (the deploying branch).
+    ci = files[".github/workflows/application-ci.yml"]
+    assert "reusable-application-ci.yml@develop" in ci
+    assert "@main" not in ci

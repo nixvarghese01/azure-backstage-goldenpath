@@ -9,6 +9,12 @@ export interface Config {
      * through the idp-platform plugin's schema (frontend visibility must be declared there).
      */
     githubOwnerType?: 'user' | 'organization';
+    /**
+     * Ref of the platform repository that generated repositories use: its catalog templates and
+     * reusable workflows (`uses: ...@<ref>`). platform-release sets the branch it deploys from.
+     * Default "main".
+     */
+    platformRef?: string;
     /** GitHub App ID of the orchestrator (App #2), used as the custom deployment protection rule. */
     orchestratorGithubAppId: number;
     discovery: { baseUrl: string };

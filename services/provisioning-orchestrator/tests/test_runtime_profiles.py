@@ -20,6 +20,7 @@ def _render(stack: str) -> dict[str, str]:
             "description": "Orders",
             "namespace": "orders-api",
             "org": "nixvarghese01",
+            "platform_ref": "develop",
             "repo": "orders-api",
             "owner": "group:default/team-orders",
             "environment": "dev",

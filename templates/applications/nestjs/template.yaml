@@ -134,6 +134,11 @@ spec:
           availabilityTier: ${{ parameters.availability.tier }}
           endpointHost: ${{ steps.submit.output.endpointHost }}
 
+    # 2b. The skeleton's workflows call the platform's reusable workflows: pin them to the platform ref.
+    - id: workflow-refs
+      name: Pin platform workflows
+      action: idp:workflow-refs
+
     # 3. Create the repository (built-in), with identifiers as Actions *variables* (no secrets).
     - id: publish
       name: Create repository

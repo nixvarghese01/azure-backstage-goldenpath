@@ -231,6 +231,7 @@ def h_open_app_pr(ctx: Context, s: Session, step: Step, req: Request) -> None:
         "environment": req.environment,
         "request_id": req.id,
         "org": ctx.settings.github_org,
+        "platform_ref": ctx.settings.platform_repo_ref,
         "repo": _app_repo(req),
         "namespace": req.spec["namespace"]["name"],
         "endpoint_host": req.spec.get("endpoint_host", ""),
