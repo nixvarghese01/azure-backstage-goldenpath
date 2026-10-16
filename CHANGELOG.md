@@ -26,6 +26,10 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 - **Docs:** ADRs 0001-0009, operations guides (bootstrap record, Terraform state, demo environment,
   troubleshooting, validation checklist) and this changelog with a release workflow.
 
+### Fixed
+- **Pipelines:** teardown of an already empty stack no longer fails the plan check (a plan with no
+  resource changes), and a destroy that stops part-way (an AKS delete that times out) retries what is left.
+
 ### Security
 - Pod Security `restricted` for platform workloads, network policies, no Kubernetes Secrets in charts,
   per-secret Key Vault access, Actions pinned to commit SHAs, secret scanning and push protection.

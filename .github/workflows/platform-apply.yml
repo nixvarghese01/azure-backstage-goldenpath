@@ -225,8 +225,20 @@ jobs:
       # in other stacks, and Checkov would match the wrong file and ignore the waivers.
       - name: Plan misconfiguration scan (Checkov, resolved values)
         run: pipx run checkov==3.3.26 -f plan.json --framework terraform_plan --repo-root-for-plan-enrichment "$GITHUB_WORKSPACE/iac/modules" --quiet --compact
-      - name: Apply the checked plan (never re-plans)
-        run: terraform apply plan.bin
+      # An apply never re-plans. A destroy that stops part-way (an AKS delete that times out or ends Failed
+      # on a transient Key Vault 409) leaves only a subset of what was approved, so destroy re-plans what
+      # is left and retries, up to twice.
+      - name: Apply the checked plan
+        run: |
+          terraform apply plan.bin && exit 0
+          [[ "$MODE" == destroy ]] || exit 1
+          extra=(-destroy); [[ "$STACK" == "30-cluster-config" ]] && extra+=(-var=kubelogin_mode=azurecli)
+          for attempt in 1 2; do
+            echo "::warning::Destroy failed part-way; retrying what is left (attempt $attempt of 2)."
+            terraform plan -var-file=terraform.tfvars "${extra[@]}" -out=retry.bin -no-color > /dev/null &&
+              terraform apply retry.bin && exit 0
+          done
+          exit 1
       - name: Report to orchestrator
         if: always() && inputs.request_id != ''
         working-directory: .
