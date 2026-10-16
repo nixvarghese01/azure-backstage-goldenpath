@@ -29,6 +29,13 @@ describe('validateInfrastructure', () => {
     expect(errors).toEqual([]);
   });
 
+  it('reports missing choices instead of throwing on the form\'s initial {}', () => {
+    const { validation, errors } = collector();
+    expect(() => validateInfrastructure({} as InfrastructureSelection, validation)).not.toThrow();
+    expect(errors).toContain('Tenant: select one.');
+    expect(errors).toContain('Subscription: select one.');
+  });
+
   it('requires the tenant and landing zone management group', () => {
     const { validation, errors } = collector();
     validateInfrastructure({ ...good, tenantId: undefined, managementGroup: undefined }, validation);

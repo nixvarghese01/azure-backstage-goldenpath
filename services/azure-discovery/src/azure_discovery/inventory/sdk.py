@@ -8,6 +8,7 @@ still fails is mapped to typed errors here - never to an empty success.
 from __future__ import annotations
 
 import logging
+from enum import Enum
 from typing import Any
 
 from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ServiceRequestError
@@ -80,6 +81,14 @@ resources
 | where type in ('microsoft.storage/storageaccounts', 'microsoft.keyvault/vaults')
 | project id, name, type, resourceGroup, location, sku = tostring(sku.name)
 """
+
+
+def _enum_text(value: object) -> str:
+    """The wire value of an SDK enum ("Enabled"). str() of a str-mixin Enum gives "SubscriptionState.ENABLED"
+    since Python 3.11, which no check matches: every subscription looked disabled and the form was empty."""
+    if isinstance(value, Enum):
+        return str(value.value)
+    return "" if value is None else str(value)
 
 
 def _translate(exc: Exception) -> Exception:
@@ -172,7 +181,7 @@ class SdkInventory:
             Subscription(
                 id=s.subscription_id or "",
                 name=s.display_name or s.subscription_id or "",
-                state=str(s.state),
+                state=_enum_text(s.state),
                 quota_id=getattr(s.subscription_policies, "quota_id", None),
                 tenant_id=s.tenant_id,
                 management_groups=ancestors.get((s.subscription_id or "").lower(), []),
@@ -192,7 +201,7 @@ class SdkInventory:
         return Subscription(
             id=s.subscription_id or subscription_id,
             name=s.display_name or s.subscription_id or subscription_id,
-            state=str(s.state),
+            state=_enum_text(s.state),
             quota_id=getattr(s.subscription_policies, "quota_id", None),
             tenant_id=s.tenant_id,
             management_groups=self._ancestors().get(subscription_id.lower(), []),

@@ -48,6 +48,9 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   dev platform) instead of `main`, which has no release yet, so the Create page lists it.
 - **Portal:** the template form no longer crashes on open (`Cannot read properties of undefined (reading
   'mode')`): the Azure resource and availability pickers fill their defaults when the form starts them as `{}`.
+- **Discovery:** the Azure resource picker lists the real tenant, subscription and resources again. On Python
+  3.11+ `str()` of an Azure SDK enum gave `SubscriptionState.ENABLED`, so every subscription looked disabled and
+  the form found no tenant. Form validation no longer throws on the picker's initial `{}`.
 
 ### Security
 - Pod Security `restricted` for platform workloads, network policies, no Kubernetes Secrets in charts,
