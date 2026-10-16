@@ -32,24 +32,15 @@ spec:
           objectName: backstage-db-password
           objectType: secret
         {{- end }}
-{{- if .Values.database.inCluster }}
 ---
-# dev: PostgreSQL inside the cluster (deploy/charts/postgres). Overrides the production database
-# connection: in-cluster host and login role, no TLS on the pod network. The password stays the
-# production one: /mnt/secrets/backstage-db-password, from Key Vault through the CSI driver.
+# Overrides of app-config.production.yaml that depend on this release's values.
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: backstage-database
+  name: backstage-config
 data:
-  app-config.database.yaml: |
-    backend:
-      database:
-        connection:
-          host: postgres
-          user: backstage
-          ssl: false
-{{- end }}
+  app-config.chart.yaml: |
+    {{- include "backstage.appConfig" . | nindent 4 }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -65,16 +56,17 @@ spec:
       labels:
         app.kubernetes.io/name: backstage
         azure.workload.identity/use: "true"
+      annotations:
+        # Roll the pods when the config overrides change.
+        checksum/config: {{ include "backstage.appConfig" . | sha256sum | trunc 16 }}
     spec:
       serviceAccountName: backstage
       securityContext: { runAsNonRoot: true, runAsUser: 1000, seccompProfile: { type: RuntimeDefault } }
       containers:
         - name: backstage
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          {{- if .Values.database.inCluster }}
           args: [node, packages/backend, --config, app-config.container.yaml, --config, app-config.production.yaml,
-                 --config, /etc/backstage/app-config.database.yaml]
-          {{- end }}
+                 --config, /etc/backstage/app-config.chart.yaml]
           ports: [{ name: http, containerPort: 7007 }]
           env:
             - { name: BACKSTAGE_BASE_URL, value: {{ include "backstage.url" . | quote }} }
@@ -84,9 +76,7 @@ spec:
           volumeMounts:
             - { name: secrets, mountPath: /mnt/secrets, readOnly: true }
             - { name: tmp, mountPath: /tmp }
-            {{- if .Values.database.inCluster }}
-            - { name: database-config, mountPath: /etc/backstage, readOnly: true }
-            {{- end }}
+            - { name: chart-config, mountPath: /etc/backstage, readOnly: true }
           livenessProbe: { httpGet: { path: /.backstage/health/v1/liveness, port: http }, initialDelaySeconds: 30, periodSeconds: 10 }
           readinessProbe: { httpGet: { path: /.backstage/health/v1/readiness, port: http }, initialDelaySeconds: 15, periodSeconds: 10 }
           resources: {{- toYaml .Values.resources | nindent 12 }}
@@ -101,9 +91,7 @@ spec:
             readOnly: true
             volumeAttributes: { secretProviderClass: backstage }
         - { name: tmp, emptyDir: { sizeLimit: 512Mi } }   # TechDocs local builds and scaffolder workspaces
-        {{- if .Values.database.inCluster }}
-        - { name: database-config, configMap: { name: backstage-database } }
-        {{- end }}
+        - { name: chart-config, configMap: { name: backstage-config } }
 ---
 apiVersion: v1
 kind: Service

@@ -26,3 +26,28 @@ helm template has no cluster to read, so auto falls back to backstage.localhost 
 {{- define "backstage.url" -}}
 {{ ternary "https" "http" (default false .Values.dns.tls) }}://{{ include "backstage.host" . }}
 {{- end -}}
+
+{{/* Overrides of app-config.production.yaml that depend on this release's values. */}}
+{{- define "backstage.appConfig" -}}
+{{- if and .Values.dns.tls (not .Values.database.inCluster) -}}
+{}
+{{- else -}}
+backend:
+  {{- if not .Values.dns.tls }}
+  # Served over plain HTTP: the default CSP's upgrade-insecure-requests would make browsers fetch
+  # the frontend's scripts over https, which nothing serves, and the page stays blank.
+  csp:
+    upgrade-insecure-requests: false
+  {{- end }}
+  {{- if .Values.database.inCluster }}
+  # dev: PostgreSQL inside the cluster (deploy/charts/postgres): in-cluster host and login role, no
+  # TLS on the pod network. The password stays the production one: /mnt/secrets/backstage-db-password,
+  # from Key Vault through the CSI driver.
+  database:
+    connection:
+      host: postgres
+      user: backstage
+      ssl: false
+  {{- end }}
+{{- end -}}
+{{- end -}}
