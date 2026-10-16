@@ -36,6 +36,14 @@ def _to_awaiting_approval(client, worker, github) -> str:
             "inputs": {"request_id": rid},
         },
     ) in github.calls
+    # The repository's OIDC subject is set once, before its first workflow (Azure trusts that form).
+    oidc = [i for i, c in enumerate(github.calls) if c[0] == "oidc_subject"]
+    first_dispatch = next(i for i, c in enumerate(github.calls) if c[0] == "dispatch")
+    assert len(oidc) == 1 and oidc[0] < first_dispatch
+    assert github.calls[oidc[0]][1] == {
+        "repo": "orders-api",
+        "claims": ["repository_owner_id", "environment", "job_workflow_ref"],
+    }
     callback(client, rid, "validate", "success", 1)
     drain(worker)
     callback(

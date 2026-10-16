@@ -39,8 +39,15 @@ class PullRequest:
     head_sha: str
 
 
+# The OIDC subject Azure's app federated credentials expect (10-identities, ADR-0005):
+# repository_owner_id:<id>:environment:<env>:job_workflow_ref:<platform reusable workflow>@<ref>.
+OIDC_SUBJECT_CLAIMS = ["repository_owner_id", "environment", "job_workflow_ref"]
+
+
 class GitHubClient(Protocol):
     def dispatch_workflow(self, repo: str, workflow: str, ref: str, inputs: dict[str, str]) -> None: ...
+
+    def set_oidc_subject(self, repo: str, claims: list[str]) -> None: ...
 
     def list_runs(self, repo: str, workflow: str, per_page: int = 30) -> list[WorkflowRun]: ...
 
@@ -104,6 +111,14 @@ class AppGitHubClient:
             "POST",
             f"/repos/{self.org}/{repo}/actions/workflows/{workflow}/dispatches",
             json={"ref": ref, "inputs": inputs},
+        )
+
+    def set_oidc_subject(self, repo: str, claims: list[str]) -> None:
+        # Per repository: works for personal accounts too (only organizations have an org-wide template).
+        self._req(
+            "PUT",
+            f"/repos/{self.org}/{repo}/actions/oidc/customization/sub",
+            json={"use_default": False, "include_claim_keys": claims},
         )
 
     def list_runs(self, repo: str, workflow: str, per_page: int = 30) -> list[WorkflowRun]:
@@ -216,6 +231,9 @@ class MockGitHubClient:
 
     def dispatch_workflow(self, repo: str, workflow: str, ref: str, inputs: dict[str, str]) -> None:
         self.calls.append(("dispatch", {"repo": repo, "workflow": workflow, "ref": ref, "inputs": inputs}))
+
+    def set_oidc_subject(self, repo: str, claims: list[str]) -> None:
+        self.calls.append(("oidc_subject", {"repo": repo, "claims": claims}))
 
     def list_runs(self, repo: str, workflow: str, per_page: int = 30) -> list[WorkflowRun]:
         return list(self.runs.get((repo, workflow), []))

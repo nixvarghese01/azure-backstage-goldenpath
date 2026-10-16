@@ -61,6 +61,12 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   branch that deployed the portal: develop for dev, main for releases) instead of `@main`, which has no release
   yet ("workflow was not found"). The same ref is the orchestrator's platform PR base. New `idp:workflow-refs`
   action for the untemplated skeleton workflows.
+- **Golden path:** generated `terraform-validate`/`terraform-plan` grant `actions: read`: GitHub checks every job of a
+  called workflow, so they failed at startup on the apply job's need. `scripts/ci/check-reusable-permissions.py`
+  checks every generated caller against the reusable workflows in template CI.
+- **Orchestrator:** sets each generated repository's OIDC subject template (`repository_owner_id`, `environment`,
+  `job_workflow_ref`) before its first workflow, so Azure federation works in personal accounts too, where there
+  is no organization-wide template.
 - **Orchestrator:** a requester's retry supersedes their earlier request for the same application while it has
   no repository yet (a scaffolder run that failed after submitting), instead of failing as a duplicate.
 
