@@ -7,6 +7,8 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 ## [Unreleased]
 
 ### Added
+- **Community standards:** a Code of Conduct (Contributor Covenant 2.1, reports through GitHub's private
+  reporting), linked from the README and CONTRIBUTING.
 - **Portal:** Backstage 1.55 Internal Developer Portal with a golden-path template for a NestJS API
   (more starters behind switches), a minimal form with prefilled default-or-custom choices and examples,
   and an Azure resource picker that follows the Cloud Adoption Framework hierarchy (tenant, management

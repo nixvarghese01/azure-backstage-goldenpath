@@ -676,7 +676,8 @@ Repository documentation (TechDocs publication is unverified):
 ## Contributing and security
 
 - Contribution guidelines are in [`CONTRIBUTING.md`](CONTRIBUTING.md).
-- Please report vulnerabilities privately as described in `SECURITY.md`. Do not open public issues for security problems.
+- Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+- Please report vulnerabilities privately as described in [`SECURITY.md`](SECURITY.md). Do not open public issues for security problems.
 
 ## License
 

@@ -2,6 +2,8 @@
 
 Thanks for helping improve Internal Developer Portal. This is a model project, so changes should keep the design consistent and documented.
 
+By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), not in a public issue.
+
 ## Branching model
 
 | Branch | Purpose | Branches from | Merges into |
