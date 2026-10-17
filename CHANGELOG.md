@@ -6,6 +6,12 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 
 ## [Unreleased]
 
+### Changed
+- **Docs:** the README highlights that the whole platform runs on an Azure Free Trial (one 4-vCPU node,
+  spending limit on, about USD 0.18 per hour, timed teardown); the roadmap and best-practice-vs-free-tier
+  carry the observability (Prometheus and Grafana, #107) and AI assistance (#109) plans; releases
+  back-merge through `chore/back-merge-vX.Y.Z` so `main` is never a pull request's (auto-deleted) head.
+
 ## [1.0.0] - 2026-10-17
 
 First release. The golden path is verified end to end on AKS in a free Azure subscription: the `orders-api`

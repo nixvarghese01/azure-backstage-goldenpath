@@ -20,6 +20,15 @@ The IDP lets developers request a production-shaped service through a self-servi
 > What comes next is on the [roadmap board](https://github.com/users/nixvarghese01/projects/4); the
 > [Implementation status](#implementation-status) table separates verified behaviour from code written.
 
+> **Runs on an Azure Free Trial.** The whole platform (AKS, Backstage, the platform services, PostgreSQL,
+> HTTPS, the golden path and the deployed apps) fits on **one 4-vCPU node** in a Free Trial subscription
+> with the spending limit on, so usage comes out of the trial credit and is never billed to a card.
+> Running costs about **USD 0.18 per hour** (almost all of it the node); a timer tears the platform down
+> after 2–48 hours, and `make`/`platform-provision` refuse to create anything while the spending limit is
+> off. v1.0.0 was built and verified this way. Every free-tier compromise is listed with its enterprise
+> switch in [Best practice vs. this free-tier project](docs/best-practice-vs-free-tier.md); setup steps are
+> in [demo-environment.md](docs/operations/demo-environment.md).
+
 Application starters now cover **NestJS, FastAPI, Go, ASP.NET Core, Spring Boot, Next.js, React/Vite
 and Vue/Vite**. NestJS remains enabled; the seven new starters are disabled pending target-system
 validation. See the [technology inventory](docs/developer-guide/technology-stacks.md) for runtimes,
@@ -649,7 +658,10 @@ Next, now that the NestJS golden path works:
 
 - Enable the other application starters (Next.js, FastAPI, .NET, Go, Spring Boot, React, Vue) after a target-system run each ([#26](https://github.com/nixvarghese01/azure-backstage-goldenpath/issues/26))
 - Additional environments (test, prod) with stricter approvals
-- NetworkPolicies, Gateway hardening (TLS policy, rate limiting through Application Gateway for Containers or the Istio add-on), observability (OpenTelemetry, Azure Monitor) and environment-specific controls
+- **Monitoring and observability:** Prometheus and Grafana in the cluster (dashboards and alerts as code, `/metrics` on every service and generated app), sized for the Free Trial ([#107](https://github.com/nixvarghese01/azure-backstage-goldenpath/issues/107))
+- **AI assistance** through an external model API (GitHub Models by default; no model in the cluster), off by default and advisory only: form guidance, failure explanations with Retry/Clean up advice, plan summaries for approvers, docs Q&A ([#109](https://github.com/nixvarghese01/azure-backstage-goldenpath/issues/109))
+- HTTPS for generated applications ([#101](https://github.com/nixvarghese01/azure-backstage-goldenpath/issues/101)) and an automated live smoke test of the golden path ([#103](https://github.com/nixvarghese01/azure-backstage-goldenpath/issues/103))
+- NetworkPolicies, Gateway hardening (TLS policy, rate limiting through Application Gateway for Containers or the Istio add-on) and environment-specific controls
 - Cost estimation integration, with configurable pricing assumptions and no hardcoded "free tier" claims
 
 Installing a Helm chart successfully does not make it production-ready. Remaining production requirements will be tracked in `docs/operations/production-readiness.md`.
