@@ -28,6 +28,7 @@
     "@backstage/plugin-permission-react": "backstage:^",
     "@backstage/plugin-scaffolder": "backstage:^",
     "@backstage/plugin-scaffolder-react": "backstage:^",
+    "@backstage/plugin-search-react": "^1.11.8",
     "@backstage/plugin-signals": "backstage:^",
     "@backstage/plugin-techdocs": "backstage:^",
     "@backstage/plugin-techdocs-react": "backstage:^",

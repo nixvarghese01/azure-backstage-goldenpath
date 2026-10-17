@@ -42,6 +42,8 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   running platform for `ttl_hours` from now without running Terraform.
 
 ### Fixed
+- **Portal:** TechDocs pages no longer fail with `No implementation available for apiRef{plugin.search.queryservice}`;
+  the app registers a search API (no search backend on the 4-vCPU cluster, so the docs search box returns no results).
 - **Pipelines:** teardown of an already empty stack no longer fails the plan check (a plan with no
   resource changes), and a destroy that stops part-way (an AKS delete that times out) retries what is left.
 - **Platform charts:** public hostnames are picked up automatically. `dns.mode: auto` (default) reads
