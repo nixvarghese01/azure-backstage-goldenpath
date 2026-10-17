@@ -6,6 +6,12 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 
 ## [Unreleased]
 
+### Added
+- **GitHub Packages:** each release publishes the platform images to ghcr.io
+  (`idp-backstage`, `idp-azure-discovery`, `idp-provisioning-orchestrator`; tags `vX.Y.Z`, `vX.Y`, `latest`),
+  scanned with Trivy, with OCI labels linking them to this repository and build provenance attestations.
+  A manual run of `release` publishes the current release's images again from its tag.
+
 ## [1.0.0] - 2026-10-17
 
 First release. The golden path is verified end to end on AKS in a free Azure subscription: the `orders-api`
