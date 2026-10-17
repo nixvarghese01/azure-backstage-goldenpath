@@ -79,6 +79,19 @@ def render_stack(templates_dir: Path, stack: str, values: dict[str, Any]) -> dic
     return files
 
 
+# Files that need the provisioned infrastructure (its outputs) or would run CI/CD before it exists:
+# the application pull request adds them after apply.
+AFTER_APPLY = (".github/workflows/", "deploy/helm/application/values-")
+
+
+def render_starter(templates_dir: Path, stack: str, values: dict[str, Any]) -> dict[str, str]:
+    """The starter application for the repository's first commit: source, tests, Dockerfile, Compose
+    and README, without the CI/CD workflows and Helm values that come with the application PR."""
+    values = {"outputs": {}, "resolved": {}, "runtime_capability": {"type": "none"}, **values}
+    files = render_stack(templates_dir, stack, values)
+    return {path: content for path, content in files.items() if not path.startswith(AFTER_APPLY)}
+
+
 def _render_directory(root: Path, values: dict[str, Any]) -> dict[str, str]:
     env = Environment(  # noqa: S701 - output is source code, not HTML
         loader=FileSystemLoader(str(root)),

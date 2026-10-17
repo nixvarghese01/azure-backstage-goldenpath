@@ -6,14 +6,13 @@ Created by **Internal Developer Portal** (request `${{ values.requestId }}`). Ow
 
 ## How this repository is built
 
-1. **Infrastructure first.** This repository starts with Terraform (`infra/terraform`), the Helm chart (`deploy/helm/application`) and the infrastructure workflows. The platform validates, plans and, after **approval in Backstage**, applies the infrastructure.
-2. **Application second.** Once the infrastructure is ready, the platform opens a pull request adding the `${{ values.stack }}` starter, tests, a rendered Dockerfile, local Compose configuration, checkout instructions and CI/CD. It merges when checks pass.
+1. **Infrastructure and starter.** This repository starts with Terraform (`infra/terraform`), the Helm chart (`deploy/helm/application`), the infrastructure workflows and the `${{ values.stack }}` starter (source, tests, Dockerfile, Compose). The platform validates, plans and, after **approval in Backstage**, applies the infrastructure.
+2. **CI/CD second.** Once the infrastructure is ready, the platform opens a pull request adding the CI/CD workflows and the Helm values filled with the infrastructure outputs. It merges when checks pass.
 3. **Deploy.** CI builds, scans and pushes the image; the deploy workflow installs the Helm chart on the shared AKS cluster and smoke-tests the endpoint.
 
 Status, URLs and history: see this component's **Provisioning** tab in Backstage.
 
-This initial infrastructure repository does not contain a runnable application yet. After the
-application pull request merges, pull `main` and run `docker compose up --build -d`. The generated
+Run the starter locally with `docker compose up --build -d`. The generated
 README then describes the local dummy API, which uses in-memory data and does not need Azure credentials.
 
 ## Layout

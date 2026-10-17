@@ -276,8 +276,10 @@ Azure credentials; data is lost on restart. The same Dockerfile builds the CI/de
 while deployed Helm values provide the approved Azure runtime configuration. Local startup and
 cloud deployment remain separate outcomes.
 
-The orchestrator selects the allowlisted stack and renders its Dockerfile, source, Compose file,
-README, tests and workflows into one application pull request. New technologies need their own
+The orchestrator selects the allowlisted stack and renders it from one stack template: the source,
+tests, Dockerfile, Compose file and README go into the repository's first commit (scaffolder action
+`idp:request:starter`), so the starter is there from the start; the CI/CD workflows and the Helm values
+filled with the infrastructure outputs follow in the application pull request after apply. New technologies need their own
 stack template, tests and compatible reusable build/deploy workflow before being enabled. The
 current implementation enables NestJS only. Runtime and generated-template validation are pending.
 

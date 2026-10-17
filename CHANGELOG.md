@@ -27,6 +27,10 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   troubleshooting, validation checklist) and this changelog with a release workflow.
 
 ### Changed
+- **Starter application in the first commit:** a generated repository now holds the stack's source, tests,
+  Dockerfile, Compose file and README from the start (new scaffolder action `idp:request:starter`, rendered
+  by the orchestrator's `GET /v1/requests/{id}/starter` from the same stack templates). The application pull
+  request after apply adds only the CI/CD workflows and the Helm values filled with the infrastructure outputs.
 - **HTTPS for the portal and GitHub hooks:** cert-manager (v1.21.2) issues a Let's Encrypt certificate for the
   Gateway's stable Azure DNS name (HTTP-01 through the Gateway) and the Gateway serves it on an HTTPS listener.
   The certificate is kept in a dedicated Key Vault (10-identities) by a `tls-sync` Workload Identity: restored

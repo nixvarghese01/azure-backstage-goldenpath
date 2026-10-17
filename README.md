@@ -476,8 +476,9 @@ Generated application repositories are always separate from this platform reposi
 ## Generated application repository
 
 Each request produces one self-contained repository that the application team owns. The tree below
-shows the final layout after the application pull request merges; the initial repository contains
-infrastructure only. NestJS is the currently enabled technology; additional backend and frontend
+shows the final layout after the application pull request merges; the first commit already holds
+the infrastructure and the starter application (source, tests, Dockerfile, Compose, README), and the
+pull request adds the CI/CD workflows and the Helm values filled with the infrastructure outputs. NestJS is the currently enabled technology; additional backend and frontend
 templates are implemented and await validation before enablement.
 
 ```

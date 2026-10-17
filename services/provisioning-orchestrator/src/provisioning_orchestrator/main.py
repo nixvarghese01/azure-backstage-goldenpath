@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from provisioning_orchestrator.config import Settings
 from provisioning_orchestrator.db import engine_from_settings, make_session_factory
+from provisioning_orchestrator.engine import app_values
 from provisioning_orchestrator.models import InboxEvent, Request
 from provisioning_orchestrator.schemas import (
     ApprovalDecision,
@@ -32,6 +33,7 @@ from provisioning_orchestrator.schemas import (
 )
 from provisioning_orchestrator.service import audit, enqueue, transition
 from provisioning_orchestrator.states import ACTIVE, CANCELLABLE, CLEANABLE, SUPERSEDABLE, State
+from provisioning_orchestrator.templating import render_starter
 from provisioning_orchestrator.views import to_out
 
 
@@ -163,6 +165,12 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
     @app.get("/v1/requests/{request_id}", response_model=RequestOut)
     def get_request(request_id: str, _: Svc, s: DB) -> RequestOut:
         return out(load(s, request_id))
+
+    @app.get("/v1/requests/{request_id}/starter")
+    def starter(request_id: str, _: Svc, s: DB) -> dict[str, dict[str, str]]:
+        """The starter application for the new repository's first commit (no infrastructure values)."""
+        req = load(s, request_id)
+        return {"files": render_starter(settings.stack_templates_dir, req.stack, app_values(settings, req))}
 
     @app.get("/v1/requests", response_model=list[RequestOut])
     def list_requests(_: Svc, s: DB, application: str | None = None, limit: int = 20) -> list[RequestOut]:
