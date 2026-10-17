@@ -6,7 +6,7 @@ ${{ values.description }}
 |---|---|
 | Owner | `${{ values.owner }}` |
 | Environment | `${{ values.environment }}` |
-| Endpoint | `https://${{ values.endpointHost }}` |
+| Endpoint | `${{ values.urlScheme }}://${{ values.endpointHost }}` |
 | Availability tier | `${{ values.availabilityTier }}` |
 | Platform request | `${{ values.requestId }}` |
 

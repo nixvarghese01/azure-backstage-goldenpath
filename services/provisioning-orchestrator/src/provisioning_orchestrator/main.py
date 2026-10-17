@@ -84,7 +84,7 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
         return req
 
     def out(req: Request) -> RequestOut:
-        return to_out(req, settings.backstage_base_url, settings.github_org)
+        return to_out(req, settings.backstage_public_url, settings.app_url_scheme)
 
     # ---------------- health ----------------
     @app.get("/healthz", include_in_schema=False)
@@ -303,23 +303,29 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
         req = load(s, request_id, lock=True)
         if not _may_manage(caller, req):
             raise _forbidden("not_allowed", "Only the requester, owning team or approvers can clean up.")
-        if req.state == State.CLEANUP_PENDING:
-            return out(req)
-        if req.state not in CLEANABLE:
-            raise _conflict("not_cleanable", f"Request is {req.state}.")
         actor = caller.user.user_ref if caller.user else caller.subject
-        transition(s, req, State.CLEANUP_PENDING, actor=actor)
+        retry = req.state == State.CLEANUP_PENDING and str(req.cleanup.get("stage", "")).endswith("_failed")
+        if req.state == State.CLEANUP_PENDING and not retry:
+            return out(req)  # already cleaning up
+        if req.state not in CLEANABLE and not retry:
+            raise _conflict("not_cleanable", f"Request is {req.state}.")
+        attempt = int(req.cleanup.get("attempt", 0)) + 1
+        if retry:
+            audit(s, req.id, actor, "cleanup_retried", after=req.cleanup.get("stage"), attempt=attempt)
+        else:
+            transition(s, req, State.CLEANUP_PENDING, actor=actor)
         repo = req.repository.get("name")
+        suffix = "" if attempt == 1 else f":{attempt}"  # a retry is new work, not a duplicate step
         if not repo:
             req.cleanup = {"stage": "done", "note": "nothing was created"}
             transition(s, req, State.CLEANED_UP, actor=actor)
         elif req.application.get("image") or req.deployment:
-            req.cleanup = {"stage": "uninstalling"}
+            req.cleanup = {"stage": "uninstalling", "attempt": attempt}
             enqueue(
                 s,
                 "DISPATCH",
                 request_id=req.id,
-                dedup_key=f"uninstall:{req.id}",
+                dedup_key=f"uninstall:{req.id}{suffix}",
                 payload={
                     "repo": repo,
                     "workflow": "application-deploy.yml",
@@ -327,12 +333,12 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
                 },
             )
         else:
-            req.cleanup = {"stage": "planning_destroy"}
+            req.cleanup = {"stage": "planning_destroy", "attempt": attempt}
             enqueue(
                 s,
                 "DISPATCH",
                 request_id=req.id,
-                dedup_key=f"destroy-plan:{req.id}",
+                dedup_key=f"destroy-plan:{req.id}{suffix}",
                 payload={
                     "repo": repo,
                     "workflow": "terraform-plan.yml",

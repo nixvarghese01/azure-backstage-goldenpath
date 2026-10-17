@@ -29,6 +29,29 @@ const URL_LABELS: Record<string, string> = {
   backstage: 'Backstage entity',
 };
 
+/** What a cleanup is doing, by the orchestrator's cleanup stage. */
+export function cleanupMessage(stage?: string): { severity: 'info' | 'warning' | 'error'; text: string } {
+  switch (stage) {
+    case 'awaiting_approval':
+      return { severity: 'warning', text: 'The destroy plan is waiting for approval in Backstage (IDP → Approvals).' };
+    case 'rejected':
+      return { severity: 'warning', text: 'The destroy was rejected; the resources are kept.' };
+    case 'uninstalling':
+      return { severity: 'info', text: 'Uninstalling the application from the cluster.' };
+    case 'uninstalled':
+    case 'planning_destroy':
+      return { severity: 'info', text: 'Planning the destroy of the infrastructure.' };
+    case 'destroy_planned':
+      return { severity: 'info', text: 'Destroy planned; GitHub holds it until it is approved.' };
+    case 'destroying':
+      return { severity: 'info', text: 'Approved: destroying the infrastructure.' };
+    default:
+      return stage?.endsWith('_failed')
+        ? { severity: 'error', text: `Cleanup failed at ${stage.replace(/_failed$/, '')}; open the workflow run, then Retry clean up.` }
+        : { severity: 'info', text: 'Cleaning up.' };
+  }
+}
+
 /** Provisioning tab: separate outcomes, current state, shared URLs, diagnostics and run history. */
 export const ProvisioningContent = () => {
   const { entity } = useEntity();
@@ -65,13 +88,19 @@ export const ProvisioningContent = () => {
           ))}
           {value.plan?.summary && (
             <Typography variant="body2" style={{ marginTop: 16 }}>
-              Plan {value.plan.hash?.slice(0, 12)}: +{value.plan.summary.add ?? 0} ~{value.plan.summary.change ?? 0} -{value.plan.summary.destroy ?? 0}
+              {value.plan.mode === 'destroy' ? 'Destroy plan' : 'Plan'} {value.plan.hash?.slice(0, 12)}: +{value.plan.summary.add ?? 0} ~{value.plan.summary.change ?? 0} -{value.plan.summary.destroy ?? 0}
               {value.approval?.by && ` · ${value.approval.decision} by ${value.approval.by}`}
             </Typography>
           )}
           {value.state === 'AWAITING_APPROVAL' && (
             <Alert severity="warning" style={{ marginTop: 16 }}>
               Waiting for approval in Backstage (IDP → Approvals).
+            </Alert>
+          )}
+          {value.state === 'CLEANUP_PENDING' && (
+            <Alert severity={cleanupMessage(value.cleanup?.stage).severity} style={{ marginTop: 16 }}>
+              {cleanupMessage(value.cleanup?.stage).text}
+              {value.cleanup?.stage === 'awaiting_approval' && <> <Link to="/idp/approvals">Open Approvals</Link></>}
             </Alert>
           )}
           <Box mt={2} display="flex" gridGap={8}>
@@ -81,6 +110,11 @@ export const ProvisioningContent = () => {
             {['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(value.state) && (
               <Button variant="outlined" color="secondary" disabled={busy} onClick={() => act(() => api.cleanup(value.id))}>
                 Clean up
+              </Button>
+            )}
+            {value.state === 'CLEANUP_PENDING' && value.cleanup?.stage?.endsWith('_failed') && (
+              <Button variant="outlined" color="secondary" disabled={busy} onClick={() => act(() => api.cleanup(value.id))}>
+                Retry clean up
               </Button>
             )}
           </Box>

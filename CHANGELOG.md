@@ -77,6 +77,11 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   (`platform_ref`); `main` needs no review so the orchestrator can merge the application PR after CI;
   `CODEOWNERS` names the owner of a personal account; the provisioning identity may read the shared registries
   and the deployment identity; the form's unused "sample endpoint" and "OpenAPI" switches are gone.
+- **Provisioning tab and cleanup:** repository and workflow links open GitHub (no `.git`), the Backstage link is
+  the public URL (not the in-cluster `http://backstage:7007`), application links use the platform's scheme, and
+  a cleanup explains its stage (with a link to Approvals when the destroy waits there). A cleanup whose run fails
+  before reporting is now marked failed (webhook and reconcile), and **Retry clean up** restarts it.
+  Reconciliation judges only a request's latest run, so a failed attempt that was re-run doesn't fail it.
 - **Orchestrator:** a requester's retry supersedes their earlier request for the same application while it has
   no repository yet (a scaffolder run that failed after submitting), instead of failing as a duplicate.
 

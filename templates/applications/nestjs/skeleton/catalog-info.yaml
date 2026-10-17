@@ -11,9 +11,9 @@ metadata:
     idp.io/availability-tier: ${{ values.availabilityTier }}
   tags: [nestjs, typescript, golden-path]
   links:
-    - url: https://${{ values.endpointHost }}
+    - url: ${{ values.urlScheme }}://${{ values.endpointHost }}
       title: Application endpoint
-    - url: https://${{ values.endpointHost }}/docs
+    - url: ${{ values.urlScheme }}://${{ values.endpointHost }}/docs
       title: API docs
 spec:
   type: service

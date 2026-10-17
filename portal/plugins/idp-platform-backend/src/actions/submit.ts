@@ -79,6 +79,7 @@ export function createSubmitAction(opts: { client: PlatformClient; config: Confi
         deploymentClientId: z => z.string(),
         callbackUrl: z => z.string(),
         stateStorageAccount: z => z.string(),
+        urlScheme: z => z.enum(['http', 'https']),
         subscriptionId: z => z.string(),
         acrName: z => z.string(),
         aksName: z => z.string(),
@@ -138,6 +139,8 @@ export function createSubmitAction(opts: { client: PlatformClient; config: Confi
       ctx.output('provisioningClientId', config.getOptionalString('idp.generatedRepository.provisioningClientId') ?? '');
       ctx.output('deploymentClientId', config.getOptionalString('idp.generatedRepository.deploymentClientId') ?? '');
       ctx.output('callbackUrl', config.getOptionalString('idp.generatedRepository.callbackUrl') ?? '');
+      // Generated links follow how the platform is served: https once the Gateway has TLS.
+      ctx.output('urlScheme', config.getString('app.baseUrl').startsWith('https://') ? 'https' : 'http');
       // 00-bootstrap's state account (stidptfstate<env><suffix>); names are global, so never derived here.
       ctx.output('stateStorageAccount',
         config.getOptionalString('idp.generatedRepository.stateStorageAccount') ?? `stidptfstate${ctx.input.environment}`);

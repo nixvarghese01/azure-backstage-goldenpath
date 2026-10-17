@@ -4,6 +4,7 @@ import { validateAvailability } from './AvailabilityPicker';
 import { validateInfrastructure } from './AzureResourcePicker';
 import { defaultEndpointHost, validateEndpointHost } from './EndpointHostPicker';
 import { validateGithubAccess } from './GithubAccess';
+import { cleanupMessage } from './ProvisioningContent';
 
 function collector() {
   const errors: string[] = [];
@@ -118,5 +119,18 @@ describe('validateGithubAccess', () => {
     const organization = collector();
     validateGithubAccess('not-needed', organization.validation);
     expect(organization.errors).toEqual([]);
+  });
+});
+
+describe('cleanupMessage', () => {
+  it('tells the requester where a destroy waits for approval', () => {
+    expect(cleanupMessage('awaiting_approval')).toEqual({
+      severity: 'warning',
+      text: 'The destroy plan is waiting for approval in Backstage (IDP → Approvals).',
+    });
+  });
+
+  it('reports a failed cleanup stage as an error', () => {
+    expect(cleanupMessage('plan_failed').severity).toBe('error');
   });
 });
