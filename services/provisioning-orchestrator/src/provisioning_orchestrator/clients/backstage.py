@@ -42,8 +42,25 @@ class HttpBackstageClient:
         res.raise_for_status()
 
     def unregister_component(self, name: str, namespace: str = "default") -> None:
-        """Remove a cleaned-up application's entity from the catalog (idempotent: 404 is fine)."""
+        """Remove a cleaned-up application from the catalog (idempotent: 404 is fine).
+
+        First the location the scaffolder registered (catalog:register), else Backstage reads the entity
+        back from it on the next refresh; then the entity itself.
+        """
         headers = {"Authorization": f"Bearer {bearer_for(self.scope)}"}
+        loc = httpx.get(
+            f"{self.base_url}/api/catalog/locations/by-entity/component/{namespace}/{name}",
+            headers=headers,
+            timeout=5.0,
+        )
+        if loc.status_code == 200:
+            res = httpx.delete(
+                f"{self.base_url}/api/catalog/locations/{loc.json()['id']}", headers=headers, timeout=5.0
+            )
+            if res.status_code not in (204, 404):
+                res.raise_for_status()
+        elif loc.status_code != 404:
+            loc.raise_for_status()
         res = httpx.get(
             f"{self.base_url}/api/catalog/entities/by-name/component/{namespace}/{name}",
             headers=headers,
