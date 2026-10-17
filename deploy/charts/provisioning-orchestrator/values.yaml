@@ -1,0 +1,42 @@
+image:
+  repository: acridpdev.azurecr.io/idp/provisioning-orchestrator
+  tag: latest
+api:
+  replicas: 2
+worker:
+  replicas: 2
+workloadIdentity:
+  clientId: ""            # id-idp-orchestrator-<env> (no Azure resource access)
+keyVault:
+  name: kv-idp-plat-dev
+  tenantId: ""
+database:
+  # true (dev): PostgreSQL inside the cluster (deploy/charts/postgres), password login.
+  # false: Azure Database for PostgreSQL with Entra authentication (url below).
+  inCluster: false
+  url: ""                 # postgresql+psycopg://id-idp-orchestrator-dev@<server>.postgres.database.azure.com:5432/orchestrator?sslmode=require
+auth:
+  tenantId: ""
+  audience: ""            # app ID URI of this service
+  allowedCallers: ""      # backstage object ID
+config:
+  githubOrg: nixvarghese01
+  githubAppId: ""
+  githubInstallationId: ""
+  platformRepo: azure-backstage-goldenpath
+  platformRepoRef: main   # platform PRs' base and generated repos' workflow ref; platform-release sets the deploying branch
+  discoveryScope: ""      # api://idp-discovery/.default
+  backstageScope: ""      # api://idp-backstage/.default
+  approverGroup: group:default/platform-approvers
+  # Comma-separated environments where approvers may approve their own request (single-person demos).
+  # Empty = separation of duties everywhere. "prod" is always ignored.
+  selfApprovalEnvironments: ""
+hooks:
+  gateway: { name: idp-gateway, namespace: idp-gateway }
+# Public name for the hooks on the shared Gateway. auto: read from the Gateway at deploy time (its
+# stable Azure DNS name, shared with Backstage, else platform-hooks.<gateway-ip>.nip.io);
+# domain: platform-hooks.<domain>; host: exactly dns.host. tls: https URLs (auto: once the Gateway's HTTPS listener has its certificate).
+dns: { mode: auto, domain: "", host: "", tls: auto }
+resources:
+  requests: { cpu: 50m, memory: 128Mi }
+  limits: { cpu: 500m, memory: 384Mi }

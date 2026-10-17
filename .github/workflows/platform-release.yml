@@ -1,0 +1,208 @@
+# Build, scan and push the platform images, then deploy them to the idp-platform namespace.
+# Source, dependency and Dockerfile scans run on every PR (ci-security, codeql); this pipeline scans the
+# built images, records an SBOM, and attests build provenance for what it pushes.
+name: platform-release
+
+on:
+  push:
+    branches: [main]
+    paths: ["portal/**", "services/**", "templates/applications/**", "deploy/charts/**", "policies/allowlist.yaml", "scripts/render-allowlist.sh", ".dockerignore", ".github/workflows/platform-release.yml"]
+  workflow_dispatch:
+  # platform-provision.yml calls this after the cluster stacks, from develop (dev) or main.
+  workflow_call:
+    secrets:
+      AZURE_TENANT_ID:
+        required: false
+      AZURE_SUBSCRIPTION_ID:
+        required: false
+      PLATFORM_DEPLOY_CLIENT_ID:
+        required: false
+      BACKSTAGE_CLIENT_ID:
+        required: false
+      DISCOVERY_CLIENT_ID:
+        required: false
+      ORCHESTRATOR_CLIENT_ID:
+        required: false
+      PROVISIONING_CLIENT_ID:
+        required: false
+      DEPLOYMENT_CLIENT_ID:
+        required: false
+      TFSTATE_STORAGE_ACCOUNT:
+        required: false
+      PLATFORM_CHART_VALUES_JSON:
+        required: false
+      PLATFORM_ALLOWLIST_JSON:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        include:
+          - name: backstage
+            context: .
+            dockerfile: portal/Dockerfile
+          - name: azure-discovery
+            context: .
+            dockerfile: services/azure-discovery/Dockerfile
+          - name: provisioning-orchestrator
+            context: .
+            dockerfile: services/provisioning-orchestrator/Dockerfile
+    env:
+      NAME: ${{ matrix.name }}
+      CONTEXT: ${{ matrix.context }}
+      DOCKERFILE: ${{ matrix.dockerfile }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: bash scripts/ci/install-tools.sh trivy
+      - name: Build, scan and record an SBOM (no credentials in this job)
+        run: |
+          image="idp/${NAME}:${GITHUB_SHA}"
+          docker build --pull -f "$DOCKERFILE" -t "$image" "$CONTEXT"
+          trivy image --severity CRITICAL --exit-code 1 --ignore-unfixed "$image"
+          mkdir -p "$RUNNER_TEMP/reports"
+          trivy image --format json --output "$RUNNER_TEMP/reports/${NAME}-scan.json" "$image"
+          trivy image --format cyclonedx --output "$RUNNER_TEMP/reports/${NAME}-sbom.cdx.json" "$image"
+          docker save "$image" | gzip > "$RUNNER_TEMP/${NAME}.tar.gz"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reports-${{ matrix.name }}
+          path: ${{ runner.temp }}/reports
+          retention-days: 90
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-${{ matrix.name }}
+          path: ${{ runner.temp }}/${{ matrix.name }}.tar.gz
+          retention-days: 1
+
+  push-and-deploy:
+    needs: images
+    runs-on: ubuntu-24.04
+    environment: platform-deploy
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      HELM_DRIVER: configmap
+      ACR_NAME: ${{ vars.ACR_NAME }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: image-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/images
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.PLATFORM_DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - run: bash scripts/ci/install-tools.sh kubelogin
+      - name: Push images
+        id: push
+        run: |
+          az acr login --name "$ACR_NAME"
+          for name in backstage azure-discovery provisioning-orchestrator; do
+            gunzip -c "$RUNNER_TEMP/images/${name}.tar.gz" | docker load
+            target="${ACR_NAME}.azurecr.io/idp/${name}:${GITHUB_SHA}"
+            docker tag "idp/${name}:${GITHUB_SHA}" "$target" && docker push "$target"
+            digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$target" | cut -d@ -f2)"
+            echo "${name//-/_}_digest=${digest}" >> "$GITHUB_OUTPUT"
+          done
+      - name: Attest backstage
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ vars.ACR_NAME }}.azurecr.io/idp/backstage
+          subject-digest: ${{ steps.push.outputs.backstage_digest }}
+          push-to-registry: true
+      - name: Attest azure-discovery
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ vars.ACR_NAME }}.azurecr.io/idp/azure-discovery
+          subject-digest: ${{ steps.push.outputs.azure_discovery_digest }}
+          push-to-registry: true
+      - name: Attest provisioning-orchestrator
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ vars.ACR_NAME }}.azurecr.io/idp/provisioning-orchestrator
+          subject-digest: ${{ steps.push.outputs.provisioning_orchestrator_digest }}
+          push-to-registry: true
+      - name: Deploy charts (images pinned by digest)
+        env:
+          # {"<chart>": "<values YAML with environment IDs>"}; identifiers only, no secrets.
+          PLATFORM_CHART_VALUES_JSON: ${{ secrets.PLATFORM_CHART_VALUES_JSON }}
+          PLATFORM_ALLOWLIST_JSON: ${{ secrets.PLATFORM_ALLOWLIST_JSON }}
+          AKS_RESOURCE_GROUP: ${{ vars.AKS_RESOURCE_GROUP }}
+          AKS_NAME: ${{ vars.AKS_NAME }}
+          POSTGRES_IN_CLUSTER: ${{ vars.PLATFORM_POSTGRES_IN_CLUSTER || 'false' }}
+          DISCOVERY_CLIENT_ID: ${{ secrets.DISCOVERY_CLIENT_ID }}
+          ORCHESTRATOR_CLIENT_ID: ${{ secrets.ORCHESTRATOR_CLIENT_ID }}
+          BACKSTAGE_CLIENT_ID: ${{ secrets.BACKSTAGE_CLIENT_ID }}
+          # Generated repositories' identities (10-identities client_ids); secrets here only for log masking.
+          PROVISIONING_CLIENT_ID: ${{ secrets.PROVISIONING_CLIENT_ID }}
+          DEPLOYMENT_CLIENT_ID: ${{ secrets.DEPLOYMENT_CLIENT_ID }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TFSTATE_STORAGE_ACCOUNT }}
+          BACKSTAGE_DIGEST: ${{ steps.push.outputs.backstage_digest }}
+          DISCOVERY_DIGEST: ${{ steps.push.outputs.azure_discovery_digest }}
+          ORCHESTRATOR_DIGEST: ${{ steps.push.outputs.provisioning_orchestrator_digest }}
+        run: |
+          az aks get-credentials -g "$AKS_RESOURCE_GROUP" -n "$AKS_NAME" --overwrite-existing
+          kubelogin convert-kubeconfig -l azurecli
+          # With an HTTPS listener (30-cluster-config public_tls), give cert-manager up to 5 minutes to
+          # issue or restore the certificate: the charts switch to https once it's Programmed (dns.tls auto).
+          listener='{.status.listeners[?(@.name=="https")].conditions[?(@.type=="Programmed")].status}'
+          if kubectl -n idp-gateway get gateway idp-gateway -o jsonpath='{.spec.listeners[*].name}' | grep -qw https; then
+            for _ in $(seq 1 30); do
+              [[ "$(kubectl -n idp-gateway get gateway idp-gateway -o jsonpath="$listener")" == True ]] && break
+              sleep 10
+            done
+            echo "HTTPS listener Programmed: $(kubectl -n idp-gateway get gateway idp-gateway -o jsonpath="$listener")" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # Each provision gives the Gateway a new public IP. The platform charts read their hosts from the
+          # Gateway (dns.mode auto); application hostnames in the allowlist (<app>.<gateway-ip>.nip.io) follow
+          # it here. Own domains are left as set.
+          ip="$(kubectl -n idp-gateway get gateway idp-gateway -o jsonpath='{.status.addresses[0].value}')"
+          if [[ "$ip" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
+            PLATFORM_ALLOWLIST_JSON="$(sed -E "s/[0-9]+(\.[0-9]+){3}\.nip\.io/$ip.nip.io/g" <<< "$PLATFORM_ALLOWLIST_JSON")"
+            export PLATFORM_ALLOWLIST_JSON
+          fi
+          deploy() { # <chart> <workload identity client id> <digest> [extra helm args...]
+            local chart="$1" client_id="$2" digest="$3"; shift 3
+            jq -er --arg c "$chart" '.[$c] // ""' <<< "$PLATFORM_CHART_VALUES_JSON" > "$RUNNER_TEMP/$chart.yaml"
+            helm upgrade --install "$chart" "deploy/charts/$chart" -n idp-platform \
+              -f "deploy/charts/$chart/values.yaml" -f "$RUNNER_TEMP/$chart.yaml" "$@" \
+              --set image.repository="${ACR_NAME}.azurecr.io/idp/$chart" \
+              --set image.tag="${GITHUB_SHA}@${digest}" \
+              --set-string workloadIdentity.clientId="$client_id" \
+              --atomic --wait --timeout 10m
+          }
+          # dev without Azure PostgreSQL: the database runs in the cluster and must be up first.
+          if [[ "$POSTGRES_IN_CLUSTER" == true ]]; then
+            jq -er '.postgres' <<< "$PLATFORM_CHART_VALUES_JSON" > "$RUNNER_TEMP/postgres.yaml"
+            helm upgrade --install postgres deploy/charts/postgres -n idp-platform \
+              -f "$RUNNER_TEMP/postgres.yaml" --atomic --wait --timeout 10m
+          fi
+          # The committed allowlist has example IDs; this environment's real ones come from a secret.
+          scripts/render-allowlist.sh policies/allowlist.yaml "$RUNNER_TEMP/allowlist.yaml"
+          deploy azure-discovery "$DISCOVERY_CLIENT_ID" "$DISCOVERY_DIGEST" --set-file allowlist="$RUNNER_TEMP/allowlist.yaml"
+          deploy provisioning-orchestrator "$ORCHESTRATOR_CLIENT_ID" "$ORCHESTRATOR_DIGEST" --set-string config.platformRepoRef="$GITHUB_REF_NAME"
+          deploy backstage "$BACKSTAGE_CLIENT_ID" "$BACKSTAGE_DIGEST" --set-string env.CATALOG_BRANCH="$GITHUB_REF_NAME"             --set-string env.PROVISIONING_CLIENT_ID="$PROVISIONING_CLIENT_ID" --set-string env.DEPLOYMENT_CLIENT_ID="$DEPLOYMENT_CLIENT_ID"             --set-string env.TFSTATE_STORAGE_ACCOUNT="$TFSTATE_STORAGE_ACCOUNT"
+          host="$(kubectl -n idp-platform get httproute backstage -o jsonpath='{.spec.hostnames[0]}')"
+          {
+            echo "### Public URLs"
+            echo "- Backstage: http://$host"
+            echo "- GitHub App callback (Backstage app): http://$host/api/auth/github/handler/frame"
+            echo "- GitHub App webhook (orchestrator app): http://$(kubectl -n idp-platform get httproute provisioning-orchestrator-hooks -o jsonpath='{.spec.hostnames[0]}')/v1/webhooks/github"
+          } >> "$GITHUB_STEP_SUMMARY"

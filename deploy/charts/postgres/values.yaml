@@ -1,0 +1,25 @@
+image:
+  repository: postgres
+  tag: 17-alpine
+storage:
+  size: 8Gi
+  # Standard SSD with the landing zone's required tags (30-cluster-config); AKS's own classes create
+  # untagged disks, which a "require tags on resources" policy denies.
+  className: managed-csi-tagged
+workloadIdentity:
+  clientId: ""          # id-idp-postgres-<env> (reads only its Key Vault secrets)
+keyVault:
+  name: ""
+  tenantId: ""
+# Databases and their login roles. Passwords: Key Vault secrets postgres-password and
+# <database>-db-password (scripts/create-platform-secrets.sh).
+databases: [backstage, orchestrator]
+# Pods allowed to connect (NetworkPolicy), by app.kubernetes.io/name.
+clients:
+  - backstage
+  - provisioning-orchestrator-api
+  - provisioning-orchestrator-worker
+  - provisioning-orchestrator-migrate
+resources:
+  requests: { cpu: 100m, memory: 256Mi }   # measured ~10m idle on the dev node
+  limits: { cpu: "1", memory: 512Mi }

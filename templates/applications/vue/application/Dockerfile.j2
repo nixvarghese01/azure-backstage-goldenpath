@@ -1,0 +1,15 @@
+# [[ values.app ]] / Vue with Vite; static assets only in the runtime.
+FROM node:24-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+COPY . .
+RUN npm run build
+
+FROM nginx:stable-alpine AS runtime
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+USER nginx
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -q -O- http://127.0.0.1:3000/health/ready
+CMD ["nginx", "-g", "daemon off;"]

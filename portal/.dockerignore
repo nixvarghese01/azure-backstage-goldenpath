@@ -1,0 +1,15 @@
+# The optional host-build image uses portal/ as its context and needs dist bundles.
+.git
+node_modules
+**/node_modules
+.env*
+app-config.local.yaml
+app-config.*.local.yaml
+*.pem
+*.key
+*.pfx
+*.p12
+.yarn/cache
+.yarn/install-state.gz
+coverage
+dist-types

@@ -1,0 +1,29 @@
+name: terraform-plan
+run-name: "plan ${{ inputs.mode }} ${{ inputs.request_id }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        required: true
+      mode:
+        description: apply | destroy
+        required: false
+        default: apply
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    uses: nixvarghese01/azure-backstage-goldenpath/.github/workflows/reusable-terraform.yml@main
+    permissions:
+      contents: read
+      id-token: write
+      actions: read   # GitHub checks every job of the called workflow; its apply job reads the plan artifact
+    with:
+      platform_ref: main   # pinned with the uses: ref by idp:workflow-refs
+      operation: plan
+      request_id: ${{ inputs.request_id }}
+      mode: ${{ inputs.mode }}
+      environment: dev

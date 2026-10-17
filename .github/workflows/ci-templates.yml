@@ -1,0 +1,152 @@
+# Renders the NestJS golden-path template with fixture values and runs the generated repository's
+# checks offline: terraform validate, Helm lint/render/policy, npm test/build and docker build.
+name: ci-templates
+
+on:
+  pull_request:
+    paths: ["templates/**", "iac/modules/**", "policies/**", ".github/workflows/ci-templates.yml"]
+  push:
+    branches: [develop, main]
+    paths: ["templates/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  # What a generated repository runs: module sources resolved from the published tags, not this checkout.
+  tagged-sources:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.14"
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - name: Every module tag the skeleton pins exists
+        run: |
+          missing=0
+          for ref in $(bash scripts/ci/skeleton-module-refs.sh); do
+            git ls-remote --exit-code --tags origin "refs/tags/$ref" >/dev/null \
+              || { echo "::error::Tag $ref does not exist; tag it with the release-modules workflow"; missing=1; }
+          done
+          exit "$missing"
+      - name: Render skeleton with fixture values
+        run: |
+          cd services && uv sync --package provisioning-orchestrator
+          uv run python ../templates/applications/nestjs/render_fixture.py "$RUNNER_TEMP/orders-api"
+      - name: Terraform init and validate against the tagged modules
+        working-directory: ${{ runner.temp }}/orders-api/infra/terraform
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+  render-and-check:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: [nestjs, fastapi, go, dotnet, springboot, nextjs, react, vue]
+    env:
+      STACK: ${{ matrix.stack }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.14"
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: bash scripts/ci/install-tools.sh conftest trivy actionlint
+      - name: Render skeleton + application with fixture values
+        run: |
+          cd services && uv sync --package provisioning-orchestrator
+          uv run python ../templates/applications/nestjs/render_fixture.py "$RUNNER_TEMP/orders-api" --stack "$STACK"
+      # GitHub fails a run at startup when a calling job grants less than ANY job of the called workflow asks.
+      - name: Generated workflows grant what the platform's reusable workflows need
+        run: cd services && uv run --with pyyaml python ../scripts/ci/check-reusable-permissions.py "$RUNNER_TEMP/orders-api" "$GITHUB_WORKSPACE"
+      - name: Checkov on the generated Terraform (as terraform-validate runs it, before sources are rewritten)
+        working-directory: ${{ runner.temp }}/orders-api
+        run: pipx run checkov==3.3.26 -d infra/terraform --framework terraform --skip-check CKV_TF_1 --quiet --compact
+      - name: Generated developer checkout configuration
+        working-directory: ${{ runner.temp }}/orders-api
+        run: docker compose config --quiet
+      - name: Terraform (generated repo)
+        working-directory: ${{ runner.temp }}/orders-api/infra/terraform
+        run: |
+          # Point module sources at this checkout instead of the published tags.
+          sed -i -E "s#git::https://github.com/[^/]+/azure-backstage-goldenpath.git//(iac/modules/[a-z-]+)\?ref=[^\"]+#$GITHUB_WORKSPACE/\1#" ./*.tf
+          terraform fmt -check -recursive
+          terraform init -backend=false
+          terraform validate
+      - name: Helm (generated repo)
+        working-directory: ${{ runner.temp }}/orders-api
+        run: |
+          helm lint deploy/helm/application -f deploy/helm/application/values-dev.yaml
+          helm template app deploy/helm/application -f deploy/helm/application/values.yaml -f deploy/helm/application/values-dev.yaml > rendered.yaml
+          conftest test rendered.yaml -p "$GITHUB_WORKSPACE/policies/helm"
+          helm template app deploy/helm/application -f deploy/helm/application/values.yaml \
+            -f deploy/helm/application/values-dev.yaml --set availability.tier=ha > rendered-ha.yaml
+          conftest test rendered-ha.yaml -p "$GITHUB_WORKSPACE/policies/helm"
+          mkdir -p "$RUNNER_TEMP/rendered" && cp rendered.yaml rendered-ha.yaml "$RUNNER_TEMP/rendered/"
+          trivy config --severity HIGH,CRITICAL --exit-code 1 "$RUNNER_TEMP/rendered"
+      - name: Generated workflows and Dockerfile scans (what the generated repo's CI runs)
+        working-directory: ${{ runner.temp }}/orders-api
+        run: |
+          actionlint -shellcheck= .github/workflows/*.yml
+          trivy config --severity HIGH,CRITICAL --exit-code 1 --skip-dirs infra --skip-dirs deploy .
+      - name: Application (generated repo)
+        if: contains(fromJSON('["nestjs", "nextjs", "react", "vue"]'), matrix.stack)
+        working-directory: ${{ runner.temp }}/orders-api
+        run: |
+          npm install --no-audit --no-fund
+          npm run lint
+          npm test
+          npm run test:e2e --if-present
+          npm run build
+          docker build -t orders-api:ci .
+      - name: Non-Node application (generated repo)
+        if: contains(fromJSON('["fastapi", "go", "dotnet", "springboot"]'), matrix.stack)
+        working-directory: ${{ runner.temp }}/orders-api
+        run: |
+          docker build --target verify -t orders-api:verify .
+          docker build -t orders-api:ci .
+      - name: Install into kind (restricted Pod Security, read-only root, non-root)
+        working-directory: ${{ runner.temp }}/orders-api
+        env:
+          HELM_DRIVER: configmap
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/install-tools.sh" kind
+          kind create cluster --name golden-path --wait 120s
+          kind load docker-image orders-api:ci --name golden-path
+          kubectl create namespace orders-api
+          kubectl label namespace orders-api pod-security.kubernetes.io/enforce=restricted
+          # No Azure in kind: in-memory store, no Gateway route, no Workload Identity client ID.
+          helm install orders-api deploy/helm/application -n orders-api \
+            -f deploy/helm/application/values.yaml -f deploy/helm/application/values-dev.yaml \
+            --set image.repository=orders-api --set image.tag=ci --set image.pullPolicy=Never \
+            --set route.enabled=false --set azure.storageAccountName="" \
+            --set serviceAccount.workloadIdentityClientId="" \
+            --wait --timeout 3m
+          kubectl -n orders-api rollout status deployment/orders-api --timeout 2m
+          kubectl -n orders-api port-forward svc/orders-api 8080:80 & sleep 3
+          curl -fsS http://localhost:8080/health/ready
+          curl -fsS http://localhost:8080/v1/orders
+          if [[ "$STACK" == "nestjs" ]]; then
+            curl -fsS -X POST http://localhost:8080/v1/orders -H 'Content-Type: application/json' \
+              -d '{"customerId":"cust-001","currency":"GBP","items":[{"sku":"SKU-1","quantity":1,"unitPrice":5}]}'
+          fi
+          test "$(kubectl -n orders-api get secrets -o name | wc -l)" -eq 0   # no Secret objects (HELM_DRIVER=configmap)

@@ -1,0 +1,54 @@
+# Branch policy (CONTRIBUTING.md "Branching model"): which branch may open a pull request into which.
+# A required check on develop and main, so a wrong source branch can't be merged.
+#   main    <- develop (release), hotfix/*
+#   develop <- feature/*, bugfix/*, hotfix/*, docs/*, chore/*, refactor/*, test/*, ci/*,
+#              dependabot/*, main (back-merge after a hotfix)
+name: branch-policy
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    name: branch policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Source branch allowed for this target
+        env:
+          SOURCE: ${{ github.head_ref }}
+          TARGET: ${{ github.base_ref }}
+        run: |
+          case "$TARGET" in
+            main)
+              case "$SOURCE" in
+                develop|hotfix/*) ;;
+                *) echo "::error::main takes pull requests only from develop (a release) or hotfix/*, not '$SOURCE'"; exit 1 ;;
+              esac ;;
+            develop)
+              case "$SOURCE" in
+                feature/*|bugfix/*|hotfix/*|docs/*|chore/*|refactor/*|test/*|ci/*|dependabot/*|main) ;;
+                *) echo "::error::name the branch feature/, bugfix/, hotfix/, docs/, chore/, refactor/, test/ or ci/ (got '$SOURCE')"; exit 1 ;;
+              esac ;;
+          esac
+          echo "ok: $SOURCE -> $TARGET"
+
+      # A merge into main is a release (workflow release.yml): it needs a version that isn't tagged yet.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.base_ref == 'main'
+        with:
+          fetch-depth: 0 # the existing tags
+          persist-credentials: false
+      - name: A new release version in CHANGELOG.md
+        if: github.base_ref == 'main'
+        run: |
+          version="$(bash scripts/ci/changelog-version.sh)"
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "::error::v$version is already released: add a new version section to CHANGELOG.md (a hotfix bumps PATCH)"; exit 1
+          fi
+          echo "merging releases v$version"

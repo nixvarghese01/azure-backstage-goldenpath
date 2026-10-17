@@ -1,0 +1,27 @@
+name: terraform-validate
+run-name: "validate ${{ inputs.request_id || github.head_ref || github.ref_name }}"
+
+on:
+  pull_request:
+    paths: ["infra/**", "deploy/**"]
+  workflow_dispatch:
+    inputs:
+      request_id:
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: nixvarghese01/azure-backstage-goldenpath/.github/workflows/reusable-terraform.yml@main
+    permissions:
+      contents: read
+      id-token: write
+      actions: read   # GitHub checks every job of the called workflow; its apply job reads the plan artifact
+    with:
+      platform_ref: main   # pinned with the uses: ref by idp:workflow-refs
+      operation: validate
+      request_id: ${{ inputs.request_id || '' }}
+      environment: dev

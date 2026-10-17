@@ -1,0 +1,98 @@
+# Local development configuration. Secrets never go here: use app-config.local.yaml (git-ignored)
+# or files fetched by scripts/dev-secrets.sh into ~/.config/idp/.
+app:
+  title: Internal Developer Portal
+  baseUrl: http://localhost:3000
+
+organization:
+  name: IDP
+
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+  cors:
+    origin: http://localhost:3000
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  database:
+    client: pg
+    connection:
+      host: localhost
+      port: 5432
+      user: backstage
+      password: dev-only-not-a-secret   # local docker compose only
+      database: backstage
+    pluginDivisionMode: schema
+
+integrations:
+  github:
+    - host: github.com
+      apps:
+        # GitHub App #1 (Backstage): repository creation, environments, catalog reads.
+        - $include: ${GITHUB_APP_BACKSTAGE_CREDENTIALS_FILE}
+
+auth:
+  environment: development
+  providers:
+    github:
+      development:
+        clientId: ${AUTH_GITHUB_CLIENT_ID}
+        clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
+        signIn:
+          resolvers:
+            - resolver: usernameMatchingUserEntityName
+
+permission:
+  enabled: true
+
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location, Template, Group, User]
+  locations:
+    - type: file
+      target: ../../catalog/org.yaml
+      rules:
+        - allow: [Group, User]
+    - type: file
+      target: ../../catalog/platform.yaml
+    - type: file
+      target: ../../../templates/applications/nestjs/template.yaml
+      rules:
+        - allow: [Template]
+
+techdocs:
+  builder: local
+  generator:
+    runIn: local
+  publisher:
+    type: local
+
+scaffolder:
+  defaultAuthor:
+    name: IDP Platform
+    email: platform@xycorp.local
+
+# --------------------------------------------------------------------- IDP
+idp:
+  githubOrg: nixvarghese01
+  githubOwnerType: user                   # personal account: repositories are created with the user's token
+  orchestratorGithubAppId: 0              # GitHub App #2 ID (set in app-config.local.yaml)
+  approverGroup: group:default/platform-approvers
+  submitTimeoutMinutes: 360
+  discovery:
+    baseUrl: http://localhost:8001
+  orchestrator:
+    baseUrl: http://localhost:8002
+  auth:
+    mode: static                          # local only; production uses Entra (see production config)
+    devToken: ${IDP_DEV_SERVICE_TOKEN}
+  stacks:
+    - { id: nestjs, name: NestJS (TypeScript), enabled: true }
+    - { id: fastapi, name: Python FastAPI, enabled: false }
+    - { id: go, name: Go HTTP API, enabled: false }
+    - { id: dotnet, name: ASP.NET Core, enabled: false }
+    - { id: springboot, name: Java Spring Boot, enabled: false }
+    - { id: nextjs, name: Next.js (React), enabled: false }
+    - { id: react, name: React + Vite, enabled: false }
+    - { id: vue, name: Vue + Vite, enabled: false }

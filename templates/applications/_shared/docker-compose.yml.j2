@@ -1,0 +1,26 @@
+# Generated local demo; no Azure credentials or shared platform services.
+name: [[ values.app ]]
+services:
+  application:
+    image: [[ values.app ]]:local
+    build: .
+    init: true
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # Same runtime profile as the Kubernetes pod (deploy/helm/application/values-dev.yaml).
+    cpus: ${APP_CPUS:-[[ values.profile.cpu_cores ]]}
+    mem_limit: ${APP_MEMORY:-[[ values.profile.memory_compose ]]}
+    environment:
+      PORT: "3000"
+[% if values.stack | default("nestjs") in ["nestjs", "nextjs"] %]
+      NODE_ENV: production
+[% endif %]
+[%- for name, value in values.profile.env.items() %]
+      [[ name ]]: "[[ value ]]"
+[%- endfor %]
+    ports: ["127.0.0.1:${APP_PORT:-3000}:3000"]
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }

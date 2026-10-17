@@ -1,0 +1,57 @@
+# Shared container settings. Load a local Docker or production override after this file.
+app:
+  title: Internal Developer Portal
+  baseUrl: http://localhost:7007
+organization:
+  name: IDP
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+    host: 0.0.0.0
+  cors:
+    origin: http://localhost:7007
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+auth:
+  environment: production
+permission:
+  enabled: true
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location, Template, Group, User]
+  locations:
+    - type: file
+      target: ./catalog/org.yaml
+      rules:
+        - allow: [Group, User]
+    - type: file
+      target: ./catalog/platform.yaml
+    - type: file
+      target: ./templates/applications/nestjs/template.yaml
+      rules:
+        - allow: [Template]
+techdocs:
+  builder: local
+  generator:
+    runIn: local
+  publisher:
+    type: local
+    local:
+      publishDirectory: /tmp/techdocs
+scaffolder:
+  defaultAuthor:
+    name: IDP Platform
+    email: platform@xycorp.local
+idp:
+  approverGroup: group:default/platform-approvers
+  submitTimeoutMinutes: 360
+  stacks:
+    - { id: nestjs, name: NestJS (TypeScript), enabled: true }
+    - { id: fastapi, name: Python FastAPI, enabled: false }
+    - { id: go, name: Go HTTP API, enabled: false }
+    - { id: dotnet, name: ASP.NET Core, enabled: false }
+    - { id: springboot, name: Java Spring Boot, enabled: false }
+    - { id: nextjs, name: Next.js (React), enabled: false }
+    - { id: react, name: React + Vite, enabled: false }
+    - { id: vue, name: Vue + Vite, enabled: false }

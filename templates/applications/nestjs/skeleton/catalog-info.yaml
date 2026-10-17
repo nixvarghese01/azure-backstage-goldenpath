@@ -1,0 +1,21 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: ${{ values.description | dump }}
+  annotations:
+    github.com/project-slug: ${{ values.org }}/${{ values.name }}
+    backstage.io/techdocs-ref: dir:.
+    idp.io/request-id: ${{ values.requestId }}
+    idp.io/environment: ${{ values.environment }}
+    idp.io/availability-tier: ${{ values.availabilityTier }}
+  tags: [nestjs, typescript, golden-path]
+  links:
+    - url: ${{ values.urlScheme }}://${{ values.endpointHost }}
+      title: Application endpoint
+    - url: ${{ values.urlScheme }}://${{ values.endpointHost }}/docs
+      title: API docs
+spec:
+  type: service
+  lifecycle: experimental
+  owner: ${{ values.owner }}

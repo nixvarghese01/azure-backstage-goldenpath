@@ -1,0 +1,5 @@
+# After the first apply: copy to backend.tf and run
+#   terraform init -migrate-state -backend-config=backend.hcl
+terraform {
+  backend "azurerm" {}
+}

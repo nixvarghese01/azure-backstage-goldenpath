@@ -1,0 +1,75 @@
+# [[ values.app ]]
+
+[[ values.description ]]
+
+Generated NestJS / TypeScript starter, owned by `[[ values.owner ]]`, for platform request
+`[[ values.request_id ]]`. The sample orders API is a dummy application to replace or extend with
+your service's business logic. The platform renders this application's Dockerfile and development
+configuration from the selected stack template.
+
+## Check out and run locally
+
+After the platform's application pull request merges, check out the repository's `main` branch:
+
+```bash
+git clone https://github.com/[[ values.org ]]/[[ values.repo ]].git
+cd [[ values.repo ]]
+docker compose up --build -d
+docker compose logs -f application
+```
+
+The local container uses an in-memory repository with no Azure credentials. Data is temporary and
+is lost when the process restarts. The server and container run with the same compiled application
+as the deployment image; Compose supplies the local configuration.
+
+| URL | Purpose |
+|---|---|
+| `http://localhost:3000/health/live` | Process health |
+| `http://localhost:3000/health/ready` | Readiness |
+| `http://localhost:3000/docs` | Swagger API documentation |
+| `http://localhost:3000/v1/orders` | Dummy orders API |
+
+Create an example order:
+
+```bash
+curl -X POST http://localhost:3000/v1/orders -H 'Content-Type: application/json' \
+  -d '{"customerId":"cust-001","currency":"GBP","items":[{"sku":"SKU-1","quantity":1,"unitPrice":5}]}'
+```
+
+`APP_PORT`, `APP_CPUS` and `APP_MEMORY` can override local port and resource limits through the
+environment or an untracked `.env` file. The default container memory ceiling is 384 MiB and Node's
+old-space ceiling is 256 MiB; sizing has not been validated under load. Stop with `docker compose down`.
+Rebuild with `docker compose up --build -d` after changing application code.
+
+For source development with Node.js 24:
+
+```bash
+npm install
+npm run start:dev
+```
+
+Once a validated `package-lock.json` is committed, use `npm ci` for reproducible installs. Do not
+put Azure keys or connection strings in the project. The local in-memory setting is explicit in
+Compose; deployed Helm values use the approved runtime capability and Workload Identity.
+
+## Platform orchestration
+
+1. Backstage validates the selected technology and infrastructure before creating the repository.
+2. Infrastructure is planned and approved through the platform workflow.
+3. The orchestrator renders this stack's source, Dockerfile, Compose file, tests and CI/CD into an
+   application pull request, using validated request metadata and non-sensitive Terraform outputs.
+4. After required checks and merge, CI builds/scans/pushes the image and deploys the Helm chart.
+
+Follow status and shared URLs in Backstage's **Provisioning** tab. A locally running dummy app does
+not mean that infrastructure or an AKS deployment has succeeded.
+
+| Path | Purpose |
+|---|---|
+| `src/`, `test/` | Starter application and tests |
+| `Dockerfile`, `docker-compose.yml` | Technology-specific image and local checkout experience |
+| `infra/terraform/` | Guarded infrastructure changes |
+| `deploy/helm/application/` | Deployment chart and generated environment values |
+| `.github/workflows/` | Reviewed platform workflow callers |
+| `docs/` | Service TechDocs |
+
+This starter's build and runtime commands require later validation in a prepared development environment.

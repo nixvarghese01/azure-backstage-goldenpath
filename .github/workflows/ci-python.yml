@@ -1,0 +1,39 @@
+name: ci-python
+
+on:
+  pull_request:
+    paths: ["services/**", "policies/allowlist.yaml", ".github/workflows/ci-python.yml"]
+  push:
+    branches: [develop, main]
+    paths: ["services/**", "policies/allowlist.yaml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: services
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.14"
+      - run: uv sync --all-packages
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy libs/idp-common/src azure-discovery/src provisioning-orchestrator/src
+      # Coverage floor 75% per service (measured 2026-10-15: discovery 78%, orchestrator 79%; discovery's
+      # Azure SDK adapter is covered only by the live_azure tests). Raise it as tests grow; never lower it.
+      - name: Unit and API tests (coverage floor 75%)
+        run: |
+          uv run pytest libs/idp-common/tests -q
+          cov=(--cov-report=term-missing:skip-covered --cov-fail-under=75)
+          (cd azure-discovery && uv run pytest -q -m "not integration and not live_azure" --cov=azure_discovery "${cov[@]}")
+          (cd provisioning-orchestrator && uv run pytest -q -m "not integration and not live_azure" --cov=provisioning_orchestrator "${cov[@]}")
+      - name: PostgreSQL integration tests (Testcontainers)
+        run: (cd provisioning-orchestrator && uv run pytest -q -m integration)

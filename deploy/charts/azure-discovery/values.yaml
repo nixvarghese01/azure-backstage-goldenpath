@@ -1,0 +1,15 @@
+image:
+  repository: acridpdev.azurecr.io/idp/azure-discovery
+  tag: latest
+replicas: 2
+workloadIdentity:
+  clientId: ""          # id-idp-discovery-<env> (Reader only)
+auth:
+  tenantId: ""
+  audience: ""          # app ID URI of this service, e.g. api://idp-discovery
+  allowedCallers: ""    # comma-separated object IDs: backstage, orchestrator
+# Contents of policies/allowlist.yaml (passed with --set-file allowlist=policies/allowlist.yaml).
+allowlist: ""
+resources:
+  requests: { cpu: 50m, memory: 128Mi }
+  limits: { cpu: 500m, memory: 256Mi }

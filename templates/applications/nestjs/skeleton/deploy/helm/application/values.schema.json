@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["image", "availability", "resources", "podSecurityContext", "securityContext"],
+  "properties": {
+    "availability": {
+      "type": "object",
+      "properties": { "tier": { "enum": ["standard", "ha"] } },
+      "required": ["tier"]
+    },
+    "replicaCount": { "type": "integer", "minimum": 1, "maximum": 10 },
+    "ha": {
+      "type": "object",
+      "properties": {
+        "minReplicas": { "type": "integer", "minimum": 2 },
+        "maxReplicas": { "type": "integer", "minimum": 2, "maximum": 20 }
+      }
+    },
+    "image": {
+      "type": "object",
+      "required": ["repository", "tag"],
+      "properties": { "repository": { "type": "string", "minLength": 1 }, "tag": { "type": "string", "minLength": 1 } }
+    },
+    "env": {
+      "type": "object",
+      "propertyNames": { "not": { "pattern": "(?i)(_KEY|_SECRET|_PASSWORD|_TOKEN|CONNECTION_?STRING)$" } },
+      "additionalProperties": { "type": "string" }
+    },
+    "podSecurityContext": {
+      "type": "object",
+      "properties": { "runAsNonRoot": { "const": true } },
+      "required": ["runAsNonRoot"]
+    },
+    "securityContext": {
+      "type": "object",
+      "properties": {
+        "allowPrivilegeEscalation": { "const": false },
+        "readOnlyRootFilesystem": { "const": true }
+      },
+      "required": ["allowPrivilegeEscalation"]
+    }
+  }
+}

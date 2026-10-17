@@ -1,0 +1,112 @@
+# Production (AKS) overrides. Secrets come from files mounted by the Secrets Store CSI driver
+# (/mnt/secrets/*), never from environment values or this file (docs/security/secret-management.md).
+app:
+  baseUrl: ${BACKSTAGE_BASE_URL}
+
+backend:
+  baseUrl: ${BACKSTAGE_BASE_URL}
+  listen:
+    port: 7007
+  cors:
+    origin: ${BACKSTAGE_BASE_URL}
+  database:
+    client: pg
+    connection:
+      host: ${POSTGRES_HOST}
+      port: 5432
+      user: ${POSTGRES_USER}
+      # Entra authentication where supported; otherwise S7 fallback password file (secret-management §3).
+      password:
+        $file: /mnt/secrets/backstage-db-password
+      database: backstage
+      ssl:
+        rejectUnauthorized: true
+    pluginDivisionMode: schema
+  auth:
+    # Lets the orchestrator send notifications with its Entra workload token (no shared secret).
+    externalAccess:
+      - type: jwks
+        options:
+          url: https://login.microsoftonline.com/${AZURE_TENANT_ID}/discovery/v2.0/keys
+          issuer: https://login.microsoftonline.com/${AZURE_TENANT_ID}/v2.0
+          audience: ${BACKSTAGE_ENTRA_AUDIENCE}
+          subjectPrefix: orchestrator
+        accessRestrictions:
+          - plugin: notifications
+          # Cleanup removes the application from the catalog (CLEANED_UP): its registered location (else
+          # Backstage reads the entity back from it) and its entity. Read + delete only.
+          # One entry per plugin: Backstage rejects a plugin declared twice, so permissions are a list.
+          - plugin: catalog
+            permission: [catalog.entity.read, catalog.entity.delete, catalog.location.read, catalog.location.delete]
+
+integrations:
+  github:
+    - host: github.com
+      apps:
+        - appId: ${GITHUB_APP_BACKSTAGE_ID}
+          clientId: ${GITHUB_APP_BACKSTAGE_CLIENT_ID}
+          clientSecret:
+            $file: /mnt/secrets/gh-app-backstage-client-secret
+          privateKey:
+            $file: /mnt/secrets/gh-app-backstage-key
+          webhookSecret: unused
+
+auth:
+  environment: production
+  session:
+    secret:
+      $file: /mnt/secrets/backstage-session-secret
+  providers:
+    github:
+      production:
+        clientId: ${GITHUB_APP_BACKSTAGE_CLIENT_ID}
+        clientSecret:
+          $file: /mnt/secrets/gh-app-backstage-client-secret
+        signIn:
+          resolvers:
+            - resolver: usernameMatchingUserEntityName
+
+catalog:
+  locations:
+    - type: file
+      target: ./catalog/org.yaml
+      rules:
+        - allow: [Group, User]
+    - type: file
+      target: ./catalog/platform.yaml
+    # The branch that deployed this portal (platform-release sets it): develop for dev, main for releases.
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/azure-backstage-goldenpath/blob/${CATALOG_BRANCH}/templates/applications/nestjs/template.yaml
+      rules:
+        - allow: [Template]
+
+idp:
+  githubOrg: ${GITHUB_ORG}
+  githubOwnerType: ${GITHUB_OWNER_TYPE}   # user (personal account) or organization
+  platformRef: ${CATALOG_BRANCH}          # platform branch for templates and generated repos' workflows
+  # Repository variables of every generated repository (identifiers only). In an organization these could
+  # be organization variables; a personal account has none, so the template sets them per repository.
+  generatedRepository:
+    provisioningClientId: ${PROVISIONING_CLIENT_ID}
+    deploymentClientId: ${DEPLOYMENT_CLIENT_ID}
+    callbackUrl: ${IDP_CALLBACK_URL}
+    stateStorageAccount: ${TFSTATE_STORAGE_ACCOUNT}
+  orchestratorGithubAppId: ${GITHUB_APP_ORCHESTRATOR_ID}
+  discovery:
+    baseUrl: http://azure-discovery.idp-platform.svc.cluster.local:8001
+  orchestrator:
+    baseUrl: http://provisioning-orchestrator-api.idp-platform.svc.cluster.local:8002
+  auth:
+    mode: entra
+    discoveryScope: ${DISCOVERY_ENTRA_SCOPE}
+    orchestratorScope: ${ORCHESTRATOR_ENTRA_SCOPE}
+
+techdocs:
+  builder: local
+  generator:
+    runIn: local
+  publisher:
+    type: local
+    local:
+      # The root filesystem is read-only; generated docs go to the writable /tmp volume.
+      publishDirectory: /tmp/techdocs

@@ -1,0 +1,7 @@
+# Optional on-demand TechDocs generation. Add after docker-compose.yml.
+services:
+  backstage:
+    build:
+      target: runtime
+    command: [node, packages/backend, --config, app-config.container.yaml, --config, app-config.docker.yaml, --config, app-config.docs.yaml]
+    mem_limit: ${BACKSTAGE_DOCS_MEMORY:-1536m}

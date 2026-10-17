@@ -1,0 +1,14 @@
+environment                = "dev"
+location                   = "uksouth"
+github_org                 = "nixvarghese01"
+github_org_id              = "000000000"
+github_repo_id             = "000000000" # gh api repos/<owner>/<repo> --jq .id (immutable OIDC subjects)
+platform_repo              = "azure-backstage-goldenpath"
+reusable_workflow_ref      = "refs/heads/main"
+discovery_subscription_ids = ["00000000-0000-0000-0000-000000000000"]
+# CAF intermediate root management group; leave empty when there are no management groups.
+discovery_management_group_ids = ["xycorp"]
+state_storage_account_name = "stidptfstatedev"
+state_resource_group_name  = "rg-idp-tfstate-dev"
+key_vault_name             = "kv-idp-plat-dev"
+secrets_created            = false # true after scripts/create-platform-secrets.sh

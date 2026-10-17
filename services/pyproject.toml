@@ -1,0 +1,35 @@
+# uv workspace root (virtual): shared dev tooling for all Python platform services.
+[tool.uv.workspace]
+members = ["libs/idp-common", "azure-discovery", "provisioning-orchestrator"]
+
+[dependency-groups]
+dev = [
+  "pytest~=9.1",
+  "pytest-asyncio>=1.0",
+  "httpx>=0.28",
+  "respx>=0.22",
+  "testcontainers[postgres]~=4.15",
+  "ruff~=0.17.0",
+  "mypy~=2.4",
+  "pytest-cov~=7.0",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "ASYNC", "RUF"]
+ignore = ["S101"]  # asserts are fine in tests
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+  "integration: needs Docker (PostgreSQL via Testcontainers)",
+  "live_azure: needs real Azure credentials (RUN_LIVE_AZURE_TESTS=1)",
+]

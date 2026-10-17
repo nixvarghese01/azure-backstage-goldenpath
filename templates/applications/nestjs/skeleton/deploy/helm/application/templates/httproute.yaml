@@ -1,0 +1,23 @@
+{{- if and .Values.route.enabled .Values.route.host }}
+# Attaches to the platform's shared Gateway (ADR-0003). No Ingress objects.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "app.name" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ .Values.route.gateway.name }}
+      namespace: {{ .Values.route.gateway.namespace }}
+  hostnames:
+    - {{ .Values.route.host | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "app.name" . }}
+          port: {{ .Values.service.port }}
+{{- end }}

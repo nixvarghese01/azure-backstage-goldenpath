@@ -1,0 +1,52 @@
+{
+  "name": "idp-portal",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "22 || 24"
+  },
+  "packageManager": "yarn@4.13.0",
+  "workspaces": {
+    "packages": [
+      "packages/*",
+      "plugins/*"
+    ]
+  },
+  "scripts": {
+    "dev": "yarn workspaces foreach -A --include backend --include app --parallel -v -i run start",
+    "start": "yarn workspace app start",
+    "start-backend": "yarn workspace backend start",
+    "build:backend": "yarn workspace backend build",
+    "build:all": "backstage-cli repo build --all",
+    "tsc": "tsc",
+    "clean": "backstage-cli repo clean",
+    "test": "backstage-cli repo test",
+    "test:all": "backstage-cli repo test --coverage",
+    "lint": "backstage-cli repo lint --since origin/main",
+    "lint:all": "backstage-cli repo lint",
+    "prettier:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@backstage/cli": "backstage:^",
+    "@backstage/cli-defaults": "backstage:^",
+    "@backstage/repo-tools": "backstage:^",
+    "@jest/environment-jsdom-abstract": "^30.0.0",
+    "@testing-library/dom": "^10.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/webpack-env": "^1.18.0",
+    "jest": "^30.0.0",
+    "jsdom": "^27.1.0",
+    "prettier": "^3.3.0",
+    "typescript": "~5.9.3"
+  },
+  "prettier": "@backstage/cli/config/prettier",
+  "resolutions": {
+    "@yarnpkg/core": "4.9.1",
+    "adm-zip@npm:0.6.0": "0.6.1",
+    "prismjs@npm:~1.27.0": "1.30.0",
+    "undici@npm:7.29.0": "7.29.1"
+  }
+}

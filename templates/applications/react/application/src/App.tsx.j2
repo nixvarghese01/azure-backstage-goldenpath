@@ -1,0 +1,23 @@
+import { useEffect, useState } from 'react';
+
+type Order = { id: string; customerId: string; currency: string; total: number };
+
+export default function App() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    fetch('/orders.json').then(response => {
+      if (!response.ok) throw new Error('Demo unavailable');
+      return response.json();
+    }).then(data => { if (active) setOrders(data); })
+      .catch(() => { if (active) setFailed(true); });
+    return () => { active = false; };
+  }, []);
+  return <main><span className="badge">REACT + VITE STARTER</span>
+    <h1>{[[ values.app | tojson ]]}</h1><p>Read-only demo data; no Azure credentials.</p>
+    <section><h2>Sample orders</h2>{failed ? <p role="alert">Demo unavailable</p> :
+      <ul>{orders.map(order => <li key={order.id}>{order.id} / {order.customerId} / {order.currency} {order.total.toFixed(2)}</li>)}</ul>}
+    </section><a href="/docs">Endpoint documentation</a>
+  </main>;
+}

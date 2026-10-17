@@ -1,0 +1,32 @@
+name: ci-portal
+
+on:
+  pull_request:
+    paths: ["portal/**", ".github/workflows/ci-portal.yml"]
+  push:
+    branches: [develop, main]
+    paths: ["portal/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: portal
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn tsc
+      - run: yarn lint:all
+      - run: yarn test:all
+      # Container config: the default config $includes GitHub App credentials, which CI doesn't have.
+      - run: yarn build:backend --config ../../app-config.container.yaml

@@ -1,0 +1,37 @@
+name: application-deploy
+run-name: "deploy ${{ inputs.action || 'deploy' }} ${{ inputs.request_id || vars.IDP_REQUEST_ID }}"
+
+on:
+  workflow_run:
+    workflows: [application-ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      request_id:
+        required: false
+        default: ""
+      action:
+        description: deploy | uninstall
+        required: false
+        default: deploy
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    uses: [[ values.org ]]/azure-backstage-goldenpath/.github/workflows/reusable-application-deploy.yml@[[ values.platform_ref ]]
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      platform_ref: [[ values.platform_ref ]]
+      environment: [[ values.environment ]]
+      action: ${{ inputs.action || 'deploy' }}
+      release: [[ values.app ]]
+      namespace: [[ values.namespace ]]
+      image_tag: ${{ github.event.workflow_run.head_sha || github.sha }}

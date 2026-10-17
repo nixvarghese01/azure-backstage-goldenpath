@@ -1,0 +1,9 @@
+apiVersion: v2
+name: postgres
+description: >-
+  Single-instance PostgreSQL inside the cluster for the dev platform (Backstage and the orchestrator),
+  used when 20-shared-dev runs without Azure Database for PostgreSQL (postgres.enabled = false).
+  test and prod use Azure PostgreSQL with Entra authentication.
+type: application
+version: 0.1.0
+appVersion: "17"

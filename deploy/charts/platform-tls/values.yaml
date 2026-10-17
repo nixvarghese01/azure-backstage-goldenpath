@@ -1,0 +1,21 @@
+# Set by iac/platform/30-cluster-config (helm_release.platform_tls).
+host: ""                      # the Gateway's stable public host (<label>.<region>.cloudapp.azure.com)
+secretName: idp-public-tls    # the Gateway's HTTPS listener reads this Secret
+certificateName: idp-public
+gateway: { name: idp-gateway, namespace: idp-gateway }
+acme:
+  server: https://acme-v02.api.letsencrypt.org/directory
+  email: ""                   # optional: Let's Encrypt expiry notices
+issuerName: letsencrypt
+# Key Vault copy of the certificate (10-identities: tls key vault), synced by the tls-sync identity.
+keyVault:
+  name: ""
+  secretName: public-tls
+serviceAccount: tls-sync      # created by 30-cluster-config, federated to the tls-sync identity
+image: { repository: mcr.microsoft.com/azure-cli, tag: "2.89.1" }
+backupSchedule: "*/30 * * * *"
+# Restore only when the stored certificate is valid for longer than cert-manager's renewal window.
+restoreMinValidDays: 30
+resources:
+  requests: { cpu: 50m, memory: 128Mi }
+  limits: { cpu: 500m, memory: 384Mi }

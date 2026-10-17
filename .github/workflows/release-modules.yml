@@ -1,0 +1,100 @@
+# Validates, tests and tags Terraform modules as `<module>/vX.Y.Z`. Generated repositories pin modules by
+# these tags and the tag ruleset makes them immutable, so a tag is only created on a checked commit of
+# develop or main. Run it after a module change merges, then bump the skeleton's refs in a pull request.
+name: release-modules
+
+on:
+  workflow_dispatch:
+    inputs:
+      modules:
+        description: 'Modules to tag, space-separated, or "skeleton" for every module the application skeleton pins'
+        required: true
+        default: skeleton
+      version:
+        description: Version to tag, X.Y.Z (no leading v)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-modules
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    outputs:
+      modules: ${{ steps.resolve.outputs.modules }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - name: Resolve modules and check the tags are new
+        id: resolve
+        env:
+          MODULES: ${{ inputs.modules }}
+          VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          [[ "$REF_NAME" == develop || "$REF_NAME" == main ]] || { echo "::error::Run from develop or main, not $REF_NAME"; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Version must be X.Y.Z, got $VERSION"; exit 1; }
+          if [[ "$MODULES" == skeleton ]]; then
+            MODULES="$(bash scripts/ci/skeleton-module-refs.sh | cut -d/ -f1 | tr '\n' ' ')"
+          fi
+          for module in $MODULES; do
+            [[ "$module" =~ ^[a-z0-9-]+$ && -d "iac/modules/$module" ]] || { echo "::error::No module iac/modules/$module"; exit 1; }
+            if git ls-remote --exit-code --tags origin "refs/tags/$module/v$VERSION" >/dev/null; then
+              echo "::error::Tag $module/v$VERSION already exists (tags are immutable; choose a new version)"; exit 1
+            fi
+          done
+          echo "modules=$MODULES" >> "$GITHUB_OUTPUT"
+      - name: Format, validate and test (no backend, mock providers)
+        env:
+          MODULES: ${{ steps.resolve.outputs.modules }}
+        run: |
+          for module in $MODULES; do
+            echo "::group::$module"
+            dir="iac/modules/$module"
+            terraform fmt -check -recursive "$dir"
+            (cd "$dir" && terraform init -backend=false -input=false >/dev/null && terraform validate)
+            if [[ -d "$dir/tests" ]]; then (cd "$dir" && terraform test); fi
+            echo "::endgroup::"
+          done
+      - name: Checkov (waivers are inline checkov:skip comments with reasons)
+        env:
+          MODULES: ${{ steps.resolve.outputs.modules }}
+        run: |
+          for module in $MODULES; do
+            pipx run checkov==3.3.26 -d "iac/modules/$module" --framework terraform --quiet --compact
+          done
+
+  tag:
+    needs: validate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false   # the token is passed to the push only, never stored in .git
+      - name: Create and push the tags on the validated commit
+        env:
+          MODULES: ${{ needs.validate.outputs.modules }}
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          tags=()
+          for module in $MODULES; do
+            git tag -a "$module/v$VERSION" -m "$module v$VERSION" "$GITHUB_SHA"
+            tags+=("refs/tags/$module/v$VERSION")
+          done
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic ${auth}" push --atomic origin "${tags[@]}"
+          printf -- '- %s\n' "${tags[@]#refs/tags/}" >> "$GITHUB_STEP_SUMMARY"

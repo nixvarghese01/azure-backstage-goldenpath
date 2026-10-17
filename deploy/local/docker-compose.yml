@@ -1,0 +1,168 @@
+# Local microservice stack: mock Azure/GitHub, no cloud provisioning or publication.
+name: idp-platform
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "2"
+
+x-orchestrator: &orchestrator
+  image: idp/provisioning-orchestrator:local
+  build:
+    context: ../..
+    dockerfile: services/provisioning-orchestrator/Dockerfile
+  init: true
+  cpus: ${ORCHESTRATOR_CPUS:-0.5}
+  mem_limit: ${ORCHESTRATOR_MEMORY:-256m}
+  logging: *logging
+  read_only: true
+  tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  networks: [platform]
+  environment:
+    IDP_AUTH_MODE: static
+    IDP_DEV_SERVICE_TOKEN: ${IDP_DEV_SERVICE_TOKEN:-dev-only-change-me}
+    ORCHESTRATOR_DATABASE_URL: postgresql+psycopg://orchestrator:dev-only-not-a-secret@postgres:5432/orchestrator
+    ORCHESTRATOR_DATABASE_ENTRA_AUTH: "false"
+    ORCHESTRATOR_GITHUB_MODE: mock
+    ORCHESTRATOR_SELF_APPROVAL_ENVIRONMENTS: ${ORCHESTRATOR_SELF_APPROVAL_ENVIRONMENTS:-}
+    ORCHESTRATOR_GITHUB_ORG: ${ORCHESTRATOR_GITHUB_ORG:-nixvarghese01}
+    ORCHESTRATOR_PLATFORM_REPO: azure-backstage-goldenpath
+    ORCHESTRATOR_BACKSTAGE_BASE_URL: http://backstage:7007
+    ORCHESTRATOR_GITHUB_WEBHOOK_SECRET_FILE: /run/secrets/webhook-secret
+    DISCOVERY_BASE_URL: http://azure-discovery:8001
+    ORCHESTRATOR_WORKER_POLL_SECONDS: "5"
+    ORCHESTRATOR_RECONCILE_SECONDS: "120"
+  secrets: [webhook-secret]
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    cpus: ${POSTGRES_CPUS:-0.5}
+    mem_limit: ${POSTGRES_MEMORY:-256m}
+    logging: *logging
+    command: [postgres, -c, shared_buffers=32MB, -c, work_mem=2MB, -c, maintenance_work_mem=16MB]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev-only-not-a-secret}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    networks: [platform]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  azure-discovery:
+    image: idp/azure-discovery:local
+    build:
+      context: ../..
+      dockerfile: services/azure-discovery/Dockerfile
+    restart: unless-stopped
+    init: true
+    cpus: ${DISCOVERY_CPUS:-0.5}
+    mem_limit: ${DISCOVERY_MEMORY:-256m}
+    # Loopback only, for the Swagger UI at http://localhost:8001/docs during local development.
+    ports:
+      - "127.0.0.1:8001:8001"
+    logging: *logging
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      IDP_AUTH_MODE: static
+      IDP_DEV_SERVICE_TOKEN: ${IDP_DEV_SERVICE_TOKEN:-dev-only-change-me}
+      DISCOVERY_AZURE_MODE: mock
+      DISCOVERY_POLICY_FILE: /etc/idp/allowlist.yaml
+    volumes:
+      - ../../policies/allowlist.yaml:/etc/idp/allowlist.yaml:ro
+    expose: ["8001"]
+    networks: [platform]
+
+  orchestrator-migrate:
+    <<: *orchestrator
+    command: [alembic, -c, /app/alembic.ini, upgrade, head]
+    restart: "no"
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  orchestrator-api:
+    <<: *orchestrator
+    restart: unless-stopped
+    expose: ["8002"]
+    # Loopback only, for the Swagger UI at http://localhost:8002/docs during local development.
+    ports:
+      - "127.0.0.1:8002:8002"
+    depends_on:
+      orchestrator-migrate:
+        condition: service_completed_successfully
+      azure-discovery:
+        condition: service_healthy
+
+  orchestrator-worker:
+    <<: *orchestrator
+    command: [orchestrator-worker]
+    restart: unless-stopped
+    stop_grace_period: 60s
+    # The API probe baked into the shared image does not apply to this process.
+    healthcheck:
+      disable: true
+    depends_on:
+      orchestrator-api:
+        condition: service_healthy
+      backstage:
+        condition: service_healthy
+
+  backstage:
+    image: idp/backstage:local
+    build:
+      context: ../..
+      dockerfile: portal/Dockerfile
+      target: runtime-lite
+    command: [node, packages/backend, --config, app-config.container.yaml, --config, app-config.docker.yaml]
+    restart: unless-stopped
+    init: true
+    cpus: ${BACKSTAGE_CPUS:-1.0}
+    mem_limit: ${BACKSTAGE_MEMORY:-768m}
+    logging: *logging
+    read_only: true
+    tmpfs: ["/tmp:rw,nosuid,size=512m,uid=1000,gid=1000,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      IDP_LOCAL_GUEST_AUTH: "true"
+      IDP_DEV_SERVICE_TOKEN: ${IDP_DEV_SERVICE_TOKEN:-dev-only-change-me}
+      ORCHESTRATOR_GITHUB_ORG: ${ORCHESTRATOR_GITHUB_ORG:-nixvarghese01}
+      NODE_OPTIONS: ${BACKSTAGE_NODE_OPTIONS:---no-node-snapshot --max-old-space-size=512}
+    ports:
+      - "127.0.0.1:7007:7007"
+    networks: [platform]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      azure-discovery:
+        condition: service_healthy
+      orchestrator-api:
+        condition: service_healthy
+
+networks:
+  platform:
+    driver: bridge
+
+volumes:
+  pgdata:
+
+secrets:
+  webhook-secret:
+    file: ./webhook-secret.dev

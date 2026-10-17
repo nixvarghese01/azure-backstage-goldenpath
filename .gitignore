@@ -1,0 +1,70 @@
+# --- Secrets and local configuration (never commit) ---
+.env
+.env.*
+!deploy/local/.env.example
+app-config.local.yaml
+app-config.*.local.yaml
+*.pem
+*.key
+*.pfx
+*.p12
+kubeconfig*
+.kube/
+deploy/local/secrets/
+
+# --- Terraform ---
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars.json
+# Reusable modules leave provider selection to their callers; root stacks commit their lock files.
+iac/modules/**/.terraform.lock.hcl
+# Rendered environment tfvars hold no secrets and are committed in generated repos.
+
+# --- Node / Backstage ---
+node_modules/
+dist/
+dist-types/
+**/.yarn/*
+!**/.yarn/releases
+!**/.yarn/plugins
+coverage/
+*.tsbuildinfo
+site/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# --- .NET build output ---
+bin/
+obj/
+
+# Workspace-local validation tools and download caches
+.tools/
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# --- Platform stack inputs (your IDs; examples are committed instead) ---
+iac/platform/**/terraform.tfvars
+iac/platform/**/backend.hcl
+iac/platform/**/backend.tf
+!iac/platform/**/backend.tf.example

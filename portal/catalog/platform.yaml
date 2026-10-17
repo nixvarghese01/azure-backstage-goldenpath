@@ -1,0 +1,40 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: idp-platform
+  description: Internal Developer Portal internal developer platform
+spec:
+  owner: group:default/platform-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: backstage
+  description: Developer portal (catalog, scaffolder, TechDocs) with the IDP bridge
+spec:
+  type: website
+  lifecycle: production
+  owner: group:default/platform-team
+  system: idp-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: azure-discovery
+  description: Read-only Azure discovery and eligibility validation (Python, FastAPI)
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform-team
+  system: idp-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: provisioning-orchestrator
+  description: Durable request orchestrator (Python, FastAPI + worker)
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform-team
+  system: idp-platform

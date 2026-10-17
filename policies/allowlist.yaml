@@ -1,0 +1,147 @@
+# Platform allowlist: the single source of truth for what the golden path may select or create.
+# Read by azure-discovery (filtering, capabilities, validation) and by the Conftest plan policies
+# (converted to JSON data at CI time). Replace the example IDs with your own.
+version: 1
+
+environments:
+  dev:
+    enabled: true
+    ha_default: false          # ADR-0004: Standard is the default in dev
+    approvers_required: 1
+  test:
+    enabled: false
+    ha_default: false
+    approvers_required: 2
+  prod:
+    enabled: false
+    ha_default: true
+    approvers_required: 2
+
+regions:
+  - uksouth
+  - swedencentral   # landing zones that allow only Sweden Central (also has the newer v2 B-series)
+
+hierarchy:
+  # Cloud Adoption Framework placement. The form walks tenant -> management group -> subscription.
+  # Both keys are optional: leave tenant_id null to accept any tenant the identity sees, and the list
+  # empty to accept subscriptions anywhere (for example one free-tier subscription directly under the
+  # Tenant Root Group). With Azure landing zones, list the "Landing zones" group (or Corp/Online).
+  tenant_id: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+  application_management_groups: [xycorp-landingzones]
+
+subscriptions:
+  # Subscription IDs the platform may use. Discovery hides everything else.
+  - id: 00000000-0000-0000-0000-000000000000
+    name: sub-idp-dev
+    environments: [dev]
+
+resource_groups:
+  # Existing resource groups that applications may reuse ("Select existing").
+  - name: rg-idp-apps-dev
+    subscription: 00000000-0000-0000-0000-000000000000
+    environments: [dev]
+
+aks_clusters:
+  - name: aks-idp-shared-dev
+    resource_group: rg-idp-aks-dev
+    subscription: 00000000-0000-0000-0000-000000000000
+    environments: [dev]
+    gateway:
+      name: idp-gateway
+      namespace: idp-gateway
+      base_domain: dev.xycorp.local
+
+container_registries:
+  - name: acridpdev
+    resource_group: rg-idp-registry-dev
+    subscription: 00000000-0000-0000-0000-000000000000
+    environments: [dev]
+
+data_resources:
+  # Existing Storage accounts / Key Vaults that applications may reuse.
+  - name: stidpshareddev
+    type: microsoft.storage/storageaccounts
+    resource_group: rg-idp-apps-dev
+    subscription: 00000000-0000-0000-0000-000000000000
+    environments: [dev]
+
+subscription_vending:
+  # EA or MCA billing scope used by iac/platform/05-subscriptions. Leave null when the billing account
+  # can't vend subscriptions (free / pay-as-you-go): the form then disables "Create new subscription".
+  billing_scope: null
+  management_group: null
+
+create_new:
+  # Which "Create new" options the platform offers (subject to subscription capabilities).
+  subscription: true
+  resource_group: false   # shared subscription: apps land in rg-idp-apps-<env> (10-identities scopes rights there)
+  aks_cluster: true
+  container_registry: true
+  namespace: true
+  storage_account: true
+  key_vault: true
+
+skus:
+  storage_account: [Standard_LRS, Standard_ZRS, Standard_GZRS] # GZRS: Terraform state account only
+  key_vault: [standard]
+  container_registry: [Basic, Standard]
+  aks_node_vm: [Standard_D2s_v5, Standard_D2as_v5, Standard_B2s, Standard_B2s_v2, Standard_B4as_v2, Standard_B4s_v2]
+
+roles:
+  # Roles the provisioning identity may assign to application runtime identities.
+  assignable:
+    - Storage Blob Data Contributor
+    - Storage Blob Data Reader
+    - Key Vault Secrets User
+
+naming:
+  application_pattern: "^[a-z][a-z0-9-]{2,30}[a-z0-9]$"
+  reserved_names: [backstage, platform, idp, admin, kube-system, default]
+
+stacks:
+  - id: nestjs
+    name: NestJS (TypeScript)
+    enabled: true
+  - id: fastapi
+    name: Python FastAPI
+    enabled: false
+    runtime_capabilities: [none]
+  - id: go
+    name: Go HTTP API
+    enabled: false
+    runtime_capabilities: [none]
+  - id: dotnet
+    name: ASP.NET Core
+    enabled: false
+    runtime_capabilities: [none]
+  - id: springboot
+    name: Java Spring Boot
+    enabled: false
+    runtime_capabilities: [none]
+  - id: nextjs
+    name: Next.js (React)
+    enabled: false
+    runtime_capabilities: [none]
+  - id: react
+    name: React + Vite
+    enabled: false
+    runtime_capabilities: [none]
+  - id: vue
+    name: Vue + Vite
+    enabled: false
+    runtime_capabilities: [none]
+
+ha:
+  min_zones: 2
+  slo_targets: ["99.5", "99.9", "99.95"]
+  reasons:
+    - customer-facing
+    - contractual-sla
+    - revenue-or-safety-critical
+    - dependency-of-critical-service
+    - testing-ha-behaviour
+    - other
+  justification:
+    min_length: 30
+    max_length: 500
+    rejected_values: [test, testing, n/a, na, none, asdf, tbd, todo, "-", "."]

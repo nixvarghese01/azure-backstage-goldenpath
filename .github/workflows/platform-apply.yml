@@ -1,0 +1,247 @@
+# Applies (or destroys) one platform stack, behind the `platform` environment's required reviewers.
+# The orchestrator dispatches this after a platform request PR merges (PLATFORM_PROVISIONING), and
+# platform-provision.yml calls it once per stack. Runs from develop (dev environment) or main.
+# Order: static gate (fmt, validate, TFLint, Checkov) -> plan -> Conftest + Checkov on the plan ->
+# apply that exact saved plan. Reviewers approve against the plan posted on the merged PR and the
+# preview job's plan in this run's summary; the apply job fails if its plan differs from the preview.
+name: platform-apply
+run-name: "platform-apply ${{ inputs.stack }} ${{ inputs.mode }} ${{ inputs.request_id }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        required: true
+      request_id:
+        required: false
+        default: ""
+      mode:
+        description: apply, or destroy (teardown)
+        type: choice
+        options: [apply, destroy]
+        default: apply
+  workflow_call:
+    inputs:
+      stack:
+        type: string
+        required: true
+      request_id:
+        type: string
+        required: false
+        default: ""
+      mode:
+        type: string
+        required: false
+        default: apply
+    secrets:
+      AZURE_TENANT_ID:
+        required: false
+      AZURE_SUBSCRIPTION_ID:
+        required: false
+      PLATFORM_CLIENT_ID:
+        required: false
+      PLATFORM_PLAN_CLIENT_ID:
+        required: false
+      VENDING_CLIENT_ID:
+        required: false
+      PLATFORM_BACKEND_HCL:
+        required: false
+      PLATFORM_TFVARS_JSON:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-apply-${{ inputs.stack }}
+  cancel-in-progress: false
+
+env:
+  ARM_USE_OIDC: "true"
+  ARM_USE_AZUREAD: "true"
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  IDP_REQUEST_ID: ${{ inputs.request_id }}
+  IDP_CALLBACK_URL: ${{ vars.IDP_CALLBACK_URL }}
+  STACK: ${{ inputs.stack }}
+  MODE: ${{ inputs.mode || 'apply' }}
+
+jobs:
+  static:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write   # orchestrator callback only; no environment, so no Azure federation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the stack name and mode
+        run: |
+          [[ "$STACK" =~ ^[0-9]{2}-[a-z0-9-]+$ && -d "iac/platform/$STACK" ]] || { echo "::error::unknown stack"; exit 1; }
+          [[ "$MODE" == apply || "$MODE" == destroy ]] || { echo "::error::mode must be apply or destroy"; exit 1; }
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - uses: ./.github/actions/terraform-static
+        with:
+          working-directory: iac/platform/${{ inputs.stack }}
+      - name: Report a failed gate to orchestrator
+        if: failure() && inputs.request_id != ''
+        run: bash scripts/ci/callback.sh platform_apply failure
+
+  # The plan before the approval: the read-only identity plans (no state lock) and writes the changes to
+  # the run summary, so the reviewer sees them on the approval screen's run. Destroys skip it (they need
+  # no approval), and so do the stacks the read-only identity can't plan (10: Microsoft Graph, 30: the
+  # cluster's API); their changes are on the merged PR's plan.
+  preview:
+    needs: static
+    if: >-
+      vars.PLATFORM_AZURE_READY == 'true' && (inputs.mode || 'apply') == 'apply'
+      && inputs.stack != '10-identities' && inputs.stack != '30-cluster-config'
+    runs-on: ubuntu-24.04
+    environment: platform-plan   # read-only identity, no reviewers
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      changes: ${{ steps.summary.outputs.changes }}
+    defaults:
+      run:
+        working-directory: iac/platform/${{ inputs.stack }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.PLATFORM_PLAN_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Write stack inputs from repository variables (IDs only)
+        env:
+          PLATFORM_BACKEND_HCL: ${{ secrets.PLATFORM_BACKEND_HCL }}
+          PLATFORM_TFVARS_JSON: ${{ secrets.PLATFORM_TFVARS_JSON }}
+        run: |
+          printf '%s\n' "${PLATFORM_BACKEND_HCL//__STACK__/$STACK}" > backend.hcl
+          jq -r --arg s "$STACK" '.[$s] // ""' <<< "$PLATFORM_TFVARS_JSON" > terraform.tfvars   # no entry = the stack's defaults
+      - name: Plan (read-only, no state lock)
+        env:
+          ARM_CLIENT_ID: ${{ secrets.PLATFORM_PLAN_CLIENT_ID }}
+        run: |
+          terraform init -backend-config=backend.hcl
+          terraform plan -lock=false -var-file=terraform.tfvars -out=plan.bin -no-color > /dev/null
+          terraform show -json plan.bin > plan.json
+      - name: Plan to approve (resource addresses and actions only, no values)
+        id: summary
+        run: |
+          summary="$(bash "$GITHUB_WORKSPACE/scripts/ci/plan-summary.sh" plan.json plan.bin)"
+          {
+            echo "### $STACK: plan to approve"
+            jq -r '.summary | "\(.add) to add, \(.change) to change, \(.destroy) to destroy"' <<< "$summary"
+            echo
+            jq -r '.summary.resources[]? | "- \(.address): \(.actions | join("/"))"' <<< "$summary"
+            echo
+            echo "The apply job below waits for approval and stops if its plan differs from this one."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "changes=$(bash "$GITHUB_WORKSPACE/scripts/ci/plan-changes.sh" <<< "$summary")" >> "$GITHUB_OUTPUT"
+
+  apply:
+    needs: [static, preview]
+    if: ${{ !cancelled() && needs.static.result == 'success' && needs.preview.result != 'failure' }}
+    runs-on: ubuntu-24.04
+    # Destroys run in platform-teardown (no reviewers) so expiry teardown never waits for a person.
+    environment: ${{ inputs.stack == '05-subscriptions' && 'platform-vending' || (inputs.mode == 'destroy' && 'platform-teardown') || 'platform' }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: iac/platform/${{ inputs.stack }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.5
+          terraform_wrapper: false
+      - name: Select identity
+        env:
+          VENDING_CLIENT_ID: ${{ secrets.VENDING_CLIENT_ID }}
+          PLATFORM_CLIENT_ID: ${{ secrets.PLATFORM_CLIENT_ID }}
+        run: |
+          if [[ "$STACK" == "05-subscriptions" ]]; then
+            echo "ARM_CLIENT_ID=${VENDING_CLIENT_ID}" >> "$GITHUB_ENV"
+          else
+            echo "ARM_CLIENT_ID=${PLATFORM_CLIENT_ID}" >> "$GITHUB_ENV"
+          fi
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ env.ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - run: bash "$GITHUB_WORKSPACE/scripts/ci/install-tools.sh" conftest kubelogin
+      - name: Write stack inputs from repository variables (IDs only)
+        env:
+          PLATFORM_BACKEND_HCL: ${{ secrets.PLATFORM_BACKEND_HCL }}
+          PLATFORM_TFVARS_JSON: ${{ secrets.PLATFORM_TFVARS_JSON }}
+        run: |
+          printf '%s\n' "${PLATFORM_BACKEND_HCL//__STACK__/$STACK}" > backend.hcl
+          jq -r --arg s "$STACK" '.[$s] // ""' <<< "$PLATFORM_TFVARS_JSON" > terraform.tfvars   # no entry = the stack's defaults
+      - name: Plan
+        run: |
+          terraform init -backend-config=backend.hcl
+          extra=(); [[ "$STACK" == "30-cluster-config" ]] && extra=(-var=kubelogin_mode=azurecli)
+          [[ "$MODE" == destroy ]] && extra+=(-destroy)
+          terraform plan -var-file=terraform.tfvars "${extra[@]}" -out=plan.bin -no-color > /dev/null
+          terraform show -json plan.bin > plan.json
+      - name: Plan summary (resource addresses and actions only, no values)
+        run: |
+          summary="$(bash "$GITHUB_WORKSPACE/scripts/ci/plan-summary.sh" plan.json plan.bin)"
+          {
+            echo "### $STACK: $MODE"
+            jq -r '.summary | "\(.add) to add, \(.change) to change, \(.destroy) to destroy"' <<< "$summary"
+            echo
+            jq -r '.summary.resources[]? | "- \(.address): \(.actions | join("/"))"' <<< "$summary"
+          } >> "$GITHUB_STEP_SUMMARY"
+          # What was approved is what gets applied: the same resources and actions as the preview.
+          if [[ -n "$PREVIEW" && "$(bash "$GITHUB_WORKSPACE/scripts/ci/plan-changes.sh" <<< "$summary")" != "$PREVIEW" ]]; then
+            echo "::error::The plan changed since the preview that was approved (state or inputs moved). Re-run to review the new plan."
+            exit 1
+          fi
+        env:
+          PREVIEW: ${{ needs.preview.outputs.changes }}
+      - name: Plan policy (Conftest)
+        run: conftest test plan.json -p "$GITHUB_WORKSPACE/policies/terraform" -d "$GITHUB_WORKSPACE/policies/allowlist.yaml" --namespace main
+      # Enrichment reads the inline checkov:skip waivers from the module sources. The root is iac/modules,
+      # not the whole repo: resource names like azurerm_kubernetes_cluster.this also exist as data sources
+      # in other stacks, and Checkov would match the wrong file and ignore the waivers.
+      - name: Plan misconfiguration scan (Checkov, resolved values)
+        run: pipx run checkov==3.3.26 -f plan.json --framework terraform_plan --repo-root-for-plan-enrichment "$GITHUB_WORKSPACE/iac/modules" --quiet --compact
+      # An apply never re-plans. A destroy that stops part-way (an AKS delete that times out or ends Failed
+      # on a transient Key Vault 409) leaves only a subset of what was approved, so destroy re-plans what
+      # is left and retries, up to twice.
+      - name: Apply the checked plan
+        run: |
+          terraform apply plan.bin && exit 0
+          [[ "$MODE" == destroy ]] || exit 1
+          extra=(-destroy); [[ "$STACK" == "30-cluster-config" ]] && extra+=(-var=kubelogin_mode=azurecli)
+          for attempt in 1 2; do
+            echo "::warning::Destroy failed part-way; retrying what is left (attempt $attempt of 2)."
+            terraform plan -var-file=terraform.tfvars "${extra[@]}" -out=retry.bin -no-color > /dev/null &&
+              terraform apply retry.bin && exit 0
+          done
+          exit 1
+      - name: Report to orchestrator
+        if: always() && inputs.request_id != ''
+        working-directory: .
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: bash scripts/ci/callback.sh platform_apply "$JOB_STATUS"

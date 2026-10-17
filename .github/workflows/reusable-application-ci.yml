@@ -1,0 +1,206 @@
+# Reusable CI: language checks, SAST, build, scan, SBOM, push and provenance (main only).
+# Azure OIDC trust stays on this workflow: pushing uses the deployment identity, whose credential
+# trusts only this workflow in <env>-build.
+#
+# test   lint, unit/e2e tests and build (Node) or the reviewed Dockerfile verify target (other runtimes)
+# sast   CodeQL for the application language (public repositories, or CODE_SCANNING_ENABLED=true)
+# image  secrets, dependency vulnerabilities, Dockerfile misconfiguration, image vulnerabilities, SBOM
+# push   push to ACR and attest build provenance (main only, no scanning credentials needed earlier)
+name: reusable-application-ci
+
+on:
+  workflow_call:
+    inputs:
+      platform_ref:
+        description: Platform ref the caller calls this workflow at (scripts and policies come from the same ref)
+        type: string
+        default: main
+      environment:
+        type: string
+        default: dev
+      image_name:
+        type: string
+        required: true
+      runtime:
+        description: node | python | go | dotnet | java
+        type: string
+        default: node
+
+permissions:
+  contents: read
+
+env:
+  IDP_REQUEST_ID: ${{ vars.IDP_REQUEST_ID }}
+  IDP_CALLBACK_URL: ${{ vars.IDP_CALLBACK_URL }}
+  PLATFORM: .platform
+  RUNTIME: ${{ inputs.runtime }}
+  IMAGE: ${{ inputs.image_name }}:${{ github.sha }}
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Validate inputs
+        env:
+          IMAGE_NAME: ${{ inputs.image_name }}
+        run: |
+          case "$RUNTIME" in node|python|go|dotnet|java) ;; *) echo '::error::Unsupported runtime'; exit 1 ;; esac
+          [[ "$IMAGE_NAME" =~ ^[a-z0-9][a-z0-9._/-]*$ ]] || { echo '::error::invalid image name'; exit 1; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: inputs.runtime == 'node'
+        with:
+          node-version: 24
+      - name: Install (lockfile if present; generated repos commit theirs after the first install)
+        if: inputs.runtime == 'node'
+        run: if [[ -f package-lock.json ]]; then npm ci; else npm install --no-audit --no-fund; fi
+      - run: npm run lint
+        if: inputs.runtime == 'node'
+      - run: npm test
+        if: inputs.runtime == 'node'
+      - run: npm run test:e2e --if-present
+        if: inputs.runtime == 'node'
+      - run: npm run build
+        if: inputs.runtime == 'node'
+      - name: Non-Node language checks inside the reviewed verify target
+        if: inputs.runtime != 'node'
+        run: docker build --target verify -t starter-verification .
+
+  sast:
+    # Code scanning is free on public repositories; private ones need GitHub Advanced Security.
+    if: github.event.repository.visibility == 'public' || vars.CODE_SCANNING_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select the CodeQL language
+        id: lang
+        run: |
+          case "$RUNTIME" in
+            node)   echo "language=javascript-typescript" >> "$GITHUB_OUTPUT"; echo "build_mode=none" >> "$GITHUB_OUTPUT" ;;
+            python) echo "language=python" >> "$GITHUB_OUTPUT"; echo "build_mode=none" >> "$GITHUB_OUTPUT" ;;
+            go)     echo "language=go" >> "$GITHUB_OUTPUT"; echo "build_mode=autobuild" >> "$GITHUB_OUTPUT" ;;
+            dotnet) echo "language=csharp" >> "$GITHUB_OUTPUT"; echo "build_mode=none" >> "$GITHUB_OUTPUT" ;;
+            java)   echo "language=java-kotlin" >> "$GITHUB_OUTPUT"; echo "build_mode=none" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: ${{ steps.lang.outputs.language }}
+          build-mode: ${{ steps.lang.outputs.build_mode }}
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: /language:${{ steps.lang.outputs.language }}
+
+  image:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # full history for the secret scan
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/azure-backstage-goldenpath
+          ref: ${{ inputs.platform_ref }}
+          path: ${{ env.PLATFORM }}
+          persist-credentials: false
+          sparse-checkout: scripts/ci
+      - name: Install verified scanners
+        run: bash "$PLATFORM/scripts/ci/install-tools.sh" trivy gitleaks
+      - name: Source scans (no credentials in this job)
+        run: |
+          gitleaks detect --no-banner --redact --source .
+          # Lockfile dependencies and committed secrets. Offline: no remote Maven POM resolution.
+          trivy fs --offline-scan --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed --skip-dirs "$PLATFORM" .
+          # Dockerfile misconfiguration. Terraform and Helm are checked by terraform-validate.
+          trivy config --severity HIGH,CRITICAL --exit-code 1 --skip-dirs infra --skip-dirs deploy --skip-dirs "$PLATFORM" .
+      - name: Build image
+        run: docker build --pull -t "$IMAGE" .
+      - name: Image scan, report and SBOM
+        run: |
+          trivy image --severity CRITICAL --exit-code 1 --ignore-unfixed "$IMAGE"
+          mkdir -p "$RUNNER_TEMP/reports"
+          trivy image --format json --output "$RUNNER_TEMP/reports/image-scan.json" "$IMAGE"
+          trivy image --format cyclonedx --output "$RUNNER_TEMP/reports/sbom.cdx.json" "$IMAGE"
+          high="$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' "$RUNNER_TEMP/reports/image-scan.json")"
+          echo "Image scan: no fixable CRITICAL vulnerabilities; ${high} HIGH (see the image-reports artifact)." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-reports
+          path: ${{ runner.temp }}/reports
+          retention-days: 30
+      - name: Save image for the push job
+        run: docker save "$IMAGE" | gzip > "$RUNNER_TEMP/image.tar.gz"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image
+          path: ${{ runner.temp }}/image.tar.gz
+          retention-days: 1
+
+  push:
+    if: >-
+      always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && needs.image.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.sast.result)
+    needs: [image, sast]
+    # sast is skipped on private repositories without code scanning; a skip must not block the push.
+    # always() keeps evaluating, and the explicit result checks keep every failure blocking.
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}-build
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      ACR_NAME: ${{ vars.ACR_NAME }}
+      IMAGE_NAME: ${{ inputs.image_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/azure-backstage-goldenpath
+          ref: ${{ inputs.platform_ref }}
+          path: ${{ env.PLATFORM }}
+          persist-credentials: false
+          sparse-checkout: scripts/ci
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: image
+          path: ${{ runner.temp }}
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.DEPLOYMENT_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Push to ACR
+        id: push
+        run: |
+          gunzip -c "$RUNNER_TEMP/image.tar.gz" | docker load
+          az acr login --name "$ACR_NAME"
+          repo="${ACR_NAME}.azurecr.io/${IMAGE_NAME}"
+          docker tag "$IMAGE" "${repo}:${GITHUB_SHA}"
+          docker push "${repo}:${GITHUB_SHA}"
+          digest="$(docker inspect --format '{{index .RepoDigests 0}}' "${repo}:${GITHUB_SHA}" | cut -d@ -f2)"
+          echo "repository=$repo" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          jq -n --arg i "${repo}:${GITHUB_SHA}" --arg d "$digest" '{image:$i, digest:$d, scan:"passed (no fixable CRITICAL)"}' > "$RUNNER_TEMP/ci.json"
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.push.outputs.repository }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+      - name: Report
+        if: always() && env.IDP_REQUEST_ID != ''
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          [[ -f "$RUNNER_TEMP/ci.json" ]] || echo '{"message":"build, scan or push failed"}' > "$RUNNER_TEMP/ci.json"
+          bash "$PLATFORM/scripts/ci/callback.sh" ci "$JOB_STATUS" "$RUNNER_TEMP/ci.json"

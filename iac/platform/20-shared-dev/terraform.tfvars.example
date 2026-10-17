@@ -1,0 +1,31 @@
+# Free-subscription demo sizing (docs/operations/demo-environment.md)
+environment            = "dev"
+location               = "uksouth"
+admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]
+
+aks = {
+  name     = "aks-idp-shared-dev"
+  sku_tier = "Free"
+  system_pool = {
+    # 4 vCPU: AKS add-ons (~1.5) + the App Routing Gateway controller (~1) + the platform (~0.5) don't
+    # fit in 2. One 4-vCPU node beats two 2-vCPU nodes, because system pods then run only once.
+    vm_size    = "Standard_B4as_v2" # or Standard_B4s_v2 (Intel) when AMD capacity is short (AllocationFailed)
+    node_count = 1
+    # 30 GB P4 instead of the 128 GB default: same function, about a quarter of the disk cost.
+    os_disk_size_gb = 30
+  }
+  # Uncomment for HA-eligible clusters (needs quota for 3 more vCPU x nodes):
+  # user_pool = { vm_size = "Standard_D2s_v5", node_count = 3, zones = ["1", "2", "3"] }
+}
+
+acr = {
+  name = "acridpdev"
+  sku  = "Basic"
+}
+
+postgres_name        = "psql-idp-dev"
+# postgres = { sku_name = "B_Standard_B1ms", zone = "2" } # pin a zone if the region is out of capacity
+# postgres = { enabled = false }                            # dev: PostgreSQL inside the cluster instead
+postgres_allowed_ips = {} # e.g. { aks-egress = "20.0.0.1" } once the cluster exists
+dns_zone_name        = null
+shared_storage_name  = "stidpshareddev"

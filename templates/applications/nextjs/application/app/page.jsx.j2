@@ -1,0 +1,16 @@
+import { orders } from '../lib/orders.mjs';
+
+export default function Home() {
+  return <main>
+    <span className="badge">NEXT.JS STARTER</span>
+    <h1>{[[ values.app | tojson ]]}</h1>
+    <p>A read-only dummy project. Replace these samples with your application.</p>
+    <section><h2>Sample orders</h2>
+      {orders.map(order => <article key={order.id}>
+        <strong>{order.id}</strong><span>{order.customerId}</span>
+        <span>{order.currency} {order.total.toFixed(2)}</span>
+      </article>)}
+    </section>
+    <nav><a href="/docs">Endpoint docs</a><a href="/health/ready">Readiness</a></nav>
+  </main>;
+}

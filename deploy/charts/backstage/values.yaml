@@ -1,0 +1,35 @@
+image:
+  repository: acridpdev.azurecr.io/idp/backstage
+  tag: latest
+replicas: 2
+database:
+  # true (dev): PostgreSQL inside the cluster (deploy/charts/postgres).
+  inCluster: false
+workloadIdentity:
+  clientId: ""             # id-idp-backstage-<env>
+keyVault:
+  name: kv-idp-plat-dev
+  tenantId: ""
+# Public name on the shared Gateway. auto: read from the Gateway at deploy time (its stable Azure DNS
+# name, else backstage.<gateway-ip>.nip.io); domain: backstage.<domain>; host: exactly dns.host. tls: https URLs (auto: once the Gateway's HTTPS listener has its certificate).
+dns: { mode: auto, domain: "", host: "", tls: auto }
+gateway: { name: idp-gateway, namespace: idp-gateway }
+env:
+  POSTGRES_HOST: ""
+  POSTGRES_USER: id-idp-backstage-dev
+  AZURE_TENANT_ID: ""
+  GITHUB_ORG: nixvarghese01
+  GITHUB_OWNER_TYPE: user   # user (personal account) or organization; see idp.githubOwnerType
+  PROVISIONING_CLIENT_ID: ""   # generated repos' Terraform identity (10-identities output; platform-release sets it)
+  DEPLOYMENT_CLIENT_ID: ""     # generated repos' build/deploy identity
+  TFSTATE_STORAGE_ACCOUNT: ""  # generated repos' Terraform state account (00-bootstrap, with its name suffix)
+  CATALOG_BRANCH: main      # repository branch for catalog templates; platform-release sets the deploying branch
+  GITHUB_APP_BACKSTAGE_ID: ""
+  GITHUB_APP_BACKSTAGE_CLIENT_ID: ""
+  GITHUB_APP_ORCHESTRATOR_ID: ""
+  DISCOVERY_ENTRA_SCOPE: ""
+  ORCHESTRATOR_ENTRA_SCOPE: ""
+  BACKSTAGE_ENTRA_AUDIENCE: ""
+resources:
+  requests: { cpu: 100m, memory: 512Mi }   # measured ~10m idle; bursts to the limit at start-up
+  limits: { cpu: "1", memory: 1Gi }

@@ -1,0 +1,64 @@
+{
+  "name": "app",
+  "version": "0.0.0",
+  "private": true,
+  "bundled": true,
+  "backstage": {
+    "role": "frontend"
+  },
+  "scripts": {
+    "start": "backstage-cli package start",
+    "build": "backstage-cli package build",
+    "clean": "backstage-cli package clean",
+    "test": "backstage-cli package test",
+    "lint": "backstage-cli package lint"
+  },
+  "dependencies": {
+    "@backstage/app-defaults": "backstage:^",
+    "@backstage/catalog-model": "backstage:^",
+    "@backstage/cli": "backstage:^",
+    "@backstage/core-app-api": "backstage:^",
+    "@backstage/core-components": "backstage:^",
+    "@backstage/core-plugin-api": "backstage:^",
+    "@backstage/integration-react": "backstage:^",
+    "@backstage/plugin-catalog": "backstage:^",
+    "@backstage/plugin-catalog-react": "backstage:^",
+    "@backstage/plugin-notifications": "backstage:^",
+    "@backstage/plugin-org": "backstage:^",
+    "@backstage/plugin-permission-react": "backstage:^",
+    "@backstage/plugin-scaffolder": "backstage:^",
+    "@backstage/plugin-scaffolder-react": "backstage:^",
+    "@backstage/plugin-search-react": "^1.11.8",
+    "@backstage/plugin-signals": "backstage:^",
+    "@backstage/plugin-techdocs": "backstage:^",
+    "@backstage/plugin-techdocs-react": "backstage:^",
+    "@backstage/plugin-user-settings": "backstage:^",
+    "@backstage/theme": "backstage:^",
+    "@internal/plugin-idp-platform": "workspace:^",
+    "@material-ui/core": "^4.12.4",
+    "@material-ui/icons": "^4.11.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router": "^6.26.0",
+    "react-router-dom": "^6.26.0"
+  },
+  "devDependencies": {
+    "@backstage/test-utils": "backstage:^",
+    "@testing-library/react": "^16.0.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "files": [
+    "dist"
+  ]
+}

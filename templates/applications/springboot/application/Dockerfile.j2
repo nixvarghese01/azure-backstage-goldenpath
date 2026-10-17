@@ -1,0 +1,18 @@
+# [[ values.app ]] / Spring Boot with a Java 21 JRE-only runtime.
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /src
+COPY pom.xml .
+COPY src ./src
+RUN mvn -B -DskipTests package
+
+FROM build AS verify
+RUN mvn -B test
+
+FROM eclipse-temurin:21-jre AS runtime
+RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
+WORKDIR /app
+COPY --from=build /src/target/app.jar /app/app.jar
+USER 10001
+ENV PORT=3000 JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=65"
+EXPOSE 3000
+CMD ["java", "-jar", "/app/app.jar"]

@@ -1,0 +1,27 @@
+# [[ values.app ]]
+
+[[ values.description ]]
+
+Technology: **[[ values.stack | default("nestjs") ]]**. Owner: `[[ values.owner ]]`.
+Platform request: `[[ values.request_id ]]`.
+
+The orchestrator adds this starter after infrastructure approval. Once its application PR merges,
+developers can check out `https://github.com/[[ values.org ]]/[[ values.repo ]]` and run
+`docker compose up --build -d`. The local service listens on `http://localhost:3000`.
+
+- `/health/live` and `/health/ready`: process and readiness endpoints.
+- `/v1/orders`: read-only sample orders, with no external database or credentials.
+- `/docs`: API documentation or starter endpoint documentation.
+- Frontend stacks also serve the sample page at `/`.
+
+Replace the demo with application-specific logic. The new starters currently support runtime
+capability **None** only; Azure Storage / Key Vault application integrations require implementation
+before enabling those selections. Platform secrets remain managed by Azure Key Vault.
+
+The generated Dockerfile is also used by CI and AKS deployment. All stacks use port 3000 and the
+same Helm health contract. `APP_PORT`, `APP_MEMORY` and `APP_CPUS` adjust local Compose settings.
+Memory ceilings are provisional; these starters have not been built, tested or deployed.
+
+`infra/terraform` contains infrastructure, `deploy/helm/application` contains deployment values,
+and `.github/workflows` calls the reviewed platform workflows. Dependency lockfiles and base-image
+digests must be validated before release. Keep credentials out of Git and Docker build contexts.

@@ -1,0 +1,16 @@
+# [[ values.app ]] / Go standard-library HTTP server.
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+COPY go.mod *.go ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/server .
+
+FROM build AS verify
+RUN go vet ./... && go test ./...
+
+FROM alpine:3.23 AS runtime
+RUN apk add --no-cache ca-certificates && addgroup -S -g 10001 app && adduser -S -D -H -u 10001 -G app app
+COPY --from=build /out/server /server
+USER 10001
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -q -O- http://127.0.0.1:3000/health/ready
+CMD ["/server"]
