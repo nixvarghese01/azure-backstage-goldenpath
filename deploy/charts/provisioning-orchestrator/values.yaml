@@ -35,8 +35,8 @@ hooks:
   gateway: { name: idp-gateway, namespace: idp-gateway }
 # Public name for the hooks on the shared Gateway. auto: read from the Gateway at deploy time (its
 # stable Azure DNS name, shared with Backstage, else platform-hooks.<gateway-ip>.nip.io);
-# domain: platform-hooks.<domain>; host: exactly dns.host. tls: https URLs.
-dns: { mode: auto, domain: "", host: "", tls: false }
+# domain: platform-hooks.<domain>; host: exactly dns.host. tls: https URLs (auto: once the Gateway's HTTPS listener has its certificate).
+dns: { mode: auto, domain: "", host: "", tls: auto }
 resources:
   requests: { cpu: 50m, memory: 128Mi }
   limits: { cpu: 500m, memory: 384Mi }

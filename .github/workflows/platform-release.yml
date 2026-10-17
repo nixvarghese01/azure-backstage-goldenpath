@@ -160,6 +160,16 @@ jobs:
         run: |
           az aks get-credentials -g "$AKS_RESOURCE_GROUP" -n "$AKS_NAME" --overwrite-existing
           kubelogin convert-kubeconfig -l azurecli
+          # With an HTTPS listener (30-cluster-config public_tls), give cert-manager up to 5 minutes to
+          # issue or restore the certificate: the charts switch to https once it's Programmed (dns.tls auto).
+          listener='{.status.listeners[?(@.name=="https")].conditions[?(@.type=="Programmed")].status}'
+          if kubectl -n idp-gateway get gateway idp-gateway -o jsonpath='{.spec.listeners[*].name}' | grep -qw https; then
+            for _ in $(seq 1 30); do
+              [[ "$(kubectl -n idp-gateway get gateway idp-gateway -o jsonpath="$listener")" == True ]] && break
+              sleep 10
+            done
+            echo "HTTPS listener Programmed: $(kubectl -n idp-gateway get gateway idp-gateway -o jsonpath="$listener")" >> "$GITHUB_STEP_SUMMARY"
+          fi
           # Each provision gives the Gateway a new public IP. The platform charts read their hosts from the
           # Gateway (dns.mode auto); application hostnames in the allowlist (<app>.<gateway-ip>.nip.io) follow
           # it here. Own domains are left as set.

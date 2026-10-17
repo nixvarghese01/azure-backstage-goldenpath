@@ -11,8 +11,8 @@ keyVault:
   name: kv-idp-plat-dev
   tenantId: ""
 # Public name on the shared Gateway. auto: read from the Gateway at deploy time (its stable Azure DNS
-# name, else backstage.<gateway-ip>.nip.io); domain: backstage.<domain>; host: exactly dns.host. tls: https URLs.
-dns: { mode: auto, domain: "", host: "", tls: false }
+# name, else backstage.<gateway-ip>.nip.io); domain: backstage.<domain>; host: exactly dns.host. tls: https URLs (auto: once the Gateway's HTTPS listener has its certificate).
+dns: { mode: auto, domain: "", host: "", tls: auto }
 gateway: { name: idp-gateway, namespace: idp-gateway }
 env:
   POSTGRES_HOST: ""

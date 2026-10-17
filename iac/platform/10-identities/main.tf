@@ -287,6 +287,40 @@ module "key_vault" {
   tags                = local.tags
 }
 
+# ------------------------------------------------------------------ public TLS certificate store
+# The Gateway's Let's Encrypt certificate outlives the cluster here, so a re-provision restores it
+# instead of requesting a new one (Let's Encrypt allows 5 certificates per week for the same name).
+# Its own vault: the sync job's identity manages secrets in it and nowhere else. 30-cluster-config
+# finds it by the idpPurpose tag; the job restores before cert-manager issues and backs up after.
+variable "tls_key_vault_name" {
+  description = "Vault for the public TLS certificate. null = key_vault_name with -plat- replaced by -tls-."
+  type        = string
+  default     = null
+}
+
+module "tls_key_vault" {
+  source              = "../../modules/key-vault"
+  name                = coalesce(var.tls_key_vault_name, replace(var.key_vault_name, "-plat-", "-tls-"))
+  resource_group_name = azurerm_resource_group.identities.name
+  location            = var.location
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  tags                = merge(local.tags, { "idpPurpose" = "public-tls" })
+}
+
+resource "azurerm_user_assigned_identity" "tls_sync" {
+  name                = "id-idp-tls-sync-${var.environment}"
+  resource_group_name = azurerm_resource_group.identities.name
+  location            = var.location
+  tags                = local.tags
+}
+
+resource "azurerm_role_assignment" "tls_sync_secrets" {
+  scope                = module.tls_key_vault.id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = azurerm_user_assigned_identity.tls_sync.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
 # Secrets are NOT Terraform resources: managing azurerm_key_vault_secret would read real values back
 # into state on every refresh. Instead (secret-management.md §6.1):
 #   1. first apply creates the vault (secrets_created = false)
@@ -541,6 +575,7 @@ output "client_ids" {
     discovery       = azurerm_user_assigned_identity.service["discovery"].client_id
     orchestrator    = azurerm_user_assigned_identity.service["orchestrator"].client_id
     postgres        = azurerm_user_assigned_identity.service["postgres"].client_id
+    tls_sync        = azurerm_user_assigned_identity.tls_sync.client_id
   }
 }
 
@@ -563,6 +598,10 @@ output "resource_groups" {
 
 output "key_vault_name" {
   value = module.key_vault.name
+}
+
+output "tls_key_vault_name" {
+  value = module.tls_key_vault.name
 }
 
 output "tenant_id" {

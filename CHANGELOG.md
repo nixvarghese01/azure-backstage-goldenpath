@@ -27,6 +27,12 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   troubleshooting, validation checklist) and this changelog with a release workflow.
 
 ### Changed
+- **HTTPS for the portal and GitHub hooks:** cert-manager (v1.21.2) issues a Let's Encrypt certificate for the
+  Gateway's stable Azure DNS name (HTTP-01 through the Gateway) and the Gateway serves it on an HTTPS listener.
+  The certificate is kept in a dedicated Key Vault (10-identities) by a `tls-sync` Workload Identity: restored
+  before cert-manager runs on a re-provision (Let's Encrypt allows 5 per week per name), backed up after
+  issuance and renewals. The charts switch to https automatically once the listener has its certificate
+  (`dns.tls: auto`) and redirect plain HTTP for the portal. Requests fit the 4-vCPU node (~30m CPU).
 - **Pipelines:** `platform-provision` has a 48 h time-to-live and an `extend` action that keeps the
   running platform for `ttl_hours` from now without running Terraform.
 

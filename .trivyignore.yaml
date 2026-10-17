@@ -21,3 +21,10 @@ misconfigurations:
       keyword PASSWORD, not a password. The values come from Key Vault at runtime through the CSI driver
       (/mnt/secrets/*-db-password); no secret is stored in the ConfigMap or the chart.
     expired_at: 2027-04-15
+  - id: KSV-0109
+    paths: ["platform-tls.yaml", "deploy/charts/platform-tls/templates/sync.yaml"]
+    statement: >-
+      False positive: ConfigMap tls-sync-script holds the sync script, which mentions Kubernetes "secrets"
+      (the API path and messages). The certificate and key live only in the Kubernetes Secret and Key Vault;
+      the script reads them at runtime with Workload Identity and never stores or prints them.
+    expired_at: 2027-04-15

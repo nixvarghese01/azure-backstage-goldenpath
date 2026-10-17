@@ -29,9 +29,40 @@ helm template has no cluster to read, so auto falls back to platform-hooks.local
 
 {{/* Backstage's public URL (its chart resolves the same way), for links on the Provisioning tab. */}}
 {{- define "provisioning-orchestrator.backstageUrl" -}}
-{{ ternary "https" "http" (default false .Values.dns.tls) }}://{{ include "provisioning-orchestrator.hostFor" (dict "ctx" . "prefix" "backstage") }}
+{{ include "provisioning-orchestrator.scheme" . }}://{{ include "provisioning-orchestrator.hostFor" (dict "ctx" . "prefix" "backstage") }}
 {{- end -}}
 
 {{- define "provisioning-orchestrator.url" -}}
-{{ ternary "https" "http" (default false .Values.dns.tls) }}://{{ include "provisioning-orchestrator.host" . }}
+{{ include "provisioning-orchestrator.scheme" . }}://{{ include "provisioning-orchestrator.host" . }}
+{{- end -}}
+
+{{/*
+TLS on the public host, from .Values.dns.tls: true/false as given, or "auto" (default): read the Gateway at
+deploy time and use https once its "https" listener is Programmed with a resolved certificate (cert-manager
+has issued it). helm template has no cluster to read, so auto means http there. Renders "true" or "false".
+*/}}
+{{- define "provisioning-orchestrator.tls" -}}
+{{- $t := .Values.dns.tls -}}
+{{- if kindIs "bool" $t -}}
+{{- $t -}}
+{{- else if eq (toString $t) "auto" -}}
+{{- $gw := lookup "gateway.networking.k8s.io/v1" "Gateway" .Values.hooks.gateway.namespace .Values.hooks.gateway.name | default dict -}}
+{{- $on := false -}}
+{{- range (dig "status" "listeners" list $gw) -}}
+{{- if eq .name "https" -}}
+{{- $ok := 0 -}}
+{{- range .conditions -}}
+{{- if and (has .type (list "Programmed" "ResolvedRefs")) (eq .status "True") }}{{ $ok = add1 $ok }}{{ end -}}
+{{- end -}}
+{{- if eq $ok 2 }}{{ $on = true }}{{ end -}}
+{{- end -}}
+{{- end -}}
+{{- $on -}}
+{{- else -}}
+{{- fail "dns.tls must be auto, true or false" -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "provisioning-orchestrator.scheme" -}}
+{{- ternary "https" "http" (eq (include "provisioning-orchestrator.tls" .) "true") -}}
 {{- end -}}
