@@ -677,6 +677,7 @@ Repository documentation (TechDocs publication is unverified):
 
 - Contribution guidelines are in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+- Questions and help: [SUPPORT.md](SUPPORT.md). Roles and how decisions are made: [GOVERNANCE.md](GOVERNANCE.md).
 - Please report vulnerabilities privately as described in [`SECURITY.md`](SECURITY.md). Do not open public issues for security problems.
 
 ## License
