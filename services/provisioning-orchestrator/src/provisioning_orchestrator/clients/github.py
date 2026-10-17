@@ -49,7 +49,8 @@ class GitHubClient(Protocol):
 
     def set_oidc_subject(self, repo: str, claims: list[str]) -> None: ...
 
-    def rerun_failed_jobs(self, repo: str, run_id: int) -> None: ...
+    def rerun_failed_jobs(self, repo: str, run_id: int) -> None:
+        """Re-run the failed jobs of a workflow run (same run id, next attempt)."""
 
     def list_runs(self, repo: str, workflow: str, per_page: int = 30) -> list[WorkflowRun]: ...
 
