@@ -2,7 +2,7 @@
 
 How Internal Developer Portal is split into services: what each one owns, how they communicate, how they authenticate to each other, and how they are deployed, scaled and observed.
 
-> **Status:** milestone 1 service code and container definitions written; builds and runtime validation pending. The AKS topology below remains the deployment target. Related documents: [README](../../README.md), [ADR-0001](../adr/0001-python-platform-services.md), [ADR-0006](../adr/0006-container-delivery.md), [local container setup](../../deploy/local/README.md), [COMPATIBILITY.md](../../COMPATIBILITY.md).
+> **Status:** deployed on AKS (dev) by `platform-release` and verified with the first golden path (v1.0.0). The AKS topology below is what runs. Related documents: [README](../../README.md), [ADR-0001](../adr/0001-python-platform-services.md), [ADR-0006](../adr/0006-container-delivery.md), [local container setup](../../deploy/local/README.md), [COMPATIBILITY.md](../../COMPATIBILITY.md).
 
 ---
 

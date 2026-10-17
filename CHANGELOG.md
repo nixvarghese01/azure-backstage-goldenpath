@@ -6,6 +6,13 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-17
+
+First release. The golden path is verified end to end on AKS in a free Azure subscription: the `orders-api`
+NestJS service went from one Backstage form to a running deployment (repository with the starter in its
+first commit, Terraform validate and plan, approval in Backstage, apply, application pull request, CI with
+image scan, Helm deploy to its own namespace), with each stage on the Provisioning tab.
+
 ### Added
 - **Community standards:** a Code of Conduct (Contributor Covenant 2.1, reports through GitHub's private
   reporting), SUPPORT.md (where answers are documented, how to ask) and GOVERNANCE.md (roles, decisions
@@ -28,8 +35,6 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 - **Local:** the whole platform in WSL Ubuntu with make targets.
 - **Docs:** ADRs 0001-0009, operations guides (bootstrap record, Terraform state, demo environment,
   troubleshooting, validation checklist) and this changelog with a release workflow.
-
-### Added
 - **Retry a failed request** (Provisioning tab → Retry; `POST /v1/requests/{id}/retry`): continues where it
   stopped instead of requesting again. An orchestrator step that ran out of attempts runs again (e.g. after a
   missing GitHub App permission is granted); validation runs again; a failed plan or apply starts from a fresh
@@ -38,6 +43,9 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   so a re-plan with the same hash is applied and approved again.
 
 ### Changed
+- **Docs match the verified state:** the README status, implementation table and milestone, the golden-path,
+  cleanup, microservices, ADR-0006/0007 and validation-checklist status lines, and troubleshooting (Retry,
+  the orchestrator app's Workflows permission). The "work in progress" badge is now the release badge.
 - **Starter application in the first commit:** a generated repository now holds the stack's source, tests,
   Dockerfile, Compose file and README from the start (new scaffolder action `idp:request:starter`, rendered
   by the orchestrator's `GET /v1/requests/{id}/starter` from the same stack templates). The application pull

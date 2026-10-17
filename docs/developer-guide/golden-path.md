@@ -1,8 +1,8 @@
 # Golden path: secure NestJS API on AKS
 
-This guide describes the planned happy path, from submitting a request in Backstage to receiving the URLs of a running application. Read it alongside the [README](../../README.md) and [ADR-0001](../adr/0001-python-platform-services.md).
+This guide describes the happy path, from submitting a request in Backstage to receiving the URLs of a running application. Read it alongside the [README](../../README.md) and [ADR-0001](../adr/0001-python-platform-services.md).
 
-> **Status:** design. The steps below describe the intended behaviour of milestone 1. See the README's *Implementation status* table for what is built and verified.
+> **Status:** verified end to end on AKS on 2026-10-17 with `orders-api` (NestJS). See the README's *Implementation status* table.
 
 ## Summary
 
@@ -281,7 +281,7 @@ tests, Dockerfile, Compose file and README go into the repository's first commit
 `idp:request:starter`), so the starter is there from the start; the CI/CD workflows and the Helm values
 filled with the infrastructure outputs follow in the application pull request after apply. New technologies need their own
 stack template, tests and compatible reusable build/deploy workflow before being enabled. The
-current implementation enables NestJS only. Runtime and generated-template validation are pending.
+current implementation enables NestJS, verified on AKS; the other stacks await their target-system run.
 
 ## State timeline
 

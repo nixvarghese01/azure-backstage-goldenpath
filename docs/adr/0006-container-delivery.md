@@ -1,6 +1,6 @@
 # ADR-0006: Container delivery for the platform services
 
-- Status: accepted for implementation; execution validation pending
+- Status: accepted; implemented and verified (images built and deployed by `platform-release`, v1.0.0)
 - Date: 2026-10-13
 - Related: [ADR-0001](0001-python-platform-services.md), [microservices architecture](../architecture/microservices.md)
 

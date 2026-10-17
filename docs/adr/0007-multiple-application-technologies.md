@@ -1,6 +1,6 @@
 # ADR-0007: Shared deployment contract across application technologies
 
-- Status: implemented; target-system validation pending
+- Status: implemented; NestJS verified on AKS (v1.0.0), the other stacks await target-system validation ([#26](https://github.com/nixvarghese01/azure-backstage-goldenpath/issues/26))
 - Date: 2026-10-13
 - Related: [ADR-0006](0006-container-delivery.md), [technology inventory](../developer-guide/technology-stacks.md)
 

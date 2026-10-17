@@ -2,7 +2,7 @@
 
 How to remove what the golden path created, for example after recording a demo. Steps are listed in dependency order.
 
-> **Status:** design. Commands are given as the intended procedure. The platform-driven cleanup (`POST /v1/requests/{id}/cleanup`) is planned for Phase 5.
+> **Status:** implemented and verified. **Clean up** on the request's Provisioning tab (`POST /v1/requests/{id}/cleanup`) uninstalls the release, plans the destroy, waits for approval in Backstage, applies it and removes the catalog entry. A failed request can also be resumed with **Retry** instead. The manual commands below are for the shared platform and for recovery.
 
 ## Rules
 
