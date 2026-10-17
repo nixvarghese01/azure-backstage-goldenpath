@@ -510,7 +510,7 @@ resource "azuread_service_principal" "audience" {
 # ------------------------------------------------------------------ Workload Identity federation
 # 30-cluster-config links the platform services' identities to their Kubernetes service accounts. That
 # needs the cluster's OIDC issuer (known only after 20-shared-dev), so the platform identity creates
-# those federated credentials, and may do only that, only on these three identities.
+# those federated credentials, and may do only that, only on these identities.
 resource "azurerm_role_definition" "workload_identity_federation" {
   name        = "IDP Workload Identity Federation (${var.environment})"
   scope       = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
@@ -529,6 +529,14 @@ resource "azurerm_role_definition" "workload_identity_federation" {
 resource "azurerm_role_assignment" "platform_workload_identity_federation" {
   for_each           = azurerm_user_assigned_identity.service
   scope              = each.value.id
+  role_definition_id = azurerm_role_definition.workload_identity_federation.role_definition_resource_id
+  principal_id       = module.platform.principal_id
+  principal_type     = "ServicePrincipal"
+}
+
+# The same for the TLS certificate sync job's identity (30-cluster-config, public_tls).
+resource "azurerm_role_assignment" "platform_tls_sync_federation" {
+  scope              = azurerm_user_assigned_identity.tls_sync.id
   role_definition_id = azurerm_role_definition.workload_identity_federation.role_definition_resource_id
   principal_id       = module.platform.principal_id
   principal_type     = "ServicePrincipal"

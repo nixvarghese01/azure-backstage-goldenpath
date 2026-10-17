@@ -32,7 +32,8 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   The certificate is kept in a dedicated Key Vault (10-identities) by a `tls-sync` Workload Identity: restored
   before cert-manager runs on a re-provision (Let's Encrypt allows 5 per week per name), backed up after
   issuance and renewals. The charts switch to https automatically once the listener has its certificate
-  (`dns.tls: auto`) and redirect plain HTTP for the portal. Requests fit the 4-vCPU node (~30m CPU).
+  (`dns.tls: auto`) and redirect plain HTTP for the portal. Requests fit the 4-vCPU node (~30m CPU). The platform
+  identity may manage federated credentials on the `tls-sync` identity (as on the service identities).
 - **Pipelines:** `platform-provision` has a 48 h time-to-live and an `extend` action that keeps the
   running platform for `ttl_hours` from now without running Terraform.
 
