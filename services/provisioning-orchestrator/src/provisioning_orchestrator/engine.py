@@ -96,6 +96,14 @@ def _dispatch(
     )
 
 
+def cleanup_step_failed(s: Session, req: Request, stage: str, run_url: str | None) -> None:
+    """A cleanup workflow failed: record it (Clean up retries from here) instead of failing the request."""
+    if (req.cleanup or {}).get("stage") == f"{stage}_failed":
+        return
+    req.cleanup = {**req.cleanup, "stage": f"{stage}_failed", "run_url": run_url}
+    audit(s, req.id, ACTOR, "cleanup_step_failed", stage=stage, run=run_url)
+
+
 # =====================================================================================================
 # Step handlers
 # =====================================================================================================
@@ -316,8 +324,7 @@ def on_callback(ctx: Context, s: Session, ev: InboxEvent) -> None:
 
     if failed:
         if cleanup:
-            req.cleanup = {**req.cleanup, "stage": f"{stage}_failed", "run_url": p.get("run_url")}
-            audit(s, req.id, ACTOR, "cleanup_step_failed", stage=stage, run=p.get("run_url"))
+            cleanup_step_failed(s, req, stage, p.get("run_url"))
         elif req.state in ACTIVE:
             fail(
                 s,
@@ -389,7 +396,14 @@ def on_callback(ctx: Context, s: Session, ev: InboxEvent) -> None:
             transition(s, req, State.SUCCEEDED, actor=ACTOR)
         case "uninstall" if status == "success" and cleanup:
             req.cleanup = {**req.cleanup, "stage": "uninstalled"}
-            _dispatch(s, req, "terraform-plan.yml", {"mode": "destroy"}, key=f"destroy-plan:{req.id}")
+            attempt = int(req.cleanup.get("attempt", 1))
+            _dispatch(
+                s,
+                req,
+                "terraform-plan.yml",
+                {"mode": "destroy"},
+                key=f"destroy-plan-after-uninstall:{req.id}:{attempt}",
+            )
         case "platform_apply" if status == "success":
             req.ready_for_repository = True
             req.platform = {**req.platform, "applied": True, "apply_run": p.get("run_url")}
@@ -474,7 +488,9 @@ def on_webhook(ctx: Context, s: Session, ev: InboxEvent) -> None:
             # Fallback when a job died before it could send its own failure callback.
             match = UUID_RE.search(run.get("display_title") or "") or UUID_RE.search(branch)
             req = s.get(Request, match.group(0)) if match else None
-            if req and req.state in ACTIVE and req.state not in {State.CLEANUP_PENDING}:
+            if req and req.state == State.CLEANUP_PENDING:
+                cleanup_step_failed(s, req, run.get("name", "workflow"), run.get("html_url"))
+            elif req and req.state in ACTIVE:
                 fail(
                     s,
                     req,

@@ -22,6 +22,7 @@ from provisioning_orchestrator.engine import (
     UUID_RE,
     Context,
     RetryLaterError,
+    cleanup_step_failed,
     deliver_outbox_message,
     process_inbox_event,
     run_step,
@@ -39,8 +40,15 @@ _WATCH = {
     State.PROVISIONING: ["terraform-apply.yml"],
     State.APPLICATION_BUILDING: ["application-ci.yml", "application-deploy.yml"],
     State.DEPLOYING: ["application-deploy.yml"],
+    # A cleanup can wait for its destroy approval indefinitely; only a failed run is reported.
+    State.CLEANUP_PENDING: ["application-deploy.yml", "terraform-plan.yml", "terraform-apply.yml"],
 }
 _STALE_AFTER = timedelta(hours=6)
+
+
+def _is_cleanup_run(title: str | None) -> bool:
+    words = (title or "").split()
+    return "destroy" in words or "uninstall" in words
 
 
 class Worker:
@@ -171,27 +179,40 @@ class Worker:
                     except Exception:
                         log.warning("cannot list %s runs for %s", wf, repo, exc_info=True)
                         continue
-                    for run in runs:
-                        m = UUID_RE.search(run.display_title or "")
-                        if (
-                            m
+                    # Only this request's latest run counts (a failed attempt that was re-run doesn't).
+                    # During a cleanup only cleanup runs do (plan/apply destroy, deploy uninstall).
+                    cleanup = req.state == State.CLEANUP_PENDING
+                    latest = next(
+                        (
+                            r
+                            for r in runs
+                            if (m := UUID_RE.search(r.display_title or ""))
                             and m.group(0) == req.id
-                            and run.status == "completed"
-                            and run.conclusion not in (None, "success", "skipped")
-                        ):
-                            fail(
-                                session,
-                                req,
-                                actor="orchestrator",
-                                stage=wf,
-                                message=f"Workflow {wf} concluded '{run.conclusion}'.",
-                                details={"run_url": run.html_url},
-                            )
-                            break
+                            and (not cleanup or _is_cleanup_run(r.display_title))
+                        ),
+                        None,
+                    )
+                    if not (
+                        latest
+                        and latest.status == "completed"
+                        and latest.conclusion not in (None, "success", "skipped")
+                    ):
+                        continue
+                    if cleanup:
+                        cleanup_step_failed(session, req, wf.removesuffix(".yml"), latest.html_url)
+                        break
+                    fail(
+                        session,
+                        req,
+                        actor="orchestrator",
+                        stage=wf,
+                        message=f"Workflow {wf} concluded '{latest.conclusion}'.",
+                        details={"run_url": latest.html_url},
+                    )
                     if req.state == State.FAILED:
                         break
                 if (
-                    req.state not in {State.FAILED}
+                    req.state not in {State.FAILED, State.CLEANUP_PENDING}
                     and datetime.now(UTC) - req.updated_at.replace(tzinfo=req.updated_at.tzinfo or UTC)
                     > _STALE_AFTER
                 ):

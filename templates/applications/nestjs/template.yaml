@@ -127,6 +127,7 @@ spec:
           endpointHost: ${{ steps.submit.output.endpointHost }}
           stateStorageAccount: ${{ steps.submit.output.stateStorageAccount }}
           ownerType: ${{ steps.submit.output.githubOwnerType }}
+          urlScheme: ${{ steps.submit.output.urlScheme }}
 
     # 2b. The skeleton's workflows call the platform's reusable workflows: pin them to the platform ref.
     - id: workflow-refs

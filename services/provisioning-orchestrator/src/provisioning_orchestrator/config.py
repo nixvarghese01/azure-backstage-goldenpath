@@ -25,7 +25,9 @@ class Settings:
     github_installation_id: str | None
     platform_repo: str
     platform_repo_ref: str
-    backstage_base_url: str
+    backstage_base_url: str  # in-cluster API calls (notifications, catalog)
+    backstage_public_url: str  # links people open (the Provisioning tab's "Backstage entity")
+    app_url_scheme: str  # "https" with TLS on the Gateway, "http" without
     backstage_scope: str | None
     callback_audience: str
     approver_group: str
@@ -57,6 +59,12 @@ class Settings:
             backstage_base_url=(
                 _env("ORCHESTRATOR_BACKSTAGE_BASE_URL", "http://backstage:7007") or ""
             ).rstrip("/"),
+            backstage_public_url=(
+                _env("ORCHESTRATOR_BACKSTAGE_PUBLIC_URL")
+                or _env("ORCHESTRATOR_BACKSTAGE_BASE_URL", "http://backstage:7007")
+                or ""
+            ).rstrip("/"),
+            app_url_scheme="http" if _env("ORCHESTRATOR_APP_URL_SCHEME", "https") == "http" else "https",
             backstage_scope=_env("BACKSTAGE_ENTRA_SCOPE"),
             callback_audience=_env("ORCHESTRATOR_CALLBACK_AUDIENCE", "idp-orchestrator") or "",
             approver_group=_env("ORCHESTRATOR_APPROVER_GROUP", "group:default/platform-approvers") or "",

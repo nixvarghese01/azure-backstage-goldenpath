@@ -11,6 +11,8 @@
 - { name: DISCOVERY_BASE_URL, value: "http://azure-discovery:8001" }
 - { name: DISCOVERY_ENTRA_SCOPE, value: {{ .Values.config.discoveryScope | quote }} }
 - { name: ORCHESTRATOR_BACKSTAGE_BASE_URL, value: "http://backstage:7007" }
+- { name: ORCHESTRATOR_BACKSTAGE_PUBLIC_URL, value: {{ include "provisioning-orchestrator.backstageUrl" . | quote }} }
+- { name: ORCHESTRATOR_APP_URL_SCHEME, value: {{ ternary "https" "http" (default false .Values.dns.tls) | quote }} }
 - { name: BACKSTAGE_ENTRA_SCOPE, value: {{ .Values.config.backstageScope | quote }} }
 - { name: ORCHESTRATOR_GITHUB_MODE, value: app }
 - { name: ORCHESTRATOR_GITHUB_ORG, value: {{ .Values.config.githubOrg | quote }} }

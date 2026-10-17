@@ -28,6 +28,7 @@ FIXTURE = {
     "endpointHost": "orders-api.dev.xycorp.local",
     "stateStorageAccount": "stidptfstatedev",
     "ownerType": "user",
+    "urlScheme": "http",
     "infrastructure.region": "uksouth",
     "infrastructure.subscription.id": "00000000-0000-0000-0000-000000000000",
     "infrastructure.resourceGroup.mode": "existing",

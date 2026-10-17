@@ -59,7 +59,7 @@ const ApprovalCard = ({ request, onDone }: { request: RequestView; onDone: () =>
         ))}
       </List>
       <Typography variant="body2">
-        Policy checks and security scans passed in the plan run.{' '}
+        {destroy ? 'Destroy plan: removes what is listed above; policy checks passed in the plan run.' : 'Policy checks and security scans passed in the plan run.'}{' '}
         {request.urls.workflow_runs && <a href={request.urls.workflow_runs} target="_blank" rel="noreferrer">View runs</a>}
       </Typography>
 

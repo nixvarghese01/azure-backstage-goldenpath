@@ -67,15 +67,17 @@ def outcomes(req: Request) -> list[Outcome]:
     return out
 
 
-def urls(req: Request, backstage_base: str, org: str) -> dict[str, str]:
+def urls(req: Request, backstage_public: str, scheme: str = "https") -> dict[str, str]:
     u: dict[str, str] = {}
     host = req.deployment.get("endpoint") or req.spec.get("endpoint_host")
     if req.deployment.get("endpoint") and host:
-        base = host if str(host).startswith("http") else f"https://{host}"
+        base = host if str(host).startswith("http") else f"{scheme}://{host}"
         u.update({"application": base, "api_docs": f"{base}/docs", "health": f"{base}/health/ready"})
     if req.repository.get("url"):
-        u["repository"] = req.repository["url"]
-        u["workflow_runs"] = f"{req.repository['url']}/actions"
+        # Recorded as the clone URL (.../repo.git); people open the web page.
+        web = str(req.repository["url"]).removesuffix(".git")
+        u["repository"] = web
+        u["workflow_runs"] = f"{web}/actions"
     if req.application.get("image"):
         u["image"] = req.application["image"]
     if req.application.get("pr_url"):
@@ -85,11 +87,11 @@ def urls(req: Request, backstage_base: str, org: str) -> dict[str, str]:
     rg_id = (req.validation.get("resolved") or {}).get("resource_group_id")
     if rg_id:
         u["azure_resource_group"] = f"https://portal.azure.com/#resource{rg_id}"
-    u["backstage"] = f"{backstage_base}/catalog/default/component/{req.application_name}"
+    u["backstage"] = f"{backstage_public}/catalog/default/component/{req.application_name}"
     return u
 
 
-def to_out(req: Request, backstage_base: str, org: str) -> RequestOut:
+def to_out(req: Request, backstage_public: str, scheme: str = "https") -> RequestOut:
     validation = req.validation or {}
     return RequestOut(
         id=req.id,
@@ -113,7 +115,7 @@ def to_out(req: Request, backstage_base: str, org: str) -> RequestOut:
         error=req.error,
         runs=req.runs or [],
         outcomes=outcomes(req),
-        urls=urls(req, backstage_base, org),
+        urls=urls(req, backstage_public, scheme),
         created_at=req.created_at,
         updated_at=req.updated_at,
     )

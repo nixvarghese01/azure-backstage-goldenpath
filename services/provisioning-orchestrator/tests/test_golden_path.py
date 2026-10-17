@@ -1,5 +1,6 @@
 """End-to-end golden path with mocked GitHub and discovery: submit -> ... -> SUCCEEDED."""
 
+from provisioning_orchestrator.clients.github import WorkflowRun
 from provisioning_orchestrator.config import Settings
 from provisioning_orchestrator.models import Request
 
@@ -328,3 +329,45 @@ def test_empty_endpoint_host_takes_the_validated_default(client, worker, discove
     with ctx.sessions() as s:
         assert s.get(Request, rid).spec["endpoint_host"] == "orders-api.dev.xycorp.local"
     assert _get(client, rid)["endpoint_host"] == "orders-api.dev.xycorp.local"
+
+
+def test_failed_cleanup_is_reported_and_can_be_retried(client, worker, github) -> None:
+    rid = _to_awaiting_approval(client, worker, github)
+    client.post(f"/v1/requests/{rid}/cancel", headers=REQUESTER)
+    assert client.post(f"/v1/requests/{rid}/cleanup", headers=REQUESTER).json()["state"] == "CLEANUP_PENDING"
+    drain(worker)
+    plans = [c for c in github.calls if c[0] == "dispatch" and c[1]["inputs"].get("mode") == "destroy"]
+    assert len(plans) == 1
+    # The destroy plan run dies before it can report (e.g. startup_failure): reconcile sees it.
+    github.runs[("orders-api", "terraform-plan.yml")] = [
+        WorkflowRun(
+            1, "terraform-plan", f"plan destroy {rid}", "completed", "startup_failure", "https://run/1"
+        ),
+        WorkflowRun(0, "terraform-plan", f"plan apply {rid}", "completed", "failure", "https://run/0"),
+    ]
+    worker.reconcile()
+    body = _get(client, rid)
+    assert body["state"] == "CLEANUP_PENDING"
+    assert body["cleanup"]["stage"] == "terraform-plan_failed"
+    # Clean up again restarts the cleanup with a fresh destroy plan.
+    assert (
+        client.post(f"/v1/requests/{rid}/cleanup", headers=REQUESTER).json()["cleanup"]["stage"]
+        == "planning_destroy"
+    )
+    drain(worker)
+    plans = [c for c in github.calls if c[0] == "dispatch" and c[1]["inputs"].get("mode") == "destroy"]
+    assert len(plans) == 2
+
+
+def test_reconcile_judges_only_the_latest_run(client, worker, github) -> None:
+    rid = _to_awaiting_approval(client, worker, github)
+    client.post(f"/v1/requests/{rid}/cancel", headers=REQUESTER)
+    client.post(f"/v1/requests/{rid}/cleanup", headers=REQUESTER)
+    drain(worker)
+    # A failed destroy plan that was re-run successfully is not a failure.
+    github.runs[("orders-api", "terraform-plan.yml")] = [
+        WorkflowRun(2, "terraform-plan", f"plan destroy {rid}", "completed", "success", "https://run/2"),
+        WorkflowRun(1, "terraform-plan", f"plan destroy {rid}", "completed", "failure", "https://run/1"),
+    ]
+    worker.reconcile()
+    assert _get(client, rid)["cleanup"]["stage"] == "planning_destroy"
