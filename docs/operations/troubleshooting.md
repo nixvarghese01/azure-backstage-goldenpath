@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Start with the request's **Provisioning** tab in Backstage. It shows the failed stage, the message, the workflow run link, and the resources that exist. Then use the table for that stage.
+Start with the request's **Provisioning** tab in Backstage. It shows the failed stage, the message, the workflow run link, and the resources that exist. Then use the table for that stage. Once the cause is fixed, **Retry** continues the request from the step that failed; **Clean up** removes what was created instead.
 
 ## By stage
 
@@ -16,7 +16,8 @@ Start with the request's **Provisioning** tab in Backstage. It shows the failed 
 | `INFRASTRUCTURE_PLANNED` never becomes `AWAITING_APPROVAL` | `deployment_protection_rule` webhook not received | Check App #2 webhook deliveries; confirm the rule is attached to `<env>-infra`; the reconcile poll fails stale requests after 6h |
 | Approve fails: `plan_changed` | A newer plan exists | Review the new plan and approve that one |
 | Approve fails: `separation_of_duties` | The requester tried to approve | Another approver must approve |
-| `FAILED` at `apply` with `created_resources` | Partial apply | Fix the cause and re-run via a new plan, or use **Clean up** |
+| `FAILED` at `apply` with `created_resources` | Partial apply | Fix the cause, then **Retry** (a new plan, approved again), or use **Clean up** |
+| `FAILED` at `open_app_pr` (`HTTPStatusError: 403` on `git/trees`) | The orchestrator GitHub App lacks **Workflows: write**, or the account hasn't accepted it on the installation | Grant it in the App's permissions, accept it under Settings → Installations, then **Retry** |
 | Stuck in `APPLICATION_BUILDING` | App PR checks failing, or not mergeable (branch protection) | Open the PR; the orchestrator merges when checks pass |
 | `FAILED` at `ci` | Tests, Trivy (CRITICAL), gitleaks, or ACR push | Open the run; for push, check the `<env>-build` environment and AcrPush |
 | `FAILED` at `deploy` | Rollout timeout, failing probes, Gateway/route, Workload Identity | `kubectl describe pod`, check `/health/ready` details; Helm rolled back automatically (`--atomic`) |

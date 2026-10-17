@@ -1,6 +1,6 @@
 # Validation checklist
 
-The code for milestone 1 was written without being run. Work through this list, in order, to validate it. Record results in the README's *Implementation status* table.
+Milestone 1 was validated with this list and a live golden path on 2026-10-17 (v1.0.0). Work through it, in order, to re-validate after larger changes, and record results in the README's *Implementation status* table.
 
 ## 1. Python services (no Azure needed)
 

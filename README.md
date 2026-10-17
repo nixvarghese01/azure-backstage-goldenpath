@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![ci-security](https://github.com/nixvarghese01/azure-backstage-goldenpath/actions/workflows/ci-security.yml/badge.svg?branch=develop)](https://github.com/nixvarghese01/azure-backstage-goldenpath/actions/workflows/ci-security.yml)
 [![codeql](https://github.com/nixvarghese01/azure-backstage-goldenpath/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/nixvarghese01/azure-backstage-goldenpath/actions/workflows/codeql.yml)
-[![Status: work in progress](https://img.shields.io/badge/status-work%20in%20progress-orange.svg)](https://github.com/users/nixvarghese01/projects/4)
+[![Release](https://img.shields.io/github/v/release/nixvarghese01/azure-backstage-goldenpath)](https://github.com/nixvarghese01/azure-backstage-goldenpath/releases)
 
 An Internal Developer Platform (IDP) built on [Backstage](https://backstage.io), Microsoft Azure, Azure Kubernetes Service (AKS), Terraform, Helm and GitHub Actions.
 
@@ -11,13 +11,14 @@ The IDP lets developers request a production-shaped service through a self-servi
 
 > **This is a model project.** It is a reference design that shows how an enterprise-grade IDP on Backstage and Azure can be structured, secured and operated. The implementation is deliberately scoped to one golden path, to demonstrate the design end to end. It is not intended for wide production rollout as-is. Where a production platform would make a different trade-off, the [ADRs](docs/adr/) say so, and [Best practice vs. this free-tier project](docs/best-practice-vs-free-tier.md) lists every deviation with its reason and the switch.
 
-> **Work in progress.** The platform runs on AKS in a free Azure subscription: Backstage, discovery and
-> the orchestrator are deployed by the pipelines, with the GitHub Apps connected. CI runs on every pull
-> request, and the full platform also runs locally with `make up` and passes `make e2e`.
-> Still ahead: the first end-to-end golden path on AKS and the v1.0.0 release.
-> Progress is tracked on the [roadmap board](https://github.com/users/nixvarghese01/projects/4) and in the
-> [milestones](https://github.com/nixvarghese01/azure-backstage-goldenpath/milestones); the
-> [Implementation status](#implementation-status) table distinguishes code written from verified behaviour.
+> **Status: v1.0.0.** The golden path works end to end on AKS in a free Azure subscription: one
+> Backstage form produced the `orders-api` repository (NestJS starter in its first commit), Terraform
+> validate and plan, approval in Backstage, apply, the application pull request, CI (build, scan, push)
+> and a Helm deploy to its own namespace, with each stage reported on the Provisioning tab. The portal
+> is served over HTTPS (Let's Encrypt), failed requests can be retried or cleaned up, and CI runs on every
+> pull request. The full platform also runs locally with `make up` and passes `make e2e`.
+> What comes next is on the [roadmap board](https://github.com/users/nixvarghese01/projects/4); the
+> [Implementation status](#implementation-status) table separates verified behaviour from code written.
 
 Application starters now cover **NestJS, FastAPI, Go, ASP.NET Core, Spring Boot, Next.js, React/Vite
 and Vue/Vite**. NestJS remains enabled; the seven new starters are disabled pending target-system
@@ -273,7 +274,7 @@ The orchestrator is a FastAPI API plus a separate worker process, both sharing o
 - **No Azure write access.** The orchestrator only uses a GitHub App token. All Azure changes are made by Terraform in GitHub Actions using OIDC identities.
 - **Audit.** An append-only `audit_events` table records who requested, who approved, which workflow run produced which result and what changed. Secrets and sensitive Terraform output are never stored.
 
-Planned endpoints:
+Endpoints:
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -283,6 +284,8 @@ Planned endpoints:
 | `GET` | `/v1/approvals?status=pending` | Pending approvals visible to the caller |
 | `POST` | `/v1/requests/{id}/approval` | Approve or reject the current plan (plan hash, comment) |
 | `POST` | `/v1/requests/{id}/cancel` | Cancel a request that has not started applying |
+| `GET` | `/v1/requests/{id}/starter` | The stack's starter application for the new repository's first commit |
+| `POST` | `/v1/requests/{id}/retry` | Continue a failed request from the step where it stopped |
 | `POST` | `/v1/requests/{id}/cleanup` | Start controlled cleanup of resources the platform created |
 | `POST` | `/v1/webhooks/github` | Receive GitHub events (HMAC-verified) |
 | `POST` | `/v1/callbacks/actions` | Receive plan summaries, plan hashes and outputs from workflow runs (GitHub OIDC-verified) |
@@ -292,7 +295,7 @@ Planned endpoints:
 
 Discovery runs as a separate Python service so it can use the official Azure SDKs for Python (`azure-identity`, `azure-mgmt-resource-subscriptions`, `azure-mgmt-resourcegraph`). It can also be developed, tested and deployed independently of the Backstage release cycle.
 
-Planned endpoints (all read-only):
+Endpoints (all read-only):
 
 | Method | Path | Returns |
 |---|---|---|
@@ -524,7 +527,7 @@ The Terraform `.tf` files are the same in every generated repository. The scaffo
 
 ## Prerequisites
 
-These are the planned prerequisites. Versions were checked on 2026-10-10; the full matrix, constraints and risks are in **[COMPATIBILITY.md](COMPATIBILITY.md)**.
+These are the prerequisites. Versions were checked on 2026-10-10; the full matrix, constraints and risks are in **[COMPATIBILITY.md](COMPATIBILITY.md)**.
 
 **Local development**
 
@@ -619,22 +622,18 @@ Mock adapters are only for local development and isolated tests. Live integratio
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Repository inspection, gap analysis, architecture documentation | ✅ Done (design documents, see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)) |
-| 2 | Backstage portal, catalog, scaffolder, local dev environment | 🟡 Code written, not yet validated |
-| 3 | NestJS golden path: Python orchestrator, repository generation, Terraform validation, workflow execution, Helm deploy, status reporting | 🟡 Code written, not yet validated |
-| 4 | Azure discovery service (Python FastAPI) and secure identity integration | 🟡 Code written, not yet validated |
-| 5 | Real Azure provisioning, approvals, state management, failure recovery, cleanup | 🟡 Terraform and workflows written; not applied |
-| 6 | Full automated testing, security checks, documentation, reproducible demo | ⚪ Tests written but not run; validation pending ([checklist](docs/operations/validation-checklist.md)) |
+| 2 | Backstage portal, catalog, scaffolder, local dev environment | ✅ Verified: Backstage 1.55 on AKS over HTTPS with GitHub sign-in; `make up` and `make e2e` locally |
+| 3 | NestJS golden path: Python orchestrator, repository generation, Terraform validation, workflow execution, Helm deploy, status reporting | ✅ Verified 2026-10-17: `orders-api` from the Backstage form to a running deployment on AKS |
+| 4 | Azure discovery service (Python FastAPI) and secure identity integration | ✅ Verified: runs on AKS with Workload Identity and fills the form's Azure pickers |
+| 5 | Real Azure provisioning, approvals, state management, failure recovery, cleanup | ✅ Verified: apply after approval in Backstage, remote state, Retry, and Clean up (destroy after approval) |
+| 6 | Full automated testing, security checks, documentation, reproducible demo | 🟡 CI (lint, types, tests, policies, Trivy, CodeQL, gitleaks) runs on every pull request; the demo ([#27](https://github.com/nixvarghese01/azure-backstage-goldenpath/issues/27)) and the other starters ([#26](https://github.com/nixvarghese01/azure-backstage-goldenpath/issues/26)) are next |
 
-Recent implementation work includes the complete local microservice Compose definition, a lightweight
-Backstage image target with optional documentation generation, bounded local resources, and the rendered
-NestJS developer starter. Source review checked the template inputs against the orchestrator and fixture
-renderer, the generated asset names against CI expectations, and the local storage setting against startup
-validation. Empty local storage settings now select the in-memory repository while malformed nonempty
-settings remain invalid. Regression coverage is written, but these changes have not been executed.
+The seven other starters (FastAPI, Go, ASP.NET Core, Spring Boot, Next.js, React/Vite, Vue/Vite) render,
+build and pass CI; they stay disabled until each has had a run on the target system like `orders-api`.
 
 ### Definition of done for milestone 1
 
-The first milestone is complete when a developer can:
+✅ Met on 2026-10-17 (`orders-api`). The first milestone is complete when a developer can:
 
 1. Start the workflow in Backstage.
 2. Receive a dedicated GitHub repository containing the application and infrastructure code.
@@ -646,9 +645,9 @@ The first milestone is complete when a developer can:
 
 ## Roadmap
 
-After the NestJS golden path works reliably:
+Next, now that the NestJS golden path works:
 
-- More application templates (Next.js, Python, .NET, Go, Java) on the same extensible template architecture
+- Enable the other application starters (Next.js, FastAPI, .NET, Go, Spring Boot, React, Vue) after a target-system run each ([#26](https://github.com/nixvarghese01/azure-backstage-goldenpath/issues/26))
 - Additional environments (test, prod) with stricter approvals
 - NetworkPolicies, Gateway hardening (TLS policy, rate limiting through Application Gateway for Containers or the Istio add-on), observability (OpenTelemetry, Azure Monitor) and environment-specific controls
 - Cost estimation integration, with configurable pricing assumptions and no hardcoded "free tier" claims
@@ -669,7 +668,8 @@ Repository documentation (TechDocs publication is unverified):
 - [`docs/adr/0006-container-delivery.md`](docs/adr/0006-container-delivery.md): container delivery and generated developer starter design
 - [`docs/developer-guide/technology-stacks.md`](docs/developer-guide/technology-stacks.md): backend/frontend starter inventory and shared contracts
 - [`docs/developer-guide/golden-path.md`](docs/developer-guide/golden-path.md): the end-to-end golden path, approval in Backstage and the shared URLs
-- [`docs/operations/cleanup.md`](docs/operations/cleanup.md): cleanup and teardown; troubleshooting and recovery procedures will follow
+- [`docs/operations/cleanup.md`](docs/operations/cleanup.md): cleanup and teardown
+- [`docs/operations/troubleshooting.md`](docs/operations/troubleshooting.md): symptoms, causes and fixes, including Retry
 - [`docs/operations/demo-environment.md`](docs/operations/demo-environment.md): running the first demo on a free Azure subscription
 - [`docs/best-practice-vs-free-tier.md`](docs/best-practice-vs-free-tier.md): enterprise best practice vs. what this free-tier project does, why each deviation exists, and how to switch
 
