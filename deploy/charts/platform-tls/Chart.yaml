@@ -1,0 +1,6 @@
+apiVersion: v2
+name: platform-tls
+description: Let's Encrypt certificate for the shared Gateway's public host, kept in Key Vault across re-provisions
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

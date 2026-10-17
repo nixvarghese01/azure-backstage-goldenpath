@@ -1,0 +1,39 @@
+# Let's Encrypt, HTTP-01 through the shared Gateway (cert-manager creates a short-lived HTTPRoute
+# for /.well-known/acme-challenge on the HTTP listener).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.issuerName }}
+spec:
+  acme:
+    server: {{ .Values.acme.server | quote }}
+    {{- with .Values.acme.email }}
+    email: {{ . | quote }}
+    {{- end }}
+    privateKeySecretRef:
+      name: {{ .Values.issuerName }}-account
+    solvers:
+      - http01:
+          gatewayHTTPRoute:
+            parentRefs:
+              - { kind: Gateway, name: {{ .Values.gateway.name }}, namespace: {{ .Values.gateway.namespace }}, sectionName: http }
+---
+# After the restore hook: cert-manager keeps a restored, matching Secret instead of issuing again.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.certificateName }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  secretName: {{ .Values.secretName }}
+  commonName: {{ required "host" .Values.host | quote }}
+  dnsNames: [{{ .Values.host | quote }}]
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: {{ .Values.issuerName }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256

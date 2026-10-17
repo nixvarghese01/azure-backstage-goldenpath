@@ -1,6 +1,7 @@
 # In-cluster platform configuration for an EXISTING cluster (never created in the same config):
-# namespaces, the shared Gateway (ADR-0003), ClusterRoles/bindings for the provisioning and deployment
-# identities (ADR-0002 §9), and Workload Identity federation for the platform services.
+# namespaces, the shared Gateway (ADR-0003) with its public TLS certificate (cert-manager, Let's Encrypt,
+# kept in Key Vault), ClusterRoles/bindings for the provisioning and deployment identities
+# (ADR-0002 §9), and Workload Identity federation for the platform services.
 
 terraform {
   required_version = "~> 1.16.0"
@@ -11,6 +12,10 @@ terraform {
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
+      version = "~> 3.3"
+    }
+    helm = {
+      source  = "hashicorp/helm"
       version = "~> 3.3"
     }
   }
@@ -59,8 +64,20 @@ variable "public_dns_label" {
   default     = null
 }
 
+variable "public_tls" {
+  description = "Let's Encrypt certificate for the public host (cert-manager) and an HTTPS listener. false = HTTP only."
+  type        = bool
+  default     = true
+}
+
+variable "acme_email" {
+  description = "Optional e-mail for Let's Encrypt expiry notices."
+  type        = string
+  default     = ""
+}
+
 variable "gateway_tls_secret" {
-  description = "Name of a TLS Secret/certificate reference for an HTTPS listener. null = HTTP only (demo)."
+  description = "An own TLS Secret for the HTTPS listener instead of the Let's Encrypt one (public_tls)."
   type        = string
   default     = null
 }
@@ -81,8 +98,20 @@ provider "kubernetes" {
   }
 }
 
+provider "helm" {
+  kubernetes = {
+    host                   = "https://${data.azurerm_kubernetes_cluster.this.fqdn}:443"
+    cluster_ca_certificate = base64decode(data.azurerm_kubernetes_cluster.this.kube_config[0].cluster_ca_certificate)
+    exec = {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "kubelogin"
+      args        = ["get-token", "--login", var.kubelogin_mode, "--server-id", "6dae42f8-4368-4678-94ff-3960e28e3630"]
+    }
+  }
+}
+
 data "azurerm_user_assigned_identity" "id" {
-  for_each            = toset(["provisioning", "deployment", "platform-deploy", "backstage", "discovery", "orchestrator", "postgres"])
+  for_each            = toset(["provisioning", "deployment", "platform-deploy", "backstage", "discovery", "orchestrator", "postgres", "tls-sync"])
   name                = "id-idp-${each.key}-${var.environment}"
   resource_group_name = var.identity_resource_group
 }
@@ -129,19 +158,22 @@ resource "kubernetes_storage_class_v1" "tagged" {
 locals {
   public_dns_label = coalesce(var.public_dns_label, "idp-${var.environment}-${substr(sha1(data.azurerm_kubernetes_cluster.this.id), 0, 6)}")
   public_host      = "${local.public_dns_label}.${data.azurerm_kubernetes_cluster.this.location}.cloudapp.azure.com"
+  tls_secret       = var.gateway_tls_secret != null ? var.gateway_tls_secret : (var.public_tls ? "idp-public-tls" : null)
 }
 
 # ------------------------------------------------------------------ namespaces
 # The Gateway's proxy pods are created and managed by AKS App Routing (Istio). Their istio-proxy
 # container sets no seccomp profile, which "restricted" rejects, so this namespace enforces
 # "baseline" (no privileged pods, host access or added capabilities) and still warns and audits
-# against "restricted". Nothing else runs here.
+# against "restricted". Besides the proxies only the TLS pieces run here: cert-manager's short-lived
+# ACME solver (its HTTPRoute attaches to the Gateway, hence gateway-access) and the tls-sync jobs.
 resource "kubernetes_namespace_v1" "gateway" {
   metadata {
     name = "idp-gateway"
     labels = merge(local.restricted, {
       "pod-security.kubernetes.io/enforce" = "baseline"
       "pod-security.kubernetes.io/warn"    = "restricted"
+      "idp.io/gateway-access"              = "true"
     })
   }
 }
@@ -177,12 +209,12 @@ resource "kubernetes_manifest" "gateway" {
           allowedRoutes = { namespaces = { from = "Selector", selector = {
           matchLabels = { "idp.io/gateway-access" = "true" } } } }
         }],
-        var.gateway_tls_secret == null ? [] : [{
+        local.tls_secret == null ? [] : [{
           name     = "https"
           port     = 443
           protocol = "HTTPS"
           hostname = var.gateway_hostname
-          tls      = { mode = "Terminate", certificateRefs = [{ kind = "Secret", name = var.gateway_tls_secret }] }
+          tls      = { mode = "Terminate", certificateRefs = [{ kind = "Secret", name = local.tls_secret }] }
           allowedRoutes = { namespaces = { from = "Selector", selector = {
           matchLabels = { "idp.io/gateway-access" = "true" } } } }
         }],
@@ -346,6 +378,125 @@ resource "kubernetes_role_binding_v1" "gateway_reader" {
     kind      = "User"
     name      = data.azurerm_user_assigned_identity.id["platform-deploy"].principal_id
   }
+}
+
+# ------------------------------------------------------------------ public TLS (cert-manager, Let's Encrypt)
+# HTTP-01 through the Gateway for the stable public host. The certificate is kept in a dedicated Key
+# Vault (10-identities) so a re-provision restores it instead of requesting a new one (Let's Encrypt
+# allows 5 per week for the same name). Requests are small to fit the single 4-vCPU node.
+resource "kubernetes_namespace_v1" "cert_manager" {
+  count = var.public_tls ? 1 : 0
+  metadata {
+    name   = "cert-manager"
+    labels = local.restricted
+  }
+}
+
+resource "helm_release" "cert_manager" {
+  count      = var.public_tls ? 1 : 0
+  name       = "cert-manager"
+  repository = "oci://quay.io/jetstack/charts" # OCI: no repository index to fetch or cache
+  chart      = "cert-manager"
+  version    = "v1.21.2"
+  namespace  = kubernetes_namespace_v1.cert_manager[0].metadata[0].name
+  wait       = true
+  values = [yamlencode({
+    crds            = { enabled = true }
+    config          = { apiVersion = "controller.config.cert-manager.io/v1alpha1", kind = "ControllerConfiguration", enableGatewayAPI = true }
+    resources       = { requests = { cpu = "10m", memory = "48Mi" } }
+    webhook         = { resources = { requests = { cpu = "10m", memory = "32Mi" } } }
+    cainjector      = { resources = { requests = { cpu = "10m", memory = "48Mi" } } }
+    startupapicheck = { enabled = false }
+    prometheus      = { enabled = false }
+    global          = { leaderElection = { namespace = "cert-manager" } }
+  })]
+}
+
+# The certificate's Key Vault copy: the tls-sync identity may manage secrets in that vault only.
+data "azurerm_resources" "tls_vault" {
+  count               = var.public_tls ? 1 : 0
+  type                = "Microsoft.KeyVault/vaults"
+  resource_group_name = var.identity_resource_group
+  required_tags       = { idpPurpose = "public-tls" }
+}
+
+resource "kubernetes_service_account_v1" "tls_sync" {
+  count = var.public_tls ? 1 : 0
+  metadata {
+    name        = "tls-sync"
+    namespace   = kubernetes_namespace_v1.gateway.metadata[0].name
+    annotations = { "azure.workload.identity/client-id" = data.azurerm_user_assigned_identity.id["tls-sync"].client_id }
+  }
+  automount_service_account_token = true # the sync jobs call the Kubernetes API for the one Secret
+}
+
+resource "kubernetes_role_v1" "tls_sync" {
+  count = var.public_tls ? 1 : 0
+  metadata {
+    name      = "tls-sync"
+    namespace = kubernetes_namespace_v1.gateway.metadata[0].name
+  }
+  rule {
+    api_groups     = [""]
+    resources      = ["secrets"]
+    resource_names = [local.tls_secret]
+    verbs          = ["get"]
+  }
+  rule {
+    # create can't be limited by name; this namespace holds only the TLS Secrets.
+    api_groups = [""]
+    resources  = ["secrets"]
+    verbs      = ["create"]
+  }
+}
+
+resource "kubernetes_role_binding_v1" "tls_sync" {
+  count = var.public_tls ? 1 : 0
+  metadata {
+    name      = "tls-sync"
+    namespace = kubernetes_namespace_v1.gateway.metadata[0].name
+  }
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Role"
+    name      = kubernetes_role_v1.tls_sync[0].metadata[0].name
+  }
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account_v1.tls_sync[0].metadata[0].name
+    namespace = kubernetes_namespace_v1.gateway.metadata[0].name
+  }
+}
+
+resource "azurerm_federated_identity_credential" "tls_sync" {
+  count                     = var.public_tls ? 1 : 0
+  name                      = "k8s-idp-gateway-tls-sync"
+  user_assigned_identity_id = data.azurerm_user_assigned_identity.id["tls-sync"].id
+  issuer                    = data.azurerm_kubernetes_cluster.this.oidc_issuer_url
+  subject                   = "system:serviceaccount:idp-gateway:tls-sync"
+  audience                  = ["api://AzureADTokenExchange"]
+}
+
+resource "helm_release" "platform_tls" {
+  count         = var.public_tls ? 1 : 0
+  name          = "platform-tls"
+  chart         = "${path.module}/../../../deploy/charts/platform-tls"
+  namespace     = kubernetes_namespace_v1.gateway.metadata[0].name
+  wait          = true
+  wait_for_jobs = true
+  values = [yamlencode({
+    host       = local.public_host
+    secretName = local.tls_secret
+    acme       = { email = var.acme_email }
+    keyVault   = { name = data.azurerm_resources.tls_vault[0].resources[0].name }
+  })]
+  # Restore needs its identity and Kubernetes access first; the issuer needs cert-manager's CRDs.
+  depends_on = [
+    helm_release.cert_manager,
+    kubernetes_role_binding_v1.tls_sync,
+    azurerm_federated_identity_credential.tls_sync,
+    kubernetes_manifest.gateway,
+  ]
 }
 
 # ------------------------------------------------------------------ Workload Identity for platform services

@@ -108,12 +108,33 @@ metadata:
   name: backstage
 spec:
   parentRefs:
-    - { name: {{ .Values.gateway.name }}, namespace: {{ .Values.gateway.namespace }} }
+    - name: {{ .Values.gateway.name }}
+      namespace: {{ .Values.gateway.namespace }}
+      {{- if eq (include "backstage.tls" .) "true" }}
+      sectionName: https
+      {{- end }}
   hostnames: [{{ include "backstage.host" . | quote }}]
   rules:
     - backendRefs:
         - { name: backstage, port: 7007 }
 ---
+{{- if eq (include "backstage.tls" .) "true" }}
+# Plain HTTP for the portal redirects to HTTPS. More specific routes on the same host keep working over
+# HTTP: the orchestrator's exact-path hooks and cert-manager's ACME challenge.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: backstage-https-redirect
+spec:
+  parentRefs:
+    - { name: {{ .Values.gateway.name }}, namespace: {{ .Values.gateway.namespace }}, sectionName: http }
+  hostnames: [{{ include "backstage.host" . | quote }}]
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect: { scheme: https, statusCode: 301 }
+---
+{{- end }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:

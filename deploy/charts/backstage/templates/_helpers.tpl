@@ -29,20 +29,21 @@ helm template has no cluster to read, so auto falls back to backstage.localhost 
 
 {{/* The orchestrator's public hooks host (its chart resolves the same way): generated repos post callbacks there. */}}
 {{- define "backstage.callbackUrl" -}}
-{{ ternary "https" "http" (default false .Values.dns.tls) }}://{{ include "backstage.hostFor" (dict "ctx" . "prefix" "platform-hooks") }}
+{{ include "backstage.scheme" . }}://{{ include "backstage.hostFor" (dict "ctx" . "prefix" "platform-hooks") }}
 {{- end -}}
 
 {{- define "backstage.url" -}}
-{{ ternary "https" "http" (default false .Values.dns.tls) }}://{{ include "backstage.host" . }}
+{{ include "backstage.scheme" . }}://{{ include "backstage.host" . }}
 {{- end -}}
 
 {{/* Overrides of app-config.production.yaml that depend on this release's values. */}}
 {{- define "backstage.appConfig" -}}
-{{- if and .Values.dns.tls (not .Values.database.inCluster) -}}
+{{- $tls := eq (include "backstage.tls" .) "true" -}}
+{{- if and $tls (not .Values.database.inCluster) -}}
 {}
 {{- else -}}
 backend:
-  {{- if not .Values.dns.tls }}
+  {{- if not $tls }}
   # Served over plain HTTP: the default CSP's upgrade-insecure-requests would make browsers fetch
   # the frontend's scripts over https, which nothing serves, and the page stays blank.
   csp:
@@ -59,4 +60,35 @@ backend:
       ssl: false
   {{- end }}
 {{- end -}}
+{{- end -}}
+
+{{/*
+TLS on the public host, from .Values.dns.tls: true/false as given, or "auto" (default): read the Gateway at
+deploy time and use https once its "https" listener is Programmed with a resolved certificate (cert-manager
+has issued it). helm template has no cluster to read, so auto means http there. Renders "true" or "false".
+*/}}
+{{- define "backstage.tls" -}}
+{{- $t := .Values.dns.tls -}}
+{{- if kindIs "bool" $t -}}
+{{- $t -}}
+{{- else if eq (toString $t) "auto" -}}
+{{- $gw := lookup "gateway.networking.k8s.io/v1" "Gateway" .Values.gateway.namespace .Values.gateway.name | default dict -}}
+{{- $on := false -}}
+{{- range (dig "status" "listeners" list $gw) -}}
+{{- if eq .name "https" -}}
+{{- $ok := 0 -}}
+{{- range .conditions -}}
+{{- if and (has .type (list "Programmed" "ResolvedRefs")) (eq .status "True") }}{{ $ok = add1 $ok }}{{ end -}}
+{{- end -}}
+{{- if eq $ok 2 }}{{ $on = true }}{{ end -}}
+{{- end -}}
+{{- end -}}
+{{- $on -}}
+{{- else -}}
+{{- fail "dns.tls must be auto, true or false" -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "backstage.scheme" -}}
+{{- ternary "https" "http" (eq (include "backstage.tls" .) "true") -}}
 {{- end -}}
