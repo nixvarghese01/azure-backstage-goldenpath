@@ -15,14 +15,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from provisioning_orchestrator.clients.backstage import BackstageClient
 from provisioning_orchestrator.clients.discovery import DiscoveryClient
 from provisioning_orchestrator.clients.github import OIDC_SUBJECT_CLAIMS, GitHubClient
 from provisioning_orchestrator.config import Settings
-from provisioning_orchestrator.models import InboxEvent, OutboxMessage, Request, Step
+from provisioning_orchestrator.models import AuditEvent, InboxEvent, OutboxMessage, Request, Step
 from provisioning_orchestrator.service import audit, enqueue, fail, record_run, transition
 from provisioning_orchestrator.states import ACTIVE, State
 from provisioning_orchestrator.templating import render_stack
@@ -30,10 +30,15 @@ from provisioning_orchestrator.templating import render_stack
 log = logging.getLogger(__name__)
 ACTOR = "orchestrator"
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+RUN_ID_RE = re.compile(r"/actions/runs/(\d+)")
 
 
 class RetryLaterError(Exception):
     """Step can't complete yet (e.g. PR checks still running); retry with backoff."""
+
+
+class RetryNotPossibleError(Exception):
+    """A failed request can't be resumed automatically (clean up and request again)."""
 
 
 @dataclass
@@ -293,6 +298,11 @@ def h_merge_app_pr(ctx: Context, s: Session, step: Step, req: Request) -> None:
     audit(s, req.id, ACTOR, "application_pr_merged", pr=pr.url)
 
 
+def h_rerun(ctx: Context, s: Session, step: Step, req: Request) -> None:
+    ctx.github.rerun_failed_jobs(step.payload["repo"], int(step.payload["run_id"]))
+    audit(s, req.id, ACTOR, "workflow_rerun", repo=step.payload["repo"], run_id=step.payload["run_id"])
+
+
 HANDLERS: dict[str, Callable[[Context, Session, Step, Request], None]] = {
     "VALIDATE": h_validate,
     "PLATFORM_REQUEST": h_platform_request,
@@ -300,6 +310,7 @@ HANDLERS: dict[str, Callable[[Context, Session, Step, Request], None]] = {
     "RELEASE_PROTECTION_RULE": h_release_rule,
     "OPEN_APP_PR": h_open_app_pr,
     "MERGE_APP_PR": h_merge_app_pr,
+    "RERUN": h_rerun,
 }
 
 
@@ -311,6 +322,120 @@ def run_step(ctx: Context, session: Session, step: Step) -> None:
     if req.state in ended and step.kind != "RELEASE_PROTECTION_RULE":
         return  # request ended: skip stale work (but still answer a held protection rule)
     HANDLERS[step.kind](ctx, session, step, req)
+
+
+# =====================================================================================================
+# Retry of a failed request
+# =====================================================================================================
+
+
+def _state_before_failure(s: Session, req: Request) -> State | None:
+    events = s.scalars(
+        select(AuditEvent)
+        .where(AuditEvent.request_id == req.id, AuditEvent.action == "state_changed")
+        .order_by(AuditEvent.id.desc())
+    )
+    for ev in events:
+        if ev.details.get("to") == State.FAILED.value and ev.details.get("from"):
+            return State(ev.details["from"])
+    return None
+
+
+def superseded_runs(req: Request) -> set[int]:
+    """Workflow runs a retry replaced: the reconciler no longer judges the request by them."""
+    return {int(i) for r in req.runs or [] for i in r.get("superseded", [])}
+
+
+def retry_request(s: Session, req: Request, actor: str) -> str:
+    """Resume a FAILED request where it stopped; returns what is retried.
+
+    - an orchestrator step that ran out of attempts (e.g. a GitHub permission granted since): run it again;
+    - validation or the infrastructure workflows: from validate again, or from a fresh plan (a failed
+      apply never re-runs against its old plan; the new plan needs approval again);
+    - the application's CI or deploy run: re-run its failed jobs.
+    """
+    previous = _state_before_failure(s, req)
+    if req.state != State.FAILED or previous is None:
+        raise RetryNotPossibleError(f"Request is {req.state}; only a failed request can be retried.")
+    retried = select(func.count()).select_from(AuditEvent)
+    attempt = 1 + (
+        s.scalar(retried.where(AuditEvent.request_id == req.id, AuditEvent.action == "retried")) or 0
+    )
+    key = f":retry{attempt}"
+    error = req.error or {}
+    run = RUN_ID_RE.search(str(error.get("run_url") or ""))
+    failed_runs = {
+        int(r["run_id"])
+        for r in req.runs or []
+        if r.get("run_id") and str(r["run_id"]).isdigit() and r.get("status") in ("failure", "cancelled")
+    }
+    if run:
+        failed_runs.add(int(run.group(1)))
+    target = previous
+    failed_steps = list(s.scalars(select(Step).where(Step.request_id == req.id, Step.status == "failed")))
+    if failed_steps:
+        for st in failed_steps:
+            st.status, st.attempts, st.last_error, st.locked_until = "pending", 0, None, None
+            st.run_after = datetime.now(UTC)
+        what = ", ".join(sorted({st.kind.lower() for st in failed_steps}))
+    elif previous in (State.REQUESTED, State.VALIDATING):
+        enqueue(s, "VALIDATE", request_id=req.id, dedup_key=f"validate:{req.id}{key}")
+        what = "validation"
+    elif previous == State.REPOSITORY_CREATED:
+        _dispatch(s, req, "terraform-validate.yml", {}, key=f"tf-validate:{req.id}{key}")
+        what = "terraform-validate"
+    elif previous in (State.INFRASTRUCTURE_PLANNED, State.AWAITING_APPROVAL, State.PROVISIONING):
+        rule, plan_hash = req.protection_rule or {}, (req.plan or {}).get("hash")
+        if rule.get("callback_url") and plan_hash and not rule.get("released_for"):
+            # A held apply of the old plan: reject it so it doesn't wait forever.
+            enqueue(
+                s,
+                "RELEASE_PROTECTION_RULE",
+                request_id=req.id,
+                dedup_key=f"release:{req.id}:{plan_hash}{key}",
+                payload={"approve": False, "plan_hash": plan_hash, "comment": "Superseded by a retry."},
+            )
+        req.plan, req.approval = {}, {}
+        _dispatch(s, req, "terraform-plan.yml", {"mode": "apply"}, key=f"plan:{req.id}{key}")
+        target, what = State.REPOSITORY_CREATED, "terraform-plan (a new plan; approval needed again)"
+    elif run and req.repository.get("name"):
+        failed_runs.discard(int(run.group(1)))  # re-run in place: the same run id is judged again
+        enqueue(
+            s,
+            "RERUN",
+            request_id=req.id,
+            dedup_key=f"rerun:{req.id}:{run.group(1)}{key}",
+            payload={"repo": _app_repo(req), "run_id": run.group(1)},
+        )
+        what = f"failed jobs of run {run.group(1)}"
+    elif previous == State.INFRASTRUCTURE_READY:
+        enqueue(s, "OPEN_APP_PR", request_id=req.id, dedup_key=f"app-pr:{req.id}{key}")
+        what = "open_app_pr"
+    else:
+        raise RetryNotPossibleError(
+            f"A request that failed in {previous} can't be resumed; clean up and request again."
+        )
+    req.state, req.error = target.value, {}
+    req.runs = [
+        *(req.runs or []),
+        {
+            "stage": "retry",
+            "run_id": None,
+            "url": None,
+            "status": "retried",
+            "superseded": sorted(failed_runs),
+            "at": datetime.now(UTC).isoformat(),
+        },
+    ][-50:]
+    audit(s, req.id, actor, "retried", attempt=attempt, what=what, after=error.get("stage"))
+    audit(
+        s,
+        req.id,
+        actor,
+        "state_changed",
+        **{"from": State.FAILED.value, "to": target.value, "reason": f"retry: {what}"},
+    )
+    return what
 
 
 # =====================================================================================================
@@ -344,7 +469,7 @@ def on_callback(ctx: Context, s: Session, ev: InboxEvent) -> None:
 
     match stage:
         case "validate" if status == "success":
-            _dispatch(s, req, "terraform-plan.yml", {"mode": "apply"}, key=f"plan:{req.id}")
+            _dispatch(s, req, "terraform-plan.yml", {"mode": "apply"}, key=f"plan:{req.id}:{p.get('run_id')}")
         case "plan" if status == "success" and not cleanup:
             req.plan = {
                 "hash": data["plan_hash"],
@@ -361,7 +486,7 @@ def on_callback(ctx: Context, s: Session, ev: InboxEvent) -> None:
                     "plan_run_id": str(p.get("run_id")),
                     "expected_plan_hash": data["plan_hash"],
                 },
-                key=f"apply:{req.id}:{data['plan_hash']}",
+                key=f"apply:{req.id}:{data['plan_hash']}:{p.get('run_id')}",
             )
         case "plan" if status == "success" and cleanup:
             req.plan = {

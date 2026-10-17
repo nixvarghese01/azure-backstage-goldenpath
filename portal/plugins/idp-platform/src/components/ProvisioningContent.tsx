@@ -57,6 +57,7 @@ export const ProvisioningContent = () => {
   const { entity } = useEntity();
   const api = useApi(idpApiRef);
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string>();
   const { value, loading, error, retry } = useAsyncRetry(
     async () => (await api.requestsFor(entity.metadata.name))[0] as RequestView | undefined,
     [api, entity.metadata.name],
@@ -70,7 +71,15 @@ export const ProvisioningContent = () => {
 
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true);
-    try { await fn(); } finally { setBusy(false); retry(); }
+    setActionError(undefined);
+    try {
+      await fn();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+      retry();
+    }
   };
 
   return (
@@ -103,9 +112,15 @@ export const ProvisioningContent = () => {
               {value.cleanup?.stage === 'awaiting_approval' && <> <Link to="/idp/approvals">Open Approvals</Link></>}
             </Alert>
           )}
+          {actionError && <Alert severity="error" style={{ marginTop: 16 }}>{actionError}</Alert>}
           <Box mt={2} display="flex" gridGap={8}>
             {['REQUESTED', 'VALIDATING', 'PLATFORM_PROVISIONING', 'REPOSITORY_CREATED', 'INFRASTRUCTURE_PLANNED', 'AWAITING_APPROVAL'].includes(value.state) && (
               <Button variant="outlined" disabled={busy} onClick={() => act(() => api.cancel(value.id))}>Cancel</Button>
+            )}
+            {value.state === 'FAILED' && (
+              <Button variant="contained" color="primary" disabled={busy} onClick={() => act(() => api.retry(value.id))}>
+                Retry
+              </Button>
             )}
             {['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(value.state) && (
               <Button variant="outlined" color="secondary" disabled={busy} onClick={() => act(() => api.cleanup(value.id))}>
@@ -138,6 +153,7 @@ export const ProvisioningContent = () => {
             <Typography variant="subtitle2">Failed at {value.error.stage}</Typography>
             <Typography>{value.error.message}</Typography>
             {value.error.run_url && <Link to={value.error.run_url}>Open the workflow run</Link>}
+            <Typography variant="body2">Fix the cause, then Retry: it continues from this step.</Typography>
             {!!value.error.created?.length && (
               <Typography variant="body2">Resources that exist: {value.error.created.join(', ')}. Use Clean up to remove them.</Typography>
             )}

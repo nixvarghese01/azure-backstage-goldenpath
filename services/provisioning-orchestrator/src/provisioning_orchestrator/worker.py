@@ -26,6 +26,7 @@ from provisioning_orchestrator.engine import (
     deliver_outbox_message,
     process_inbox_event,
     run_step,
+    superseded_runs,
 )
 from provisioning_orchestrator.models import InboxEvent, OutboxMessage, Request, Step
 from provisioning_orchestrator.queue import claim_next, complete, retry_or_fail
@@ -182,6 +183,7 @@ class Worker:
                     # Only this request's latest run counts (a failed attempt that was re-run doesn't).
                     # During a cleanup only cleanup runs do (plan/apply destroy, deploy uninstall).
                     cleanup = req.state == State.CLEANUP_PENDING
+                    replaced = superseded_runs(req)
                     latest = next(
                         (
                             r
@@ -189,6 +191,7 @@ class Worker:
                             if (m := UUID_RE.search(r.display_title or ""))
                             and m.group(0) == req.id
                             and (not cleanup or _is_cleanup_run(r.display_title))
+                            and r.id not in replaced
                         ),
                         None,
                     )

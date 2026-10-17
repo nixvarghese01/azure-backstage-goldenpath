@@ -49,6 +49,9 @@ class GitHubClient(Protocol):
 
     def set_oidc_subject(self, repo: str, claims: list[str]) -> None: ...
 
+    def rerun_failed_jobs(self, repo: str, run_id: int) -> None:
+        """Re-run the failed jobs of a workflow run (same run id, next attempt)."""
+
     def list_runs(self, repo: str, workflow: str, per_page: int = 30) -> list[WorkflowRun]: ...
 
     def commit_files_on_branch(
@@ -120,6 +123,9 @@ class AppGitHubClient:
             f"/repos/{self.org}/{repo}/actions/oidc/customization/sub",
             json={"use_default": False, "include_claim_keys": claims},
         )
+
+    def rerun_failed_jobs(self, repo: str, run_id: int) -> None:
+        self._req("POST", f"/repos/{self.org}/{repo}/actions/runs/{run_id}/rerun-failed-jobs")
 
     def list_runs(self, repo: str, workflow: str, per_page: int = 30) -> list[WorkflowRun]:
         data = self._req(
@@ -234,6 +240,9 @@ class MockGitHubClient:
 
     def set_oidc_subject(self, repo: str, claims: list[str]) -> None:
         self.calls.append(("oidc_subject", {"repo": repo, "claims": claims}))
+
+    def rerun_failed_jobs(self, repo: str, run_id: int) -> None:
+        self.calls.append(("rerun", {"repo": repo, "run_id": run_id}))
 
     def list_runs(self, repo: str, workflow: str, per_page: int = 30) -> list[WorkflowRun]:
         return list(self.runs.get((repo, workflow), []))

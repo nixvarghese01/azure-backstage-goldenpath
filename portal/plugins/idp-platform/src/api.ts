@@ -42,6 +42,7 @@ export interface IdpApi {
   decide(requestId: string, decision: 'approve' | 'reject', planHash: string, comment: string): Promise<RequestView>;
   cancel(requestId: string): Promise<RequestView>;
   cleanup(requestId: string): Promise<RequestView>;
+  retry(requestId: string): Promise<RequestView>;
 }
 
 export const idpApiRef = createApiRef<IdpApi>({ id: 'plugin.idp.service' });
@@ -108,5 +109,8 @@ export class IdpClient implements IdpApi {
   }
   cleanup(requestId: string) {
     return this.req<RequestView>(`/requests/${encodeURIComponent(requestId)}/cleanup`, { method: 'POST' });
+  }
+  retry(requestId: string) {
+    return this.req<RequestView>(`/requests/${encodeURIComponent(requestId)}/retry`, { method: 'POST' });
   }
 }

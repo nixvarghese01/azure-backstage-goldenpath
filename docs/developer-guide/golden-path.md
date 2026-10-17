@@ -293,6 +293,12 @@ REQUESTED → VALIDATING → REPOSITORY_CREATED → INFRASTRUCTURE_PLANNED
 
 Expected duration: about 10–15 minutes of automated work, plus the time taken to approve.
 
+Any state can end in `FAILED`. The Provisioning tab shows where and links the workflow run. Fix the cause,
+then **Retry**: it continues from that step. A step the orchestrator itself runs (for example opening the
+application pull request) runs again; validation runs again; a failed plan or apply starts from a fresh
+plan that needs approval again; a failed application CI or deploy run re-runs its failed jobs. **Clean up**
+removes what was created instead.
+
 ## Prerequisites for this path
 
 These are set up once by the platform team:
