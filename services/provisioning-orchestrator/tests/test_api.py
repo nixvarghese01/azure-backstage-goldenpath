@@ -102,3 +102,13 @@ def test_callback_deduplication_is_scoped_to_request(client) -> None:
         assert (
             client.post("/v1/callbacks/actions", headers=SERVICE, json=body).json()["status"] == "duplicate"
         )
+
+
+def test_starter_renders_the_application_for_the_first_commit(client) -> None:
+    rid = client.post("/v1/requests", json=submission(), headers=REQUESTER).json()["id"]
+    res = client.get(f"/v1/requests/{rid}/starter", headers=SERVICE)
+    assert res.status_code == 200
+    assert res.json()["files"] == {
+        "Dockerfile": "FROM node:24-alpine\n",
+        "src/main.ts": "// orders-api in orders-api\n",
+    }

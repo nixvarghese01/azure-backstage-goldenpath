@@ -416,7 +416,7 @@ For a public demo, keep the platform repository public. Keep one generated examp
 |---|---|---|
 | **Discovery** (used by `azure-discovery`) | Read-only (`Reader`) on approved subscriptions | Workload Identity on AKS, `az login` locally |
 | **Backstage** (used by `backstage`) | No Azure resource access. Reads only its own Key Vault secrets, requests tokens to call the platform services, and signs in to PostgreSQL | Workload Identity |
-| **Orchestrator** (used by `provisioning-orchestrator`) | GitHub App installation on the generated repositories (Actions and Deployments write, to dispatch workflows and answer protection rules; Contents and Pull requests write, for the application pull request) and on the platform repository (Pull requests and Contents write, to raise platform change requests). No Azure resource access: it reads only its own Key Vault secrets and signs in to PostgreSQL | Workload Identity, plus the GitHub App private key from Key Vault through the Secrets Store CSI driver |
+| **Orchestrator** (used by `provisioning-orchestrator`) | GitHub App installation on the generated repositories (Actions and Deployments write, to dispatch workflows and answer protection rules; Contents, Pull requests and Workflows write, for the application pull request, which adds `.github/workflows/` files) and on the platform repository (Pull requests and Contents write, to raise platform change requests). No Azure resource access: it reads only its own Key Vault secrets and signs in to PostgreSQL | Workload Identity, plus the GitHub App private key from Key Vault through the Secrets Store CSI driver |
 | **Subscription vending** (only when a new subscription is requested) | Subscription creator on the billing scope, and management group placement | GitHub OIDC federated credential, used by a platform-team-approved workflow |
 | **Platform** (used by `platform-plan.yml` and `platform-apply.yml`) | Creates and changes shared platform infrastructure in `iac/platform`: AKS, ACR, Key Vault, PostgreSQL, DNS, identities and their role assignments. Plans on pull requests use a separate read-only plan identity | GitHub OIDC federated credential, `platform` environment with required reviewers |
 | **Platform deployment** (used by `images.yml` and `deploy-platform.yml`) | Pushes platform images to ACR and deploys to the `idp-platform` namespace only | GitHub OIDC federated credential |
@@ -476,8 +476,9 @@ Generated application repositories are always separate from this platform reposi
 ## Generated application repository
 
 Each request produces one self-contained repository that the application team owns. The tree below
-shows the final layout after the application pull request merges; the initial repository contains
-infrastructure only. NestJS is the currently enabled technology; additional backend and frontend
+shows the final layout after the application pull request merges; the first commit already holds
+the infrastructure and the starter application (source, tests, Dockerfile, Compose, README), and the
+pull request adds the CI/CD workflows and the Helm values filled with the infrastructure outputs. NestJS is the currently enabled technology; additional backend and frontend
 templates are implemented and await validation before enablement.
 
 ```

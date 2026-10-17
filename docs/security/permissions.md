@@ -34,7 +34,7 @@ The exact access each identity has, as implemented in `iac/platform/10-identitie
 | App | Installed on | Repository permissions | Events |
 |---|---|---|---|
 | **#1 Backstage** | Organisation (all repos) | Administration: write (create repos and environments), Contents: write, Metadata: read, Variables: write (repo variables), Environments: write; Members: read (org) | — |
-| **#2 Orchestrator** | Organisation (generated repos + platform repo) | Actions: write, Deployments: write (custom protection rules), Contents: write, Pull requests: write, Metadata: read | `workflow_run`, `deployment_protection_rule`, `deployment_status`, `pull_request` |
+| **#2 Orchestrator** | Organisation (generated repos + platform repo) | Actions: write, Deployments: write (custom protection rules), Contents: write, Pull requests: write, Workflows: write (the application PR adds `.github/workflows/` files), Metadata: read | `workflow_run`, `deployment_protection_rule`, `deployment_status`, `pull_request` |
 
 GitHub App #2 must be enabled as a **custom deployment protection rule** integration for the organisation.
 

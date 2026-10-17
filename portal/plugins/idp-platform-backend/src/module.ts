@@ -3,6 +3,7 @@ import { ScmIntegrations } from '@backstage/integration';
 import { scaffolderActionsExtensionPoint } from '@backstage/plugin-scaffolder-node';
 import { PlatformClient } from './client';
 import { createRepositoryCreatedAction } from './actions/repositoryCreated';
+import { createStarterAction } from './actions/starter';
 import { createSubmitAction } from './actions/submit';
 import { createWorkflowRefsAction } from './actions/workflowRefs';
 
@@ -23,6 +24,7 @@ export const idpScaffolderModule = createBackendModule({
           createSubmitAction({ client, config }),
           createRepositoryCreatedAction({ client, config, integrations }),
           createWorkflowRefsAction({ config }),
+          createStarterAction({ client }),
         );
       },
     });

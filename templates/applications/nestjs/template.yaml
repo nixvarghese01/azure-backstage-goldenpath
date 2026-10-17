@@ -5,8 +5,8 @@ metadata:
   title: Application starter (backend or frontend)
   description: >-
     Request an application using an enabled technology stack. The platform validates your choices, creates a repository with the
-    infrastructure, provisions or reuses approved Azure resources after approval, adds the application
-    as a pull request, deploys it to AKS and shares the URLs.
+    infrastructure and the starter application, provisions or reuses approved Azure resources after
+    approval, adds the CI/CD workflows as a pull request, deploys it to AKS and shares the URLs.
   tags: [backend, frontend, aks, golden-path, recommended]
   annotations:
     backstage.io/techdocs-ref: dir:../../../docs
@@ -133,6 +133,14 @@ spec:
     - id: workflow-refs
       name: Pin platform workflows
       action: idp:workflow-refs
+
+    # 2c. The starter application (source, tests, Dockerfile) in the first commit; the application PR
+    #     adds its CI/CD workflows and Helm values once the infrastructure is applied.
+    - id: starter
+      name: Add starter application
+      action: idp:request:starter
+      input:
+        requestId: ${{ steps.submit.output.requestId }}
 
     # 3. Create the repository (built-in), with identifiers as Actions *variables* (no secrets).
     - id: publish

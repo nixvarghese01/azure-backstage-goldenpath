@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from provisioning_orchestrator.templating import render_stack
+from provisioning_orchestrator.templating import render_stack, render_starter
 
 
 @pytest.mark.parametrize("directory", ["bin", "obj", "tests/Checks/bin", "tests/Checks/obj"])
@@ -60,3 +60,45 @@ def test_description_is_serialized_in_generated_sources(description: str) -> Non
     ci = files[".github/workflows/application-ci.yml"]
     assert "reusable-application-ci.yml@develop" in ci
     assert "@main" not in ci
+
+
+def test_starter_leaves_out_what_needs_the_infrastructure(tmp_path: Path) -> None:
+    root = tmp_path / "nestjs"
+    for rel, text in {
+        "src/main.ts.j2": "// [[ values.app ]]\n",
+        "Dockerfile": "FROM node:24-alpine\n",
+        ".github/workflows/application-ci.yml.j2": "name: ci\n",
+        "deploy/helm/application/values-dev.yaml.j2": "kv: [[ values.outputs.get('key_vault_uri', '') ]]\n",
+    }.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text, encoding="utf-8")
+
+    assert render_starter(tmp_path, "nestjs", {"app": "orders-api"}) == {
+        "Dockerfile": "FROM node:24-alpine\n",
+        "src/main.ts": "// orders-api\n",
+    }
+
+
+def test_nestjs_starter_has_source_tests_and_dockerfile() -> None:
+    templates = Path(__file__).resolve().parents[3] / "templates" / "applications"
+    files = render_starter(
+        templates,
+        "nestjs/application",
+        {
+            "app": "orders-api",
+            "stack": "nestjs",
+            "description": "Orders",
+            "owner": "group:default/platform-team",
+            "environment": "dev",
+            "request_id": "r-1",
+            "namespace": "orders-api",
+            "org": "nixvarghese01",
+            "platform_ref": "develop",
+            "repo": "orders-api",
+            "endpoint_host": "",
+            "availability": {"tier": "standard"},
+        },
+    )
+    for path in ("Dockerfile", "package.json", "src/main.ts", "src/app.module.ts", "test/app.e2e-spec.ts"):
+        assert path in files
+    assert not [p for p in files if p.startswith((".github/", "deploy/"))]
