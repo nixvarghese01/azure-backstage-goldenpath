@@ -26,6 +26,14 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 - **Docs:** ADRs 0001-0009, operations guides (bootstrap record, Terraform state, demo environment,
   troubleshooting, validation checklist) and this changelog with a release workflow.
 
+### Added
+- **Retry a failed request** (Provisioning tab → Retry; `POST /v1/requests/{id}/retry`): continues where it
+  stopped instead of requesting again. An orchestrator step that ran out of attempts runs again (e.g. after a
+  missing GitHub App permission is granted); validation runs again; a failed plan or apply starts from a fresh
+  plan that needs approval again; a failed application CI or deploy run re-runs its failed jobs. Runs a retry
+  replaced no longer count for the reconciler; plan, apply and approval-release keys include the triggering run,
+  so a re-plan with the same hash is applied and approved again.
+
 ### Changed
 - **Starter application in the first commit:** a generated repository now holds the stack's source, tests,
   Dockerfile, Compose file and README from the start (new scaffolder action `idp:request:starter`, rendered

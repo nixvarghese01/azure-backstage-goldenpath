@@ -1,5 +1,7 @@
 """End-to-end golden path with mocked GitHub and discovery: submit -> ... -> SUCCEEDED."""
 
+from dataclasses import replace
+
 from provisioning_orchestrator.clients.github import WorkflowRun
 from provisioning_orchestrator.config import Settings
 from provisioning_orchestrator.models import Request
@@ -371,3 +373,114 @@ def test_reconcile_judges_only_the_latest_run(client, worker, github) -> None:
     ]
     worker.reconcile()
     assert _get(client, rid)["cleanup"]["stage"] == "planning_destroy"
+
+
+def _approve(client, worker, rid: str) -> None:
+    res = client.post(
+        f"/v1/requests/{rid}/approval",
+        headers=APPROVER,
+        json={"decision": "approve", "plan_hash": PLAN_HASH, "comment": "ok"},
+    )
+    assert res.status_code == 200, res.text
+    drain(worker)
+
+
+def test_retry_runs_a_step_that_ran_out_of_attempts(client, worker, github) -> None:
+    rid = _to_awaiting_approval(client, worker, github)
+    _approve(client, worker, rid)
+    worker.ctx.settings = replace(worker.ctx.settings, max_step_attempts=1)
+
+    def forbidden(*_a, **_k):
+        raise RuntimeError("403 Forbidden")
+
+    github.commit_files_on_branch = forbidden  # type: ignore[method-assign]
+    callback(client, rid, "apply", "success", 3, {"outputs": {"identity_client_id": "abc"}})
+    drain(worker)
+    assert _get(client, rid)["state"] == "FAILED"
+    assert (
+        client.post(f"/v1/requests/{rid}/retry", headers=REQUESTER).json()["state"] == "INFRASTRUCTURE_READY"
+    )
+
+    del github.commit_files_on_branch  # the permission was granted: the mock's own method again
+    drain(worker)
+    body = _get(client, rid)
+    assert body["state"] == "APPLICATION_BUILDING"
+    assert body["application"]["pr_number"] == 1
+
+
+def test_retry_after_a_failed_apply_plans_again_and_needs_approval(client, worker, github) -> None:
+    rid = _to_awaiting_approval(client, worker, github)
+    _approve(client, worker, rid)
+    callback(client, rid, "apply", "failure", 3, {"message": "quota"})
+    drain(worker)
+    assert _get(client, rid)["state"] == "FAILED"
+
+    body = client.post(f"/v1/requests/{rid}/retry", headers=REQUESTER).json()
+    assert body["state"] == "REPOSITORY_CREATED"
+    drain(worker)
+    plans = [c for c in github.calls if c[0] == "dispatch" and c[1]["workflow"] == "terraform-plan.yml"]
+    assert len(plans) == 2
+    # The same plan again (nothing was created): applied and approved again, not deduplicated away.
+    callback(client, rid, "plan", "success", 4, {"plan_hash": PLAN_HASH, "summary": {"add": 7}})
+    drain(worker)
+    applies = [c for c in github.calls if c[0] == "dispatch" and c[1]["workflow"] == "terraform-apply.yml"]
+    assert len(applies) == 2
+    webhook(
+        client,
+        "deployment_protection_rule",
+        f"dpr2-{rid}",
+        {
+            "action": "requested",
+            "environment": "dev-infra",
+            "deployment_callback_url": "https://api.github.com/callback/2",
+            "repository": {"name": "orders-api"},
+        },
+    )
+    drain(worker)
+    assert _get(client, rid)["state"] == "AWAITING_APPROVAL"
+    _approve(client, worker, rid)
+    assert [c[1]["callback_url"] for c in github.calls if c[0] == "review"][-1].endswith("/callback/2")
+
+
+def test_retry_reruns_a_failed_application_run(client, worker, github) -> None:
+    rid = _to_awaiting_approval(client, worker, github)
+    _approve(client, worker, rid)
+    callback(client, rid, "apply", "success", 3, {"outputs": {}})
+    drain(worker)
+    res = client.post(
+        "/v1/callbacks/actions",
+        headers=SERVICE,
+        json={
+            "request_id": rid,
+            "stage": "ci",
+            "status": "failure",
+            "run_id": 77,
+            "run_url": "https://github.com/nixvarghese01/orders-api/actions/runs/77",
+            "data": {},
+        },
+    )
+    assert res.status_code == 202
+    drain(worker)
+    assert _get(client, rid)["state"] == "FAILED"
+    assert (
+        client.post(f"/v1/requests/{rid}/retry", headers=REQUESTER).json()["state"] == "APPLICATION_BUILDING"
+    )
+    drain(worker)
+    assert ("rerun", {"repo": "orders-api", "run_id": 77}) in github.calls
+
+
+def test_retry_only_for_failed_requests_and_reconcile_skips_replaced_runs(client, worker, github) -> None:
+    rid = _to_awaiting_approval(client, worker, github)
+    assert client.post(f"/v1/requests/{rid}/retry", headers=REQUESTER).status_code == 409
+    other = {**REQUESTER, "X-IDP-User": "user:default/kim", "X-IDP-Groups": "group:default/other-team"}
+
+    callback(client, rid, "plan", "failure", 9)
+    drain(worker)
+    assert client.post(f"/v1/requests/{rid}/retry", headers=other).status_code == 403
+    assert client.post(f"/v1/requests/{rid}/retry", headers=REQUESTER).json()["state"] == "REPOSITORY_CREATED"
+    # The failed run is still the newest on GitHub until the new one starts: not a new failure.
+    github.runs[("orders-api", "terraform-plan.yml")] = [
+        WorkflowRun(9, "terraform-plan", f"plan apply {rid}", "completed", "failure", "https://run/9"),
+    ]
+    worker.reconcile()
+    assert _get(client, rid)["state"] == "REPOSITORY_CREATED"

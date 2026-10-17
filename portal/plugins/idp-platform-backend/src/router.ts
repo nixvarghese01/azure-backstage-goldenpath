@@ -132,6 +132,10 @@ export async function createRouter(deps: {
     res.json(await client.orchestrator('POST', `/v1/requests/${id(req.params.id)}/cancel`, { user: await user(req) }));
   });
 
+  router.post('/requests/:id/retry', async (req, res) => {
+    res.json(await client.orchestrator('POST', `/v1/requests/${id(req.params.id)}/retry`, { user: await user(req) }));
+  });
+
   router.post('/requests/:id/cleanup', async (req, res) => {
     res.json(await client.orchestrator('POST', `/v1/requests/${id(req.params.id)}/cleanup`, { user: await user(req) }));
   });

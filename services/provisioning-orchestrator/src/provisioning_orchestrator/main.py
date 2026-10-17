@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from provisioning_orchestrator.config import Settings
 from provisioning_orchestrator.db import engine_from_settings, make_session_factory
-from provisioning_orchestrator.engine import app_values
+from provisioning_orchestrator.engine import RetryNotPossibleError, app_values, retry_request
 from provisioning_orchestrator.models import InboxEvent, Request
 from provisioning_orchestrator.schemas import (
     ApprovalDecision,
@@ -261,7 +261,7 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
             s,
             "RELEASE_PROTECTION_RULE",
             request_id=req.id,
-            dedup_key=f"release:{req.id}:{body.plan_hash}",
+            dedup_key=f"release:{req.id}:{body.plan_hash}:{req.plan.get('run_id', '')}",
             payload={
                 "approve": approve,
                 "plan_hash": body.plan_hash,
@@ -303,6 +303,18 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
                 payload={"approve": False, "plan_hash": req.plan["hash"], "comment": "Request cancelled."},
             )
         transition(s, req, State.CANCELLED, actor=caller.user.user_ref if caller.user else caller.subject)
+        s.commit()
+        return out(req)
+
+    @app.post("/v1/requests/{request_id}/retry", response_model=RequestOut)
+    def retry(request_id: str, caller: User, s: DB) -> RequestOut:
+        req = load(s, request_id, lock=True)
+        if not _may_manage(caller, req):
+            raise _forbidden("not_allowed", "Only the requester, owning team or approvers can retry.")
+        try:
+            retry_request(s, req, caller.user.user_ref if caller.user else caller.subject)
+        except RetryNotPossibleError as exc:
+            raise _conflict("not_retryable", str(exc)) from None
         s.commit()
         return out(req)
 
