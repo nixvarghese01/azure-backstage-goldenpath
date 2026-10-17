@@ -89,6 +89,11 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   a cleanup explains its stage (with a link to Approvals when the destroy waits there). A cleanup whose run fails
   before reporting is now marked failed (webhook and reconcile), and **Retry clean up** restarts it.
   Reconciliation judges only a request's latest run, so a failed attempt that was re-run doesn't fail it.
+- **Cleanup removes the app from the catalog for good:** the orchestrator deletes the location the scaffolder
+  registered, then the entity (before, Backstage read the entity back from its location).
+- **New repositories' workflows:** GitHub can skip registering the workflows of a repository's first push (the
+  first dispatch then failed with 404). "Start provisioning" waits for them and, if any is still missing,
+  re-commits that file with the requester's token so GitHub registers it.
 - **Orchestrator:** a requester's retry supersedes their earlier request for the same application while it has
   no repository yet (a scaffolder run that failed after submitting), instead of failing as a duplicate.
 

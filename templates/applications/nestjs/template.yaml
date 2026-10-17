@@ -226,6 +226,7 @@ spec:
         owner: ${{ steps.submit.output.githubOrg }}
         name: ${{ parameters.name }}
         approvalEnvironment: ${{ parameters.environment }}-infra
+        token: ${{ secrets.USER_OAUTH_TOKEN if steps.submit.output.githubOwnerType == 'user' }}
 
   output:
     links:

@@ -33,10 +33,11 @@ backend:
           subjectPrefix: orchestrator
         accessRestrictions:
           - plugin: notifications
-          # Cleanup removes the application's entity (CLEANED_UP): read + delete only.
+          # Cleanup removes the application from the catalog (CLEANED_UP): its registered location (else
+          # Backstage reads the entity back from it) and its entity. Read + delete only.
           # One entry per plugin: Backstage rejects a plugin declared twice, so permissions are a list.
           - plugin: catalog
-            permission: [catalog.entity.read, catalog.entity.delete]
+            permission: [catalog.entity.read, catalog.entity.delete, catalog.location.read, catalog.location.delete]
 
 integrations:
   github:
