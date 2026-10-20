@@ -15,8 +15,8 @@ def _get(client, rid: str) -> dict:
     return client.get(f"/v1/requests/{rid}", headers=SERVICE).json()
 
 
-def _to_awaiting_approval(client, worker, github) -> str:
-    rid = client.post("/v1/requests", json=submission(), headers=REQUESTER).json()["id"]
+def _to_awaiting_approval(client, worker, github, **overrides) -> str:
+    rid = client.post("/v1/requests", json=submission(**overrides), headers=REQUESTER).json()["id"]
     drain(worker)
     assert _get(client, rid)["ready_for_repository"] is True
     res = client.post(
@@ -229,6 +229,104 @@ def test_double_approval_applies_once(client, worker, github) -> None:
     assert ok.status_code == 200 and again.status_code == 409
     drain(worker)
     assert sum(1 for c in github.calls if c[0] == "review") == 1
+
+
+APPROVER_2 = {**APPROVER, "X-IDP-User": "user:default/kim"}
+
+
+def _vote(client, rid: str, headers: dict, plan_hash: str = PLAN_HASH):
+    return client.post(
+        f"/v1/requests/{rid}/approval", headers=headers, json={"decision": "approve", "plan_hash": plan_hash}
+    )
+
+
+def _reviews(github) -> int:
+    return sum(1 for c in github.calls if c[0] == "review")
+
+
+def test_two_approvers_release_once(client, worker, github, discovery) -> None:
+    discovery.result = {**discovery.result, "approvers_required": 2}
+    rid = _to_awaiting_approval(client, worker, github)
+    first = _vote(client, rid, APPROVER)
+    assert first.status_code == 200
+    assert first.json()["state"] == "AWAITING_APPROVAL"
+    assert first.json()["approval"]["decision"] == "pending"
+    assert [a["by"] for a in first.json()["approval"]["approvals"]] == ["user:default/sam"]
+    again = _vote(client, rid, APPROVER)
+    assert again.json()["detail"]["code"] == "already_approved"
+    drain(worker)
+    assert _reviews(github) == 0  # one of two approvals never releases the apply
+    second = _vote(client, rid, APPROVER_2)
+    assert second.json()["state"] == "PROVISIONING"
+    assert second.json()["approval"]["decision"] == "approve"
+    assert _vote(client, rid, {**APPROVER, "X-IDP-User": "user:default/lee"}).status_code == 409
+    drain(worker)
+    assert _reviews(github) == 1
+
+
+def test_rejection_after_partial_approval_cancels(client, worker, github, discovery) -> None:
+    discovery.result = {**discovery.result, "approvers_required": 2}
+    rid = _to_awaiting_approval(client, worker, github)
+    _vote(client, rid, APPROVER)
+    res = client.post(
+        f"/v1/requests/{rid}/approval",
+        headers=APPROVER_2,
+        json={"decision": "reject", "plan_hash": PLAN_HASH, "comment": "no"},
+    )
+    assert res.json()["state"] == "CANCELLED"
+    drain(worker)
+    assert [c[1]["approve"] for c in github.calls if c[0] == "review"] == [False]
+
+
+def test_new_plan_run_resets_the_approval_count(client, worker, github, discovery) -> None:
+    discovery.result = {**discovery.result, "approvers_required": 2}
+    rid = _to_awaiting_approval(client, worker, github)
+    _vote(client, rid, APPROVER)
+    callback(client, rid, "apply", "failure", 3, {"message": "runner lost"})
+    drain(worker)
+    assert client.post(f"/v1/requests/{rid}/retry", headers=REQUESTER).status_code == 200
+    drain(worker)
+    # The retry plans again; the identical hash from a new run still needs every approval again.
+    callback(client, rid, "plan", "success", 4, {"plan_hash": PLAN_HASH, "summary": {}})
+    drain(worker)
+    webhook(
+        client,
+        "deployment_protection_rule",
+        f"dpr-retry-{rid}",
+        {
+            "action": "requested",
+            "environment": "dev-infra",
+            "deployment_callback_url": "https://api.github.com/callback/3",
+            "repository": {"name": "orders-api"},
+        },
+    )
+    drain(worker)
+    res = _vote(client, rid, APPROVER_2)
+    assert res.json()["state"] == "AWAITING_APPROVAL"
+    assert len(res.json()["approval"]["approvals"]) == 1
+
+
+def test_requester_never_counts_toward_two_approvers(client_factory, worker, github, discovery) -> None:
+    discovery.result = {**discovery.result, "approvers_required": 2}
+    client = client_factory(self_approval_environments=frozenset({"dev"}))
+    rid = _to_awaiting_approval(client, worker, github)
+    headers = {**REQUESTER, "X-IDP-Groups": "group:default/team-orders,group:default/platform-approvers"}
+    assert _vote(client, rid, headers).json()["detail"]["code"] == "separation_of_duties"
+
+
+def test_missing_approval_policy_fails_closed(client, worker, github) -> None:
+    rid = _to_awaiting_approval(client, worker, github, environment="test")
+    res = _vote(client, rid, APPROVER)
+    assert res.status_code == 409
+    assert res.json()["detail"]["code"] == "approval_policy_unavailable"
+    drain(worker)
+    assert _reviews(github) == 0
+
+
+def test_prod_never_accepts_a_single_approver(client, worker, github, discovery) -> None:
+    discovery.result = {**discovery.result, "approvers_required": 1}
+    rid = _to_awaiting_approval(client, worker, github, environment="prod")
+    assert _vote(client, rid, APPROVER).json()["detail"]["code"] == "approval_policy_unavailable"
 
 
 def test_reject_cancels_and_rejects_rule(client, worker, github) -> None:

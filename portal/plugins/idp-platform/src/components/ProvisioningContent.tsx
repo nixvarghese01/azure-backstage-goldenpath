@@ -29,6 +29,14 @@ const URL_LABELS: Record<string, string> = {
   backstage: 'Backstage entity',
 };
 
+/** How far a plan is through its environment's distinct approvals, while more are needed. */
+export function approvalProgress(approval?: RequestView['approval']): string | undefined {
+  if (!approval || approval.decision !== 'pending' || !approval.required) return undefined;
+  const approvals = approval.approvals ?? [];
+  const who = approvals.map(a => a.by).join(', ');
+  return `${approvals.length} of ${approval.required} approvals${who ? ` (${who})` : ''}`;
+}
+
 /** What a cleanup is doing, by the orchestrator's cleanup stage. */
 export function cleanupMessage(stage?: string): { severity: 'info' | 'warning' | 'error'; text: string } {
   switch (stage) {
@@ -98,12 +106,13 @@ export const ProvisioningContent = () => {
           {value.plan?.summary && (
             <Typography variant="body2" style={{ marginTop: 16 }}>
               {value.plan.mode === 'destroy' ? 'Destroy plan' : 'Plan'} {value.plan.hash?.slice(0, 12)}: +{value.plan.summary.add ?? 0} ~{value.plan.summary.change ?? 0} -{value.plan.summary.destroy ?? 0}
-              {value.approval?.by && ` · ${value.approval.decision} by ${value.approval.by}`}
+              {value.approval?.by && value.approval.decision !== 'pending' && ` · ${value.approval.decision} by ${value.approval.by}`}
             </Typography>
           )}
           {value.state === 'AWAITING_APPROVAL' && (
             <Alert severity="warning" style={{ marginTop: 16 }}>
               Waiting for approval in Backstage (IDP → Approvals).
+              {approvalProgress(value.approval) && ` ${approvalProgress(value.approval)}.`}
             </Alert>
           )}
           {value.state === 'CLEANUP_PENDING' && (

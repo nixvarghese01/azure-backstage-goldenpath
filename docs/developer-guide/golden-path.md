@@ -190,7 +190,8 @@ The approval decision is made in Backstage, and GitHub enforces it.
    - the approver is **not** the requester (separation of duties). For a single-person demo, an environment can opt out with `ORCHESTRATOR_SELF_APPROVAL_ENVIRONMENTS` (Helm: `config.selfApprovalEnvironments`); `prod` never can, and the approval is recorded as `self_approved`
    - the approval is bound to the **exact plan hash** (a new plan needs a new approval)
    - the request has not already been decided (a duplicate click or replayed request has no effect)
-4. The orchestrator approves the protection rule through the GitHub API, and the apply job runs. **Reject** rejects the rule instead: the job fails cleanly, the state becomes `CANCELLED`, and the reason is shown.
+   - enough **distinct** approvers have approved: the environment's `approvers_required` in `policies/allowlist.yaml`, which discovery returns with the validation result. Approvals count only for the exact plan hash, plan run and mode (apply or destroy), so a new plan, a retry or a destroy starts again at zero; the same person approving twice counts once; the requester never counts toward a requirement of two or more. Until enough approvals arrive, the request stays `AWAITING_APPROVAL` and Backstage shows "1 of 2 approvals". A missing or invalid count refuses the decision, and `prod` never accepts fewer than two
+4. When the last required approval arrives, the orchestrator approves the protection rule through the GitHub API, and the apply job runs. **Reject** rejects the rule instead: the job fails cleanly, the state becomes `CANCELLED`, and the reason is shown.
 5. The decision, approver, comment, plan hash and workflow run ID are written to `audit_events`.
 
 Re-running the workflow from the GitHub UI does not bypass approval, because the job still waits for the orchestrator to release the protection rule.
@@ -199,7 +200,7 @@ Re-running the workflow from the GitHub UI does not bypass approval, because the
 
 | Gate | dev | test / prod (future) |
 |---|---|---|
-| Infrastructure apply | One approver in Backstage | Two approvers in Backstage |
+| Infrastructure apply | One approver in Backstage | Two distinct approvers in Backstage (enforced by the orchestrator) |
 | Application deploy | Automatic | Approval in Backstage |
 | New subscription, AKS cluster or container registry | Platform team, through the `platform` GitHub environment reviewers on the platform repository. Backstage shows the status and links but doesn't approve | Same |
 

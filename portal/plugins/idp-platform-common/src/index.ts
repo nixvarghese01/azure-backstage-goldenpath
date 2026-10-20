@@ -93,7 +93,13 @@ export interface RequestView {
   repository: { owner?: string; name?: string; url?: string };
   platform: { pr_url?: string; changes?: string[] };
   plan: { hash?: string; summary?: PlanSummary; mode?: string };
-  approval: { decision?: string; by?: string; comment?: string };
+  approval: {
+    decision?: string; // 'pending' while an environment needs more distinct approvers
+    by?: string;
+    comment?: string;
+    required?: number;
+    approvals?: { by: string; at: string; comment?: string; self_approved?: boolean }[];
+  };
   application: { pr_url?: string; image?: string };
   deployment: { endpoint?: string; pods?: string; run_url?: string };
   cleanup: { stage?: string };

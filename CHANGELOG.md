@@ -7,6 +7,11 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 ## [Unreleased]
 
 ### Fixed
+- **Approvals:** the orchestrator enforces the environment's `approvers_required`. Discovery returns the
+  count with the validation result, and the apply (or destroy) stays held until that many distinct
+  approvers approve the exact plan run; repeat approvals by one person count once, a new plan or retry
+  starts at zero, a rejection ends it, and the requester never counts toward two. A missing or invalid
+  count fails closed, and `prod` needs at least two. Backstage shows "1 of 2 approvals" (#113).
 - **Deploy rollback:** a readiness or smoke check that fails after Helm succeeded (outside `--atomic`)
   now restores the Helm revision recorded before the upgrade and verifies the previous image is back; a
   first install is left for diagnosis. The run stays failed, the callback and Provisioning tab say which

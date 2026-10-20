@@ -37,7 +37,7 @@ Legend: ✅ follows best practice · ⚠️ deliberate free-tier deviation · �
 | Workloads to Azure | ✅ Workload Identity, one identity per service | Same | n/a | n/a |
 | Least privilege | ✅ Rights scoped to the workload's resource groups; custom roles | Same; no identity can write outside the IDP's groups | n/a | n/a |
 | Operator access | PIM (just-in-time) and conditional access | ⚠️ Standing access for the single admin | PIM needs Entra ID P2 | Enable PIM for the platform roles |
-| Approvals | Two people (four-eyes) | ⚠️ One reviewer; opt-in self-approval in `dev` only, recorded as `self_approved` | One-person project | `approvers_required: 2` and remove `selfApprovalEnvironments` |
+| Approvals | Two people (four-eyes) | ⚠️ One reviewer; opt-in self-approval in `dev` only, recorded as `self_approved` | One-person project | `approvers_required: 2` (the orchestrator then holds the apply until two distinct approvers, never counting the requester) and remove `selfApprovalEnvironments` |
 | Portal sign-in | Entra ID single sign-on with users and groups synced from Microsoft Graph | ⚠️ GitHub sign-in; users and groups from a catalog file | Simplest for a public demo | 🔜 Microsoft Graph org provider and Entra sign-in |
 
 ## Network

@@ -4,7 +4,7 @@ import { validateAvailability } from './AvailabilityPicker';
 import { validateInfrastructure } from './AzureResourcePicker';
 import { defaultEndpointHost, validateEndpointHost } from './EndpointHostPicker';
 import { validateGithubAccess } from './GithubAccess';
-import { cleanupMessage } from './ProvisioningContent';
+import { approvalProgress, cleanupMessage } from './ProvisioningContent';
 
 function collector() {
   const errors: string[] = [];
@@ -119,6 +119,23 @@ describe('validateGithubAccess', () => {
     const organization = collector();
     validateGithubAccess('not-needed', organization.validation);
     expect(organization.errors).toEqual([]);
+  });
+});
+
+describe('approvalProgress', () => {
+  it('counts distinct approvals while more are needed', () => {
+    expect(
+      approvalProgress({
+        decision: 'pending',
+        required: 2,
+        approvals: [{ by: 'user:default/sam', at: '2026-10-20T10:00:00Z' }],
+      }),
+    ).toBe('1 of 2 approvals (user:default/sam)');
+  });
+
+  it('says nothing once the plan is decided', () => {
+    expect(approvalProgress({ decision: 'approve', by: 'user:default/kim', required: 2 })).toBeUndefined();
+    expect(approvalProgress({})).toBeUndefined();
   });
 });
 
