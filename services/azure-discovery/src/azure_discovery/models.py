@@ -167,6 +167,13 @@ class ValidationResult(BaseModel):
         ),
     )
     resolved: dict[str, str] = Field(default_factory=dict)
+    approvers_required: int | None = Field(
+        default=None,
+        description=(
+            "Distinct approvers the environment's policy requires before infrastructure changes run "
+            "(absent when the environment is unknown)"
+        ),
+    )
 
 
 class ErrorBody(BaseModel):

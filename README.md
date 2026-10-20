@@ -270,6 +270,7 @@ Reviewers approve infrastructure changes in the Backstage UI. GitHub enforces th
   - that the approver is not the requester
   - that the approval matches the **exact plan hash**, so a changed plan needs a new approval
   - that the request has not already been decided
+  - that the environment's `approvers_required` (from `policies/allowlist.yaml`) **distinct** approvers have approved this plan; the job stays held until then, and one rejection ends it
 - Re-running the workflow from GitHub does not bypass approval, and every decision is written to the audit log.
 
 ### Provisioning orchestrator service

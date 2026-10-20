@@ -270,6 +270,7 @@ def validate_request(
         warnings=c.warnings,
         platform_changes=platform_changes,
         resolved=resolved,
+        approvers_required=env_policy.approvers_required if env_policy else None,
     )
 
 

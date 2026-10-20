@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 class EnvironmentPolicy(BaseModel):
     enabled: bool
     ha_default: bool
-    approvers_required: int = 1
+    approvers_required: int = Field(default=1, ge=1)
 
 
 class SubscriptionEntry(BaseModel):

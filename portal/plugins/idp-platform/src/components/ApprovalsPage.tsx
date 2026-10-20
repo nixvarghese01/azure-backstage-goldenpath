@@ -6,6 +6,7 @@ import { Alert } from '@material-ui/lab';
 import React, { useState } from 'react';
 import useAsyncRetry from 'react-use/esm/useAsyncRetry';
 import { idpApiRef } from '../api';
+import { approvalProgress } from './ProvisioningContent';
 
 const ApprovalCard = ({ request, onDone }: { request: RequestView; onDone: () => void }) => {
   const api = useApi(idpApiRef);
@@ -38,6 +39,7 @@ const ApprovalCard = ({ request, onDone }: { request: RequestView; onDone: () =>
         <Chip label={`+${summary.add ?? 0} ~${summary.change ?? 0} -${summary.destroy ?? 0}`} color={summary.destroy ? 'secondary' : 'default'} />
         {summary.reused ? <Chip label={`${summary.reused} reused`} variant="outlined" /> : null}
         {request.availability?.tier === 'ha' && <Chip label="HA" color="primary" />}
+        {approvalProgress(request.approval) && <Chip label={approvalProgress(request.approval)} variant="outlined" />}
       </Box>
 
       {request.availability?.tier === 'ha' && (

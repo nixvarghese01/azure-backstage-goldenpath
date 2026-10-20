@@ -6,6 +6,13 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 
 ## [Unreleased]
 
+### Fixed
+- **Approvals:** the orchestrator enforces the environment's `approvers_required`. Discovery returns the
+  count with the validation result, and the apply (or destroy) stays held until that many distinct
+  approvers approve the exact plan run; repeat approvals by one person count once, a new plan or retry
+  starts at zero, a rejection ends it, and the requester never counts toward two. A missing or invalid
+  count fails closed, and `prod` needs at least two. Backstage shows "1 of 2 approvals" (#113).
+
 ### Added
 - **GitHub Packages:** each release publishes the platform images to ghcr.io
   (`idp-backstage`, `idp-azure-discovery`, `idp-provisioning-orchestrator`; tags `vX.Y.Z`, `vX.Y`, `latest`),
