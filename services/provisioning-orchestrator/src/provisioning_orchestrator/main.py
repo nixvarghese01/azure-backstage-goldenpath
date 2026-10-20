@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import os
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
@@ -57,6 +58,21 @@ def verify_github_signature(body: bytes, signature: str | None) -> bool:
         if hmac.compare_digest(expected, signature):
             return True
     return False
+
+
+def approvers_required(req: Request) -> int:
+    """Distinct approvers the environment's validated policy requires. Fails closed: a missing or
+    invalid count refuses the decision, except for dev requests validated before discovery reported
+    it (dev has always needed one), and prod never accepts fewer than two."""
+    raw = (req.validation or {}).get("approvers_required")
+    if raw is None and req.environment == "dev":
+        return 1
+    if isinstance(raw, int) and not isinstance(raw, bool) and raw >= (2 if req.environment == "prod" else 1):
+        return raw
+    raise _conflict(
+        "approval_policy_unavailable",
+        f"No valid approval policy for {req.environment}; validate the request again.",
+    )
 
 
 def create_app(settings: Settings | None = None, sessions: sessionmaker[Session] | None = None) -> FastAPI:
@@ -233,30 +249,63 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
         destroy = req.state == State.CLEANUP_PENDING and req.cleanup.get("stage") == "awaiting_approval"
         if req.state != State.AWAITING_APPROVAL and not destroy:
             raise _conflict("not_awaiting_approval", f"Request is {req.state}.")
-        if req.approval.get("hash") == body.plan_hash:
-            raise _conflict("already_decided", "This plan has already been decided.")
         if req.plan.get("hash") != body.plan_hash:
             raise _conflict("plan_changed", "The plan changed since you reviewed it; review the new plan.")
+        required = approvers_required(req)
+        if self_approval and required > 1:
+            raise _forbidden(
+                "separation_of_duties",
+                f"This environment needs {required} approvers other than the requester.",
+            )
+        # Approvals count only for this exact plan: a new plan or run (a retry, a destroy) starts at zero.
+        mode = req.plan.get("mode", "apply")
+        generation = f"{mode}:{body.plan_hash}:{req.plan.get('run_id', '')}"
+        record = req.approval if req.approval.get("generation") == generation else {}
+        if record.get("decision") in ("approve", "reject") or (
+            not req.approval.get("generation") and req.approval.get("hash") == body.plan_hash
+        ):
+            raise _conflict("already_decided", "This plan has already been decided.")
+        approvals = list(record.get("approvals", []))
+        if any(a["by"] == user.user_ref for a in approvals):
+            raise _conflict("already_approved", "You already approved this plan; it needs another approver.")
         approve = body.decision == "approve"
+        if approve:
+            approvals.append(
+                {
+                    "by": user.user_ref,
+                    "at": datetime.now(UTC).isoformat(),
+                    "comment": body.comment,
+                    "self_approved": self_approval,
+                }
+            )
+        decided = not approve or len(approvals) >= required
         req.approval = {
-            "decision": body.decision,
+            "generation": generation,
+            "decision": body.decision if decided else "pending",
             "by": user.user_ref,
             "hash": body.plan_hash,
             "comment": body.comment,
-            "mode": req.plan.get("mode", "apply"),
+            "mode": mode,
             "self_approved": self_approval,
+            "required": required,
+            "approvals": approvals,
         }
         audit(
             s,
             req.id,
             user.user_ref,
-            "approval_decided",
+            "approval_decided" if decided else "approval_recorded",
             decision=body.decision,
             self_approved=self_approval,
             plan_hash=body.plan_hash,
             comment=body.comment,
+            approvals=len(approvals),
+            required=required,
             summary=req.plan.get("summary"),
         )
+        if not decided:
+            s.commit()
+            return out(req)
         enqueue(
             s,
             "RELEASE_PROTECTION_RULE",

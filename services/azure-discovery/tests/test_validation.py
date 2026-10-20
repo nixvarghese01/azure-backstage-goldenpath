@@ -18,6 +18,12 @@ def test_golden_path_request_is_valid(client) -> None:
     assert "aks_cluster_id" in body["resolved"]
 
 
+def test_result_carries_the_environment_approver_count(client, policy) -> None:
+    assert _validate(client)["approvers_required"] == policy.environments["dev"].approvers_required
+    policy.environments["dev"].approvers_required = 2
+    assert _validate(client)["approvers_required"] == 2
+
+
 def test_demo_stack_rejects_unsupported_azure_capability(client, policy) -> None:
     stack = next(item for item in policy.stacks if item.id == "fastapi")
     stack.enabled = True
