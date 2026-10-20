@@ -13,7 +13,7 @@ For questions see [SUPPORT.md](SUPPORT.md); for roles and how decisions are made
 | `develop` | Integration branch, the default | `main` | `main` (release) |
 | `feature/<issue>-<topic>` | New behaviour | `develop` | `develop` |
 | `bugfix/<issue>-<topic>` | A fix for something not yet released | `develop` | `develop` |
-| `hotfix/<issue>-<topic>` | An urgent fix for a release | `main` | `main`, then `main` back into `develop` |
+| `hotfix/<issue>-<topic>` | An urgent fix for a release | `main` | `main`, then back into `develop` through `chore/back-merge-vX.Y.Z` |
 | `docs/`, `chore/`, `refactor/`, `test/`, `ci/` | Docs, upkeep, restructuring, tests, pipelines | `develop` | `develop` |
 
 Examples: `feature/12-endpoint-host-picker`, `bugfix/31-namespace-default`, `hotfix/40-plan-hash-check`.
@@ -48,6 +48,9 @@ change under `[Unreleased]` in the same pull request.
    changelog section as notes and publishes the platform images to GitHub Packages
    (`ghcr.io/<owner>/idp-{backstage,azure-discovery,provisioning-orchestrator}:vX.Y.Z`, with build
    provenance); `platform-release` deploys from `main`. Nothing to do by hand.
+4. Back-merge: branch `chore/back-merge-vX.Y.Z` **from `main`** and open a pull request into `develop`
+   (merge commit). Never open a pull request with `main` itself as the head branch: the repository
+   deletes head branches after merging, which would delete `main`.
 
 Terraform modules are versioned separately (`<module>/vX.Y.Z`, workflow `release-modules`).
 
@@ -56,7 +59,8 @@ Terraform modules are versioned separately (`<module>/vX.Y.Z`, workflow `release
 1. Branch `hotfix/<issue>-<topic>` from `main`; fix it, with tests, and add a `PATCH` section
    (`[X.Y.Z+1] - <date>`) to `CHANGELOG.md`.
 2. Open a pull request into `main`; merging it releases `vX.Y.Z+1`.
-3. Open a pull request `main` → `develop` so the fix isn't lost.
+3. Back-merge it as in step 4 of Releases (`chore/back-merge-vX.Y.Z` from `main` into `develop`) so the
+   fix isn't lost.
 
 ## Commits and pull requests
 

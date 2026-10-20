@@ -58,7 +58,7 @@ Legend: ✅ follows best practice · ⚠️ deliberate free-tier deviation · �
 | Node size | General purpose (D-series) | ⚠️ Burstable B-series v2, 30 GB OS disk | Cheapest size that fits the platform | `system_pool.vm_size` |
 | Ingress controller | One controller | ✅ Gateway API (App Routing Istio); the default nginx controller is **off** | It would reserve about 1 vCPU for nothing | n/a |
 | Security | ✅ Pod Security `restricted`, Azure Policy add-on, host encryption, Workload Identity | Same; the gateway namespace is `baseline` (managed Istio proxies) | n/a | n/a |
-| Monitoring | Container Insights / Managed Prometheus | ⚠️ Off | Log Analytics ingestion is charged per GB | 🔜 Managed Prometheus + Grafana (see Observability) |
+| Monitoring | Container Insights / Managed Prometheus | ⚠️ Off | Log Analytics ingestion is charged per GB | 🔜 Prometheus + Grafana **in the cluster** (~170m CPU, 740Mi; [#107](https://github.com/nixvarghese01/azure-backstage-goldenpath/issues/107)); managed services are the enterprise switch |
 
 ### What fits in 4 vCPU (measured on the dev node)
 
@@ -104,7 +104,7 @@ uses. A golden-path app requests 100m by default: **3-5 small apps fit**.
 
 | Area | Best practice | This project | Why | To switch |
 |---|---|---|---|---|
-| Metrics and dashboards | Managed Prometheus + Grafana, SLO alerts | ⚠️ `kubectl top` and `/healthz` | Ingestion and Grafana cost money | 🔜 Managed Prometheus (low volume) |
+| Metrics and dashboards | Managed Prometheus + Grafana, SLO alerts | ⚠️ `kubectl top` and `/healthz` | Ingestion and Grafana cost money | 🔜 In-cluster Prometheus (24h retention) + Grafana, dashboards and alerts as code ([#107](https://github.com/nixvarghese01/azure-backstage-goldenpath/issues/107)) |
 | Logs and audit | Log Analytics, audit export to a SIEM | ⚠️ Pod logs only; Actions logs and Git history are the audit trail | Ingestion cost | Container Insights with a daily cap |
 | Platform metrics | DORA metrics, template usage, developer feedback | 🔜 Not collected | Next maturity step | Planned |
 
@@ -136,6 +136,15 @@ planned design:
 - **Optional language model through an external API:** for example GitHub Models (free, rate-limited,
   authenticated with a GitHub token) or a key you bring. It is off by default, the call goes from the
   existing Backstage backend, and the cluster footprint stays at about 50m CPU.
+- **Advisory only:** the model explains and suggests; policies, approvals and Terraform plans decide, and
+  nothing it produces is applied without the existing human approval. Only request metadata, policy
+  text, plan summaries and redacted logs are sent.
+
+Planned features, in order ([#109](https://github.com/nixvarghese01/azure-backstage-goldenpath/issues/109)):
+form guidance (no model), an "explain this failure" action on the Provisioning tab that also advises
+Retry or Clean up, a plain-language plan summary for approvers, docs Q&A over a small index built in
+CI, a request drafted from a description (confirmed by the user), and optional review comments on the
+application pull request.
 
 ## How to talk about these trade-offs
 
