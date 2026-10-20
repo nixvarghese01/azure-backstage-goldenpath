@@ -6,6 +6,14 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 
 ## [Unreleased]
 
+### Fixed
+- **Deploy rollback:** a readiness or smoke check that fails after Helm succeeded (outside `--atomic`)
+  now restores the Helm revision recorded before the upgrade and verifies the previous image is back; a
+  first install is left for diagnosis. The run stays failed, the callback and Provisioning tab say which
+  check failed and what the cluster confirms was restored, and a `deploy-diagnostics` artifact keeps the
+  Helm history, events and logs. The generic "Helm rolled back" message is gone. Tested on real
+  revisions in kind (#114).
+
 ### Added
 - **GitHub Packages:** each release publishes the platform images to ghcr.io
   (`idp-backstage`, `idp-azure-discovery`, `idp-provisioning-orchestrator`; tags `vX.Y.Z`, `vX.Y`, `latest`),

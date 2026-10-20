@@ -20,7 +20,7 @@ Start with the request's **Provisioning** tab in Backstage. It shows the failed 
 | `FAILED` at `open_app_pr` (`HTTPStatusError: 403` on `git/trees`) | The orchestrator GitHub App lacks **Workflows: write**, or the account hasn't accepted it on the installation | Grant it in the App's permissions, accept it under Settings → Installations, then **Retry** |
 | Stuck in `APPLICATION_BUILDING` | App PR checks failing, or not mergeable (branch protection) | Open the PR; the orchestrator merges when checks pass |
 | `FAILED` at `ci` | Tests, Trivy (CRITICAL), gitleaks, or ACR push | Open the run; for push, check the `<env>-build` environment and AcrPush |
-| `FAILED` at `deploy` | Rollout timeout, failing probes, Gateway/route, Workload Identity | `kubectl describe pod`, check `/health/ready` details; Helm rolled back automatically (`--atomic`) |
+| `FAILED` at `deploy` | Rollout timeout, failing probes, Gateway/route, Workload Identity | The error says which check failed and what was restored, as the cluster confirms it: Helm `--atomic` for a failed upgrade, or a verified rollback to the recorded revision for a failed readiness or smoke check (a first install is left for diagnosis). Download the run's `deploy-diagnostics` artifact (Helm history, events, logs), then `kubectl describe pod` and check `/health/ready` |
 | `/health/ready` reports storage `HTTP 403` | Role assignment not yet propagated, or wrong identity client ID in the ServiceAccount | Wait a few minutes; compare the annotation with `terraform output identity_client_id` |
 
 ## Platform services

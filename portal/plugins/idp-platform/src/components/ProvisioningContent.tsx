@@ -153,6 +153,9 @@ export const ProvisioningContent = () => {
             <Typography variant="subtitle2">Failed at {value.error.stage}</Typography>
             <Typography>{value.error.message}</Typography>
             {value.error.run_url && <Link to={value.error.run_url}>Open the workflow run</Link>}
+            {value.error.diagnostics && (
+              <Typography variant="body2">Diagnostics: the run's <code>{value.error.diagnostics}</code> artifact.</Typography>
+            )}
             <Typography variant="body2">Fix the cause, then Retry: it continues from this step.</Typography>
             {!!value.error.created?.length && (
               <Typography variant="body2">Resources that exist: {value.error.created.join(', ')}. Use Clean up to remove them.</Typography>

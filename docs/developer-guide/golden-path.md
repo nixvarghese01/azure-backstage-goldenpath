@@ -227,10 +227,13 @@ The pull request contains:
 | # | Action | State |
 |---|---|---|
 | 4.1 | `application-deploy.yml` (environment `dev`) logs in with the deployment identity, which has namespace-scoped access only | `DEPLOYING` |
-| 4.2 | `helm upgrade --install` into the `orders-api` namespace on `aks-idp-shared-dev`, with the Workload Identity labels and annotations | `DEPLOYING` |
+| 4.1a | The deployed Helm revision and image are recorded (none on a first install) | `DEPLOYING` |
+| 4.2 | `helm upgrade --install --atomic` into the `orders-api` namespace on `aks-idp-shared-dev`, with the Workload Identity labels and annotations | `DEPLOYING` |
 | 4.3 | `kubectl rollout status` waits for the new pods | `DEPLOYING` |
 | 4.4 | A smoke test through the endpoint checks `/health/ready` (including the Storage dependency) and `GET /v1/orders` | `DEPLOYING` |
-| 4.5 | The deployment status is reported as success | `SUCCEEDED` |
+| 4.5 | The deployment status is reported as success, with the Helm revision and image tag | `SUCCEEDED` |
+
+**When a check fails.** Helm's `--atomic` undoes only a failed upgrade. Readiness (4.3) and the smoke test (4.4) run after Helm has finished, so a failure there would leave the new release serving. In that case the workflow rolls back to the revision recorded in 4.1a and verifies that the workload runs the previous image again. A first install has nothing to restore, so it stays installed for diagnosis, and **Clean up** removes it. The run still fails, and the request becomes `FAILED`. The callback says which check failed (`deploy`, `readiness` or `smoke`) and what the cluster confirms (`helm_atomic`, `succeeded`, `failed` or `not_possible_first_install`), and the Provisioning tab shows that message. The run's `deploy-diagnostics` artifact holds the Helm history, workload state, events and logs. No rollback is ever claimed without that check (`scripts/ci/app-deploy-recovery.sh`).
 
 The containers run as non-root, with a read-only root filesystem, all capabilities dropped, the `RuntimeDefault` seccomp profile, resource requests and limits, and liveness and readiness probes. No Azure credentials exist in the code, the image, the Helm values or the repository.
 

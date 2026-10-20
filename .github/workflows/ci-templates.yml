@@ -4,7 +4,13 @@ name: ci-templates
 
 on:
   pull_request:
-    paths: ["templates/**", "iac/modules/**", "policies/**", ".github/workflows/ci-templates.yml"]
+    paths:
+      - "templates/**"
+      - "iac/modules/**"
+      - "policies/**"
+      - ".github/workflows/ci-templates.yml"
+      - ".github/workflows/reusable-application-deploy.yml"
+      - "scripts/ci/app-deploy-recovery.sh"
   push:
     branches: [develop, main]
     paths: ["templates/**"]
@@ -150,3 +156,53 @@ jobs:
               -d '{"customerId":"cust-001","currency":"GBP","items":[{"sku":"SKU-1","quantity":1,"unitPrice":5}]}'
           fi
           test "$(kubectl -n orders-api get secrets -o name | wc -l)" -eq 0   # no Secret objects (HELM_DRIVER=configmap)
+      # What reusable-application-deploy does when a check fails after Helm succeeded, on real revisions.
+      - name: Deploy recovery (restore after a failed check, Helm --atomic, first install, failed rollback)
+        working-directory: ${{ runner.temp }}/orders-api
+        env:
+          HELM_DRIVER: configmap
+          RELEASE: orders-api
+          NAMESPACE: orders-api
+          STATE_DIR: ${{ runner.temp }}/recovery
+        run: |
+          recovery="$GITHUB_WORKSPACE/scripts/ci/app-deploy-recovery.sh"
+          upgrade() {
+            helm upgrade orders-api deploy/helm/application -n orders-api \
+              -f deploy/helm/application/values.yaml -f deploy/helm/application/values-dev.yaml \
+              --set image.repository=orders-api --set image.pullPolicy=Never \
+              --set route.enabled=false --set azure.storageAccountName="" \
+              --set serviceAccount.workloadIdentityClientId="" "$@"
+          }
+          image() { kubectl -n orders-api get deployment orders-api -o jsonpath='{.spec.template.spec.containers[0].image}'; }
+
+          # A healthy upgrade whose smoke check then fails: the recorded revision comes back, verified.
+          bash "$recovery" record
+          test "$(jq .revision "$STATE_DIR/previous.json")" -eq 1
+          docker tag orders-api:ci orders-api:ci2 && kind load docker-image orders-api:ci2 --name golden-path
+          upgrade --set image.tag=ci2 --atomic --wait --timeout 3m
+          test "$(image)" = "orders-api:ci2"
+          bash "$recovery" recover smoke
+          jq -e '.rollback == "succeeded" and .previous.revision == 1 and .failed_release.revision == 2' "$STATE_DIR/outcome.json"
+          test "$(image)" = "orders-api:ci"
+          test "$(helm status orders-api -n orders-api -o json | jq .version)" -eq 3
+          bash "$recovery" report failure | jq -e '.failure == "smoke" and .rollback == "succeeded"'
+
+          # A failed upgrade: Helm --atomic restores it, and the report says so only because the cluster shows it.
+          rm -f "$STATE_DIR"/*.json
+          bash "$recovery" record
+          if upgrade --set image.tag=missing --atomic --wait --timeout 60s; then exit 1; fi
+          bash "$recovery" report failure | jq -e '.failure == "deploy" and .rollback == "helm_atomic"'
+          test "$(image)" = "orders-api:ci"
+
+          # A rollback that can't happen is reported as failed, and the step fails.
+          jq -n '{revision: 99, image: "orders-api:gone"}' > "$STATE_DIR/previous.json"
+          if bash "$recovery" recover smoke; then exit 1; fi
+          jq -e '.rollback == "failed"' "$STATE_DIR/outcome.json"
+
+          # A first install has nothing to restore: it stays for diagnosis and is reported as such.
+          rm -f "$STATE_DIR"/*.json
+          RELEASE=orders-api-first bash "$recovery" record
+          jq -e '.revision == null' "$STATE_DIR/previous.json"
+          RELEASE=orders-api-first bash "$recovery" recover smoke
+          jq -e '.rollback == "not_possible_first_install"' "$STATE_DIR/outcome.json"
+          bash "$recovery" diagnostics && test -s "$STATE_DIR/diagnostics/helm-history.txt"

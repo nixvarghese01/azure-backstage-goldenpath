@@ -2,6 +2,8 @@
 # The deployment identity is bound only inside the application's namespace (idp-app-deployer).
 # Helm stores release state in ConfigMaps (HELM_DRIVER=configmap): no Kubernetes Secret objects (ADR-0005).
 # The exact manifests being deployed are checked against the Helm policies before the upgrade.
+# A readiness or smoke check that fails after Helm succeeded (outside --atomic) restores the recorded
+# previous revision and verifies it; the run still fails, and the callback says what was restored (#114).
 name: reusable-application-deploy
 
 on:
@@ -100,15 +102,22 @@ jobs:
       - name: Report start
         if: inputs.action == 'deploy' && env.IDP_REQUEST_ID != ''
         run: bash "$PLATFORM/scripts/ci/callback.sh" deploy started
+      - name: Record the deployed release (revision, image)
+        if: inputs.action == 'deploy'
+        run: bash "$PLATFORM/scripts/ci/app-deploy-recovery.sh" record
       - name: Helm upgrade --install
         if: inputs.action == 'deploy'
+        id: helm
         run: |
           helm upgrade --install "$RELEASE" "$CHART" \
             --namespace "$NAMESPACE" \
             --values "$CHART/values.yaml" --values "$CHART/values-${ENVIRONMENT}.yaml" \
             --set image.tag="$IMAGE_TAG" \
             --atomic --wait --timeout 10m
-          kubectl rollout status deployment/"$RELEASE" -n "$NAMESPACE" --timeout 5m
+      - name: Readiness
+        if: inputs.action == 'deploy'
+        id: readiness
+        run: kubectl rollout status deployment/"$RELEASE" -n "$NAMESPACE" --timeout 5m
       - name: Smoke test through the shared Gateway
         if: inputs.action == 'deploy'
         id: smoke
@@ -123,8 +132,26 @@ jobs:
           curl -fsS "${resolve[@]}" "http://${host}/health/ready" > "$RUNNER_TEMP/ready.json"
           curl -fsS "${resolve[@]}" "http://${host}/v1/orders" > /dev/null
           ready="$(kubectl get deployment "$RELEASE" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}/{.spec.replicas}')"
-          jq -n --arg e "$host" --arg p "$ready" --slurpfile h "$RUNNER_TEMP/ready.json" \
-            '{endpoint:$e, pods:$p, health:$h[0]}' > "$RUNNER_TEMP/deploy.json"
+          revision="$(helm status "$RELEASE" -n "$NAMESPACE" -o json | jq '.version')"
+          jq -n --arg e "$host" --arg p "$ready" --argjson r "$revision" --arg i "$IMAGE_TAG" \
+            --slurpfile h "$RUNNER_TEMP/ready.json" \
+            '{endpoint:$e, pods:$p, revision:$r, image_tag:$i, health:$h[0]}' > "$RUNNER_TEMP/deploy.json"
+      # Helm's --atomic covers only the upgrade itself; these checks run after it, so recover here.
+      - name: Restore the previous release after a failed check
+        if: failure() && (steps.readiness.outcome == 'failure' || steps.smoke.outcome == 'failure')
+        env:
+          CHECK: ${{ steps.readiness.outcome == 'failure' && 'readiness' || 'smoke' }}
+        run: bash "$PLATFORM/scripts/ci/app-deploy-recovery.sh" recover "$CHECK"
+      - name: Collect diagnostics
+        if: failure() && inputs.action == 'deploy' && steps.helm.outcome != 'skipped'
+        run: bash "$PLATFORM/scripts/ci/app-deploy-recovery.sh" diagnostics
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure() && inputs.action == 'deploy'
+        with:
+          name: deploy-diagnostics
+          path: ${{ runner.temp }}/deploy-state
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Helm uninstall
         if: inputs.action == 'uninstall'
         run: helm uninstall "$RELEASE" --namespace "$NAMESPACE" --wait --ignore-not-found
@@ -132,7 +159,12 @@ jobs:
         if: always() && env.IDP_REQUEST_ID != ''
         env:
           JOB_STATUS: ${{ job.status }}
+          HELM_OUTCOME: ${{ steps.helm.outcome }}
         run: |
           stage=deploy; [[ "$ACTION" == "uninstall" ]] && stage=uninstall
-          [[ -f "$RUNNER_TEMP/deploy.json" ]] || echo '{"message":"deployment or smoke test failed; Helm rolled back (--atomic)"}' > "$RUNNER_TEMP/deploy.json"
+          # A failure reports what failed and only the recovery the cluster confirms (never assumed).
+          if [[ "$ACTION" == "deploy" && "$JOB_STATUS" != "success" ]]; then
+            bash "$PLATFORM/scripts/ci/app-deploy-recovery.sh" report "$HELM_OUTCOME" > "$RUNNER_TEMP/deploy.json" \
+              || echo '{"message":"The deployment failed; see the run for details."}' > "$RUNNER_TEMP/deploy.json"
+          fi
           bash "$PLATFORM/scripts/ci/callback.sh" "$stage" "$JOB_STATUS" "$RUNNER_TEMP/deploy.json"

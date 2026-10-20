@@ -463,7 +463,12 @@ def on_callback(ctx: Context, s: Session, ev: InboxEvent) -> None:
                 actor=ACTOR,
                 stage=stage,
                 message=data.get("message") or f"{stage} {status}",
-                details={"run_url": p.get("run_url"), "created": data.get("created_resources", [])},
+                details={
+                    "run_url": p.get("run_url"),
+                    "created": data.get("created_resources", []),
+                    # A failed deploy: which check failed and what the cluster confirms was restored.
+                    **{k: data[k] for k in ("failure", "rollback", "restored", "diagnostics") if k in data},
+                },
             )
         return
 
