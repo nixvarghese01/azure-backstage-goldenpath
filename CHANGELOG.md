@@ -12,6 +12,12 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   approvers approve the exact plan run; repeat approvals by one person count once, a new plan or retry
   starts at zero, a rejection ends it, and the requester never counts toward two. A missing or invalid
   count fails closed, and `prod` needs at least two. Backstage shows "1 of 2 approvals" (#113).
+- **Deploy rollback:** a readiness or smoke check that fails after Helm succeeded (outside `--atomic`)
+  now restores the Helm revision recorded before the upgrade and verifies the previous image is back; a
+  first install is left for diagnosis. The run stays failed, the callback and Provisioning tab say which
+  check failed and what the cluster confirms was restored, and a `deploy-diagnostics` artifact keeps the
+  Helm history, events and logs. The generic "Helm rolled back" message is gone. Tested on real
+  revisions in kind (#114).
 
 ### Added
 - **GitHub Packages:** each release publishes the platform images to ghcr.io

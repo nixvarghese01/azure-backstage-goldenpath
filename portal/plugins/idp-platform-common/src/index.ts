@@ -104,7 +104,15 @@ export interface RequestView {
   deployment: { endpoint?: string; pods?: string; run_url?: string };
   cleanup: { stage?: string };
   availability: { tier?: string; reason?: string; justification?: string; slo_target?: string };
-  error: { stage?: string; message?: string; run_url?: string; created?: string[] };
+  error: {
+    stage?: string;
+    message?: string;
+    run_url?: string;
+    created?: string[];
+    failure?: string; // a failed deploy: deploy | readiness | smoke | before_upgrade
+    rollback?: string; // what the cluster confirms: helm_atomic | succeeded | failed | not_possible_first_install | ...
+    diagnostics?: string; // the run's artifact with Helm history, workload state, events and logs
+  };
   runs: { stage: string; run_id?: string; url?: string; status: string; at: string }[];
   outcomes: Outcome[];
   urls: Record<string, string>;

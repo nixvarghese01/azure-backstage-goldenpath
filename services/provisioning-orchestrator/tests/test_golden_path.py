@@ -131,6 +131,39 @@ def test_golden_path_reaches_succeeded(client, worker, github) -> None:
     assert body["urls"]["api_docs"].endswith("/docs")
 
 
+def test_failed_smoke_check_reports_the_verified_rollback(client, worker, github) -> None:
+    rid = _to_awaiting_approval(client, worker, github)
+    client.post(
+        f"/v1/requests/{rid}/approval", headers=APPROVER, json={"decision": "approve", "plan_hash": PLAN_HASH}
+    )
+    drain(worker)
+    callback(client, rid, "apply", "success", 3, {"outputs": {"namespace": "orders-api"}})
+    drain(worker)
+    callback(client, rid, "deploy", "started", 5)
+    message = "The smoke check failed after Helm finished, so revision 3 (acr/orders-api:old) was restored."
+    callback(
+        client,
+        rid,
+        "deploy",
+        "failure",
+        5,
+        {
+            "failure": "smoke",
+            "rollback": "succeeded",
+            "message": message,
+            "restored": {"revision": 5, "image": "acr/orders-api:old"},
+            "diagnostics": "deploy-diagnostics",
+        },
+    )
+    drain(worker)
+    body = _get(client, rid)
+    assert body["state"] == "FAILED"  # a verified rollback never turns a failed check into success
+    assert body["error"]["message"] == message
+    assert body["error"]["rollback"] == "succeeded"
+    assert body["error"]["failure"] == "smoke"
+    assert body["error"]["diagnostics"] == "deploy-diagnostics"
+
+
 def test_replayed_callback_is_ignored(client, worker, github) -> None:
     rid = _to_awaiting_approval(client, worker, github)
     # Same run + stage + status again: deduplicated, state unchanged.
