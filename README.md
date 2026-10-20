@@ -685,6 +685,20 @@ Repository documentation (TechDocs publication is unverified):
 - [`docs/operations/demo-environment.md`](docs/operations/demo-environment.md): running the first demo on a free Azure subscription
 - [`docs/best-practice-vs-free-tier.md`](docs/best-practice-vs-free-tier.md): enterprise best practice vs. what this free-tier project does, why each deviation exists, and how to switch
 
+## Container images
+
+Each release publishes the platform images to [GitHub Packages](https://github.com/nixvarghese01?tab=packages&repo_name=azure-backstage-goldenpath):
+
+```bash
+docker pull ghcr.io/nixvarghese01/idp-backstage:v1.0.0
+docker pull ghcr.io/nixvarghese01/idp-provisioning-orchestrator:v1.0.0
+docker pull ghcr.io/nixvarghese01/idp-azure-discovery:v1.0.0
+```
+
+They are built from the release tag, scanned with Trivy (no critical findings) and carry build
+provenance (`gh attestation verify oci://ghcr.io/nixvarghese01/idp-backstage:v1.0.0 -R nixvarghese01/azure-backstage-goldenpath`).
+The images running on AKS are built by `platform-release` and pulled from the platform's own registry (ACR).
+
 ## Contributing and security
 
 - Contribution guidelines are in [`CONTRIBUTING.md`](CONTRIBUTING.md).

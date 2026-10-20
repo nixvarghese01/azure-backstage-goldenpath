@@ -1,7 +1,9 @@
 # Release (CONTRIBUTING.md "Releases"): every merge into main is a release, from develop or a hotfix/*
 # branch. The version is the newest "## [X.Y.Z]" section of CHANGELOG.md. This tags the merge commit
-# vX.Y.Z and publishes the GitHub release with that changelog section as its notes. Images are built
-# and deployed by platform-release; Terraform modules have their own tags (release-modules).
+# vX.Y.Z and publishes the GitHub release with that changelog section as its notes, then publishes the
+# platform images to GitHub Packages (ghcr.io) with that version. Run it by hand (any branch) to publish
+# the images of the current release again; they are built from its tag. The images deployed to Azure are built and pushed to ACR by
+# platform-release; Terraform modules have their own tags (release-modules).
 name: release
 
 on:
@@ -23,6 +25,9 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write # the tag and the release
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      skip: ${{ steps.version.outputs.skip }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,15 +39,16 @@ jobs:
         run: |
           version="$(bash scripts/ci/changelog-version.sh)"
           tag="v$version"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           if existing="$(git rev-parse -q --verify "refs/tags/$tag^{commit}")"; then
-            if [[ "$existing" == "$GITHUB_SHA" ]]; then
-              echo "$tag already points at this commit: nothing to do"
+            # A manual run publishes the existing release's images again (built from the tag).
+            if [[ "$existing" == "$GITHUB_SHA" || "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+              echo "$tag is already tagged ($existing): nothing to tag"
               echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
             fi
             echo "::error::$tag is already released ($existing). Add a new version section to CHANGELOG.md."; exit 1
           fi
           bash scripts/ci/changelog-version.sh --notes "$version" > "$RUNNER_TEMP/notes.md"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
       - name: Tag the commit and publish the release
@@ -59,3 +65,70 @@ jobs:
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" \
             --notes-file "$RUNNER_TEMP/notes.md"
           echo "Released $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  packages:
+    name: packages (${{ matrix.name }})
+    # A new release, or a manual run on main (publishes the current release's images again).
+    needs: release
+    if: needs.release.outputs.skip == 'false' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write # ghcr.io/<owner>/idp-*
+      id-token: write # build provenance
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backstage
+            dockerfile: portal/Dockerfile
+            description: Backstage portal of the Internal Developer Portal (IDP)
+          - name: azure-discovery
+            dockerfile: services/azure-discovery/Dockerfile
+            description: Read-only, allowlisted Azure inventory service of the IDP
+          - name: provisioning-orchestrator
+            dockerfile: services/provisioning-orchestrator/Dockerfile
+            description: Provisioning orchestrator of the IDP (requests, approvals, GitHub automation)
+    env:
+      NAME: ${{ matrix.name }}
+      DOCKERFILE: ${{ matrix.dockerfile }}
+      DESCRIPTION: ${{ matrix.description }}
+      TAG: ${{ needs.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+          persist-credentials: false
+      - run: bash scripts/ci/install-tools.sh trivy
+      - name: Build and scan
+        id: build
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image="ghcr.io/${owner}/idp-${NAME}"
+          version="${TAG#v}"
+          docker build --pull -f "$DOCKERFILE" -t "${image}:${TAG}"             --label org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}"             --label org.opencontainers.image.version="$version"             --label org.opencontainers.image.revision="$(git rev-parse HEAD)"             --label org.opencontainers.image.licenses=MIT             --label org.opencontainers.image.title="idp-${NAME}"             --label org.opencontainers.image.description="$DESCRIPTION" .
+          trivy image --severity CRITICAL --exit-code 1 --ignore-unfixed "${image}:${TAG}"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "minor=${version%.*}" >> "$GITHUB_OUTPUT"
+      - name: Push to GitHub Packages
+        id: push
+        env:
+          IMAGE: ${{ steps.build.outputs.image }}
+          MINOR: ${{ steps.build.outputs.minor }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for t in "$TAG" "v${MINOR}" latest; do
+            docker tag "${IMAGE}:${TAG}" "${IMAGE}:${t}"
+            docker push "${IMAGE}:${t}"
+          done
+          digest="$(docker inspect --format '{{index .RepoDigests 0}}' "${IMAGE}:${TAG}" | cut -d@ -f2)"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Published \`${IMAGE}:${TAG}\` (\`${digest}\`)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.build.outputs.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

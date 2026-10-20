@@ -44,8 +44,10 @@ change under `[Unreleased]` in the same pull request.
 2. Open a pull request `develop` → `main` titled `Release vX.Y.Z`, with the changelog section as its
    description, and merge it with a **merge commit**. `branch policy` fails if that version is already
    tagged.
-3. The `release` workflow tags the merge commit `vX.Y.Z` and publishes the GitHub release with the
-   changelog section as notes; `platform-release` deploys from `main`. Nothing to do by hand.
+3. The `release` workflow tags the merge commit `vX.Y.Z`, publishes the GitHub release with the
+   changelog section as notes and publishes the platform images to GitHub Packages
+   (`ghcr.io/<owner>/idp-{backstage,azure-discovery,provisioning-orchestrator}:vX.Y.Z`, with build
+   provenance); `platform-release` deploys from `main`. Nothing to do by hand.
 4. Back-merge: branch `chore/back-merge-vX.Y.Z` **from `main`** and open a pull request into `develop`
    (merge commit). Never open a pull request with `main` itself as the head branch: the repository
    deletes head branches after merging, which would delete `main`.

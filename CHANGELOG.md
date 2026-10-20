@@ -6,6 +6,12 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 
 ## [Unreleased]
 
+### Added
+- **GitHub Packages:** each release publishes the platform images to ghcr.io
+  (`idp-backstage`, `idp-azure-discovery`, `idp-provisioning-orchestrator`; tags `vX.Y.Z`, `vX.Y`, `latest`),
+  scanned with Trivy, with OCI labels linking them to this repository and build provenance attestations.
+  A manual run of `release` publishes the current release's images again from its tag.
+
 ### Changed
 - **Docs:** the README highlights that the whole platform runs on an Azure Free Trial (one 4-vCPU node,
   spending limit on, about USD 0.18 per hour, timed teardown); the roadmap and best-practice-vs-free-tier
