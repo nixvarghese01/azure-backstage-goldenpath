@@ -31,6 +31,12 @@ config:
   # Comma-separated environments where approvers may approve their own request (single-person demos).
   # Empty = separation of duties everywhere. "prod" is always ignored.
   selfApprovalEnvironments: ""
+  # Operations tab links (#115), with {app}, {namespace}, {environment} and {request_id} placeholders.
+  # Empty shows "not configured"; the monitoring stack (#107) fills in dashboard, logs and traces.
+  operationsLinks:
+    dashboard: ""
+    logs: ""
+    traces: ""
 hooks:
   gateway: { name: idp-gateway, namespace: idp-gateway }
 # Public name for the hooks on the shared Gateway. auto: read from the Gateway at deploy time (its

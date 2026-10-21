@@ -20,6 +20,14 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   revisions in kind (#114).
 
 ### Added
+- **Operations tab:** each component shows how it runs now, observed in the cluster, separately from the
+  provisioning history: health from the workload (healthy, degraded, down, stopped, missing; never healthy
+  when the cluster can't be read, with the last observation marked stale), the running image and digest
+  against the last successful deployment, pods with restarts and reasons, and links (application,
+  repository, deployment run, runbook; dashboard, logs and traces once #107 configures them). The
+  orchestrator reads the cluster with a read-only role and caches each read for 15 s; only the requester,
+  owning team and approvers can see it. A later deploy of a succeeded request now updates its record
+  instead of failing the callback (#115).
 - **GitHub Packages:** each release publishes the platform images to ghcr.io
   (`idp-backstage`, `idp-azure-discovery`, `idp-provisioning-orchestrator`; tags `vX.Y.Z`, `vX.Y`, `latest`),
   scanned with Trivy, with OCI labels linking them to this repository and build provenance attestations.

@@ -120,6 +120,40 @@ export interface RequestView {
   updated_at: string;
 }
 
+/** What runs now, observed in the cluster by the orchestrator (#115); separate from provisioning. */
+export type OperationalHealth =
+  | 'healthy' | 'degraded' | 'down' | 'stopped' | 'missing' | 'unknown' | 'not_deployed' | 'removed';
+
+export interface OperationsLink {
+  available: boolean;
+  url?: string;
+  reason?: string;
+}
+
+export interface OperationsView {
+  request_id: string;
+  application: string;
+  owner: string;
+  environment: string;
+  namespace: string;
+  provisioning_state: string;
+  health: OperationalHealth;
+  summary: string;
+  source?: string;
+  observed_at?: string | null;
+  stale: boolean;
+  /** Why the cluster couldn't be read: permission_denied | unavailable | not_configured. */
+  unavailable?: string;
+  last_known_health?: OperationalHealth;
+  age_seconds?: number;
+  replicas?: { desired: number; ready: number; updated: number } | null;
+  pods?: { name: string; phase?: string; ready: boolean; restarts: number; reason?: string | null; digest?: string | null }[];
+  running?: { image: string; digests: string[] }[];
+  matches_last_deployment?: boolean | null;
+  last_deployment?: { at?: string; run_url?: string; revision?: number; image_tag?: string } | null;
+  links: Record<string, OperationsLink>;
+}
+
 export interface Finding {
   field: string;
   code: string;

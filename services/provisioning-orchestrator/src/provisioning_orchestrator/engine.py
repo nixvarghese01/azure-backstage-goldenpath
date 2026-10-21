@@ -526,10 +526,16 @@ def on_callback(ctx: Context, s: Session, ev: InboxEvent) -> None:
             if req.state == State.APPLICATION_BUILDING:
                 transition(s, req, State.DEPLOYING, actor=ACTOR)
         case "deploy" if status == "success":
-            req.deployment = {**req.deployment, **data, "run_url": p.get("run_url")}
+            req.deployment = {
+                **req.deployment,
+                **data,
+                "run_url": p.get("run_url"),
+                "deployed_at": datetime.now(UTC).isoformat(),
+            }
             if req.state == State.APPLICATION_BUILDING:
                 transition(s, req, State.DEPLOYING, actor=ACTOR)
-            transition(s, req, State.SUCCEEDED, actor=ACTOR)
+            if req.state == State.DEPLOYING:  # later deploys of a SUCCEEDED request only update the record
+                transition(s, req, State.SUCCEEDED, actor=ACTOR)
         case "uninstall" if status == "success" and cleanup:
             req.cleanup = {**req.cleanup, "stage": "uninstalled"}
             attempt = int(req.cleanup.get("attempt", 1))

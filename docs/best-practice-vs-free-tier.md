@@ -36,6 +36,7 @@ Legend: ✅ follows best practice · ⚠️ deliberate free-tier deviation · �
 | CI to Azure | ✅ OIDC federation, no client secrets, immutable subjects | Same | n/a | n/a |
 | Workloads to Azure | ✅ Workload Identity, one identity per service | Same | n/a | n/a |
 | Least privilege | ✅ Rights scoped to the workload's resource groups; custom roles | Same; no identity can write outside the IDP's groups | n/a | n/a |
+| Operations view access | Read-only RoleBinding per application namespace | ⚠️ One read-only ClusterRoleBinding for the orchestrator (Deployments, ReplicaSets, Pods; no Secrets or logs) | Keeps the app-namespace module and the generated repositories' pinned module versions unchanged | Bind `idp-operations-reader` in the app-namespace module and drop the ClusterRoleBinding |
 | Operator access | PIM (just-in-time) and conditional access | ⚠️ Standing access for the single admin | PIM needs Entra ID P2 | Enable PIM for the platform roles |
 | Approvals | Two people (four-eyes) | ⚠️ One reviewer; opt-in self-approval in `dev` only, recorded as `self_approved` | One-person project | `approvers_required: 2` (the orchestrator then holds the apply until two distinct approvers, never counting the requester) and remove `selfApprovalEnvironments` |
 | Portal sign-in | Entra ID single sign-on with users and groups synced from Microsoft Graph | ⚠️ GitHub sign-in; users and groups from a catalog file | Simplest for a public demo | 🔜 Microsoft Graph org provider and Entra sign-in |

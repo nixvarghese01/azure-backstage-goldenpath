@@ -93,6 +93,22 @@ describe('discovery routes', () => {
   });
 });
 
+describe('operations', () => {
+  it('asks the orchestrator as the verified user, who decides what they may see', async () => {
+    const { server, client } = await app();
+    await request(server).get('/requests/req-1/operations').expect(200);
+    expect(client.orchestrator).toHaveBeenCalledWith('GET', '/v1/requests/req-1/operations', {
+      user: { userRef: USER, groupRefs: ['group:default/platform-approvers'] },
+    });
+  });
+
+  it('rejects an id that could change the upstream path', async () => {
+    const { server, client } = await app();
+    await request(server).get('/requests/..%2Fapprovals/operations').expect(400);
+    expect(client.orchestrator).not.toHaveBeenCalled();
+  });
+});
+
 describe('approvals', () => {
   it('refuses an approval without the approve permission', async () => {
     const { server, client } = await app({ allowApproval: false });

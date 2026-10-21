@@ -1,6 +1,6 @@
 import { createApiRef, type DiscoveryApi, type FetchApi } from '@backstage/core-plugin-api';
 import { ResponseError } from '@backstage/errors';
-import type { Capabilities, ManagementGroup, RequestView, Tenant } from '@internal/plugin-idp-platform-common';
+import type { Capabilities, ManagementGroup, OperationsView, RequestView, Tenant } from '@internal/plugin-idp-platform-common';
 
 export interface NamedResource {
   id: string;
@@ -43,6 +43,7 @@ export interface IdpApi {
   cancel(requestId: string): Promise<RequestView>;
   cleanup(requestId: string): Promise<RequestView>;
   retry(requestId: string): Promise<RequestView>;
+  operations(requestId: string): Promise<OperationsView>;
 }
 
 export const idpApiRef = createApiRef<IdpApi>({ id: 'plugin.idp.service' });
@@ -112,5 +113,8 @@ export class IdpClient implements IdpApi {
   }
   retry(requestId: string) {
     return this.req<RequestView>(`/requests/${encodeURIComponent(requestId)}/retry`, { method: 'POST' });
+  }
+  operations(requestId: string) {
+    return this.req<OperationsView>(`/requests/${encodeURIComponent(requestId)}/operations`);
   }
 }
