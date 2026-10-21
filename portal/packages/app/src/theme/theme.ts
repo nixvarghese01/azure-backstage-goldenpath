@@ -48,6 +48,14 @@ function components(border: string, subtle: string) {
         type: { textTransform: 'none', letterSpacing: 0, opacity: 0.7 },
       },
     },
+    // Navigation links are not prose: no underline in the sidebar, underline only on hover elsewhere.
+    BackstageSidebarItem: {
+      styleOverrides: {
+        root: { textDecoration: 'none', '&:hover': { textDecoration: 'none' } },
+        label: { textDecoration: 'none', fontWeight: 500 },
+      },
+    },
+    MuiLink: { defaultProps: { underline: 'hover' as const } },
     MuiPaper: {
       styleOverrides: {
         root: { backgroundImage: 'none' },
