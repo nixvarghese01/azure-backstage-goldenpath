@@ -1,4 +1,4 @@
-"""Generate the proposed platform animation. Requires Pillow; does not start any services."""
+"""Generate the platform architecture animation (docs/assets/architecture.gif). Requires Pillow; starts nothing."""
 
 from __future__ import annotations
 
@@ -26,14 +26,14 @@ def font(size: int, bold: bool = False):
 
 NODES = {
     "developer": (60, 180, "Developer", "Request a service in the portal", "Choose stack, team and resources", "#63c7ff", "01"),
-    "portal": (510, 180, "Backstage", "Catalog + scaffolder + approvals", "One entry point for developers", "#b19aff", "02"),
+    "portal": (510, 180, "Backstage", "Catalog + scaffolder + approvals", "Operations + Kubernetes tabs", "#b19aff", "02"),
     "github": (960, 180, "GitHub automation", "Repository + Actions + OIDC", "Plan, approve, build and scan", "#ff9bbb", "05"),
     "discovery": (60, 410, "Azure discovery", "Read-only inventory + allowlists", "Revalidate every resource choice", "#5ee3d0", "03"),
     "orchestrator": (510, 410, "Orchestrator", "API + independent worker", "Durable steps, retries and audit", "#ffb96b", "04"),
     "azure": (960, 410, "Azure infrastructure", "Terraform: approved changes", "Storage, identities and namespaces", "#63c7ff", "06"),
     "vault": (60, 640, "Azure Key Vault", "Dedicated secret management", "CSI files + Workload Identity", "#ffdf77", "KV"),
     "postgres": (510, 640, "PostgreSQL", "Separate service databases", "Workflow state + inbox + outbox", "#8bb6ff", "DB"),
-    "aks": (960, 640, "AKS + starter app", "Docker image + Helm deployment", "NestJS dummy API / team service", "#a2e18e", "07"),
+    "aks": (960, 640, "AKS + starter app", "Docker image + Helm deployment", "Verified rollout, live health", "#a2e18e", "07"),
 }
 
 EDGES = {
@@ -48,6 +48,7 @@ EDGES = {
     "vault_portal": ([(360, 675), (420, 675), (420, 335), (570, 335), (570, 300)], "#ffdf77"),
     "vault_worker": ([(360, 705), (445, 705), (445, 575), (575, 575), (575, 530)], "#ffdf77"),
     "vault_app": ([(210, 760), (210, 795), (1110, 795), (1110, 760)], "#ffdf77"),
+    "observe": ([(960, 700), (900, 700), (900, 505), (810, 505)], "#a2e18e"),
 }
 
 SCENES = [
@@ -55,9 +56,11 @@ SCENES = [
     ("Orchestrate", "Backstage submits the request; the API and worker manage its lifecycle.", ["submit", "persist"], ["portal", "orchestrator", "postgres"]),
     ("Validate", "Discovery checks resource selections against Azure inventory and allowlists.", ["validate", "inventory"], ["discovery", "azure", "orchestrator"]),
     ("Automate", "The worker coordinates repository creation, reviewed plans and application builds.", ["automation", "persist"], ["orchestrator", "github", "postgres"]),
+    ("Approve", "Reviewers approve the exact plan in Backstage; GitHub holds the apply until enough distinct approvers.", ["submit", "automation"], ["portal", "orchestrator", "github"]),
     ("Provision", "Approved GitHub Actions use OIDC to apply the saved Terraform plan.", ["provision"], ["github", "azure"]),
-    ("Deploy", "The selected stack becomes a Docker-ready starter and deploys through Helm.", ["deploy"], ["azure", "aks"]),
+    ("Deploy", "Helm deploys the starter; a failed check restores the previous release, verified.", ["deploy"], ["azure", "aks"]),
     ("Deliver secrets", "Key Vault supplies runtime secret files through CSI and Workload Identity.", ["vault_portal", "vault_worker", "vault_app"], ["vault", "portal", "orchestrator", "aks"]),
+    ("Observe", "The orchestrator reads live health from AKS for the Operations tab, apart from the history.", ["observe", "submit"], ["aks", "orchestrator", "portal"]),
     ("Track progress", "Durable state and audit history support the provisioning status shown in Backstage.", ["persist", "submit"], ["postgres", "orchestrator", "portal"]),
 ]
 
@@ -79,10 +82,10 @@ def render(scene_index, tick, ticks=14):
     for x in range(20, WIDTH, 36):
         for y in range(20, HEIGHT, 36):
             draw.ellipse((x, y, x + 1, y + 1), fill="#20263b")
-    draw.rounded_rectangle((60, 38, 280, 66), radius=14, fill="#253356")
-    draw.text((75, 41), "PROPOSED SOLUTION", font=font(16, True), fill="#abcfff")
-    draw.text((60, 75), "Internal Developer Portal", font=font(42, True), fill="#f5f6ff")
-    draw.text((62, 132), "Self-service applications  /  Guarded provisioning  /  Runtime secrets", font=font(22), fill="#bac4de")
+    draw.rounded_rectangle((60, 38, 228, 66), radius=14, fill="#253356")
+    draw.text((75, 41), "ARCHITECTURE", font=font(16, True), fill="#abcfff")
+    draw.text((60, 75), "Internal Developer Portal on Azure", font=font(42, True), fill="#f5f6ff")
+    draw.text((62, 132), "Self-service  /  Approved provisioning  /  Runtime secrets  /  Live health", font=font(22), fill="#bac4de")
     title, caption, active_edges, active_nodes = SCENES[scene_index]
     for key, (points, color) in EDGES.items():
         selected = key in active_edges
@@ -122,9 +125,9 @@ def main():
     # A shared palette keeps the text and background stable across animation frames.
     palette = frames[0].quantize(colors=128)
     converted = [frame.quantize(palette=palette, dither=Image.Dither.NONE) for frame in frames]
-    converted[0].save(OUT / "proposed-platform.gif", save_all=True, append_images=converted[1:], duration=110, loop=0, optimize=True, disposal=1)
-    frames[6 * 14].save(OUT / "proposed-platform-preview.png")
-    print(OUT / "proposed-platform.gif")
+    converted[0].save(OUT / "architecture.gif", save_all=True, append_images=converted[1:], duration=110, loop=0, optimize=True, disposal=1)
+    frames[4 * 14].save(OUT / "architecture-preview.png")  # the Approve scene
+    print(OUT / "architecture.gif")
 
 
 if __name__ == "__main__":

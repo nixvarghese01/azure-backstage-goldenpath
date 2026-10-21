@@ -1,4 +1,6 @@
-# Local code review — 2026-10-13
+# Local code review — 2026-10-13 (historical)
+
+> **Kept for reference.** A dated review note from before milestone 1 was verified; it is not updated.
 
 Milestone 1 remains unverified end to end. The maintainer requested completion of coding first,
 with local testing and other execution deferred. No repository was published, no remote CI was
@@ -42,7 +44,7 @@ The cross-service pytest attempt stopped during collection because SQLAlchemy wa
 Dependency setup was declined. No test suite or validation command was run after the maintainer
 requested coding only, and the changes above have not been executed.
 
-Follow [validation-checklist.md](validation-checklist.md) when execution is authorized. Prioritize
+Follow [validation-checklist.md](../operations/validation-checklist.md) when execution is authorized. Prioritize
 Python API construction and regression tests, the cross-service golden path, portal type checking,
 generated NestJS lint/unit/API tests, Terraform mock-provider tests, and Helm rendering/policies.
 PostgreSQL restart/concurrency and kind deployment checks require their own prepared environments.

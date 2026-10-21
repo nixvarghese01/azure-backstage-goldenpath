@@ -2,7 +2,7 @@
 
 This guide describes the happy path, from submitting a request in Backstage to receiving the URLs of a running application. Read it alongside the [README](../../README.md) and [ADR-0001](../adr/0001-python-platform-services.md).
 
-> **Status:** verified end to end on AKS on 2026-10-17 with `orders-api` (NestJS). See the README's *Implementation status* table.
+> **Status:** verified end to end on AKS with `orders-api` (NestJS), first on 2026-10-17 and again on 2026-10-21 with the Operations and Kubernetes tabs; see the [walkthrough](#walkthrough).
 
 ## Summary
 
@@ -11,6 +11,18 @@ This guide describes the happy path, from submitting a request in Backstage to r
 3. **Generate the application.** It is generated for the chosen stack, with a rendered Dockerfile, local Compose configuration, checkout instructions and CI/CD, as a pull request into the same repository.
 4. **Deploy** to the selected AKS cluster and namespace, then verify the deployment.
 5. **Share the URLs** on the Backstage entity page and in a notification.
+
+## Walkthrough
+
+A real run of this path (`orders-api`, 2026-10-21) on the Free Trial platform. The GitHub side:
+
+| | |
+|---|---|
+| The repository right after the request: infrastructure, the starter app, docs and catalog entry in the first commit | ![Repository after the request](../assets/screenshots/09-repository.png) |
+| Terraform validate and plan run in the repository's Actions, dispatched by the orchestrator | ![Plan running](../assets/screenshots/10-plan-running.png) |
+| The apply job waits on the `dev-infra` protection rule until the plan is approved in Backstage; the rule records who approved | ![Apply released after approval](../assets/screenshots/13-apply-released.png) |
+| Apply, the application pull request, CI and deploy: every run green | ![All workflows green](../assets/screenshots/15-workflows-green.png) |
+| The finished repository, deployed and ready for the team | ![Final repository](../assets/screenshots/18-repository-final.png) |
 
 ## Example request
 

@@ -10,7 +10,7 @@ Installing successfully doesn't make this production-ready. This model project d
 | Subscription guardrails | Plan policies (Conftest) and the allowlist | Azure Policy assignments at management-group scope: allowed locations, SKUs, required tags, deny public network access |
 | Identity | Provisioning identity with subscription-level custom role + ABAC | Per-landing-zone provisioning identities, PIM for the platform identity, conditional access for operators |
 | Workflows | Callers pin reusable workflows to `@main` | Pin to release tags (`@workflows/v1`) and update `reusable_workflow_ref` |
-| Observability | Structured logs, optional OTLP traces | Azure Monitor / Managed Prometheus and Grafana dashboards, SLO alerting, audit log export to a SIEM |
+| Observability | Structured logs, optional OTLP traces; the Operations tab (live health, running version, pods) and the Kubernetes tab; Prometheus and Grafana planned (#107) | Azure Monitor / Managed Prometheus and Grafana dashboards, SLO alerting, audit log export to a SIEM |
 | Orchestration | PostgreSQL job table | Temporal (ADR-0001) once workflow types and volumes grow |
 | Data | Dev: PostgreSQL in the cluster (ADR-0009), no backup; optional Burstable Azure PostgreSQL, 7-day backups | HA PostgreSQL (zone-redundant), longer retention, tested restore |
 | Environments | `dev` only | `test`/`prod` with two approvers, HA default in prod, deploy approvals |

@@ -1,8 +1,11 @@
 # Demo environment: free Azure subscription
 
-How the first demo runs on a **free Azure subscription**, what that subscription limits, and how the platform behaves within those limits.
+How the platform runs on an **Azure Free Trial subscription**, what that subscription limits, and how the platform behaves within those limits.
 
-> **Status:** plan for the first demo. Related documents: [IMPLEMENTATION_PLAN.md](../../IMPLEMENTATION_PLAN.md) (Phase 0 and demo script), [cleanup.md](cleanup.md), [COMPATIBILITY.md](../../COMPATIBILITY.md).
+> **Status:** in use. The golden path has run end to end on this setup (one `Standard_B4s_v2` node in
+> Sweden Central). Related documents: [golden-path.md](../developer-guide/golden-path.md) (the walkthrough,
+> with screenshots), [cleanup.md](cleanup.md), [best-practice-vs-free-tier.md](../best-practice-vs-free-tier.md),
+> [COMPATIBILITY.md](../../COMPATIBILITY.md).
 
 ## 1. Approach
 
@@ -40,10 +43,10 @@ Options the subscription can't support are **disabled in the form, with the reas
 | Resource | Demo choice | Why |
 |---|---|---|
 | Region | One allowlisted region with AKS 1.36 and enough quota: `swedencentral` in the first run, because the landing zone policy allows only that region | Single region keeps cost and quota simple |
-| AKS | **Free tier** control plane (no uptime SLA), **1 system node: `Standard_B2s_v2`** (2 vCPU / 8 GiB; Sweden Central has no v1 B-series) with a **30 GB OS disk**, Azure CNI Overlay | Fits a small vCPU quota. **Not enough on its own:** AKS add-ons request ~1.5 vCPU and the App Routing ingress (Istio Gateway controller and nginx) ~2 vCPU more, so the Gateway stays unprogrammed. Plan for **2 nodes (4 vCPU)**, which needs 4 free regional vCPUs |
+| AKS | **Free tier** control plane (no uptime SLA), **1 node: `Standard_B4s_v2`** (4 vCPU / 16 GiB; Sweden Central has no v1 B-series) with a **30 GB OS disk**, Azure CNI Overlay | The Free Trial allows 4 regional vCPUs, so everything (AKS add-ons, the App Routing Gateway, Backstage, the platform services, PostgreSQL and the deployed apps) shares this one node. Pods request about 85% of its CPU but use about 5% |
 | Ingress | App Routing Gateway API with **one** shared Gateway, so one public IP and load balancer | [ADR-0003](../adr/0003-ingress-gateway-api.md) |
 | ACR | **Basic** | Enough for a few images |
-| PostgreSQL | Azure Database for PostgreSQL flexible server, **smallest Burstable** size, no HA, minimum storage | Platform state for Backstage and the orchestrator |
+| PostgreSQL | **In the cluster** (a StatefulSet with a small disk), per [ADR-0009](../adr/0009-dev-in-cluster-postgres.md) | Platform state for Backstage and the orchestrator without a second billed service; the flexible server is the enterprise switch |
 | Key Vault | Standard, RBAC, purge protection with the **minimum 7-day retention** | Short retention so the name is freed soon after teardown |
 | Storage | `Standard_LRS` for Terraform state and the demo app | No ZRS needed without HA |
 | DNS | One Azure DNS zone, or the Gateway's IP address with a `nip.io`-style hostname if you don't own a domain | Avoids buying a domain for the demo |
@@ -100,9 +103,16 @@ To end a session early, run `platform-provision` with `action: teardown`.
    ```
    If needed, request an increase for *Total Regional vCPUs* and the VM family you'll use. Free-trial subscriptions may need an upgrade to pay-as-you-go before quota increases are approved.
 4. Allowlist the region, the free subscription ID and the shared resource names in `policies/`.
-5. Apply the platform stacks in order: `00-bootstrap` → `10-identities` → `20-shared-dev`.
-6. Run the golden-path demo ([IMPLEMENTATION_PLAN.md §6](../../IMPLEMENTATION_PLAN.md#6-demo-script)). Record evidence.
-7. **Tear down the same day** ([cleanup.md](cleanup.md)), then check *Cost Management* the next day.
+5. Run `scripts/bootstrap-platform.sh` once from an admin machine (`00-bootstrap` and `10-identities`: state
+   storage, identities and app registrations).
+6. Run the **`platform-provision`** workflow (`action: provision`, a `ttl_hours`). It checks the spending
+   limit, plans `20-shared-dev` and `30-cluster-config`, waits for your approval on each in the `platform`
+   environment, then builds, scans and deploys the platform images behind the `platform-deploy` approval.
+
+   ![platform-provision: cost guard, plan summary and the required approval](../assets/screenshots/20-platform-provision.png)
+7. Run the golden path from the portal ([golden-path.md](../developer-guide/golden-path.md)).
+8. Let the TTL tear the platform down, or run `platform-provision` with `action: teardown`, then check
+   *Cost Management* the next day.
 
 ## Reaching an application without your own domain
 

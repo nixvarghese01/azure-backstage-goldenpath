@@ -81,7 +81,7 @@ jobs:
           working-directory: iac/platform/${{ matrix.stack }}
       - name: Note when Azure isn't configured yet
         if: vars.PLATFORM_AZURE_READY != 'true'
-        run: echo "::warning::PLATFORM_AZURE_READY isn't true, so the Azure plan is skipped; static checks still ran. See IMPLEMENTATION_PLAN.md Phase 4."
+        run: echo "::warning::PLATFORM_AZURE_READY isn't true, so the Azure plan is skipped; static checks still ran. See docs/operations/demo-environment.md."
 
   plan:
     needs: [detect, static]
