@@ -102,4 +102,4 @@ Follow [demo-environment.md](demo-environment.md):
 2. Run `scripts/postgres-grant-identities.sql`.
 3. Set the Key Vault secret values out of band.
 4. Run `platform-release`.
-5. Run the golden path ([IMPLEMENTATION_PLAN.md §6](../../IMPLEMENTATION_PLAN.md#6-demo-script)).
+5. Run the golden path ([golden-path.md](../developer-guide/golden-path.md)).

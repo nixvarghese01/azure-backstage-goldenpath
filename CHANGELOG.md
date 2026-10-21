@@ -47,6 +47,13 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   A manual run of `release` publishes the current release's images again from its tag.
 
 ### Changed
+- **Docs refreshed to the current platform:** a screenshot walkthrough of a real `orders-api` run in the
+  golden path guide and a "See it in action" section in the README; the architecture animation regenerated
+  with the Approve and Observe steps (it said "proposed solution"); the README's status, features,
+  roadmap and documentation index brought up to date; the service API reference and the identity table
+  kept once (in microservices.md and permissions.md) instead of duplicated in the README; stale "plan"
+  and "unverified" notes removed from COMPATIBILITY.md, demo-environment.md and secret-management.md; the
+  original implementation plan and a dated review note moved to `docs/history/`.
 - **Docs:** the README highlights that the whole platform runs on an Azure Free Trial (one 4-vCPU node,
   spending limit on, about USD 0.18 per hour, timed teardown); the roadmap and best-practice-vs-free-tier
   carry the observability (Prometheus and Grafana, #107) and AI assistance (#109) plans; releases

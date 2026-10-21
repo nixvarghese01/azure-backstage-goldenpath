@@ -2,7 +2,7 @@
 
 How Internal Developer Portal avoids, stores, delivers, rotates and protects secrets, across the platform services, CI/CD, Terraform and the generated applications.
 
-> **Status:** design for milestone 1. Related documents: [microservices architecture](../architecture/microservices.md), [README: identity and security model](../../README.md#identity-and-security-model), [ADR-0002](../adr/0002-terraform-structure.md).
+> **Status:** in use on AKS (dev): the platform services read their Key Vault secrets as CSI files through Workload Identity. Related documents: [microservices architecture](../architecture/microservices.md), [README: identity and security model](../../README.md#identity-and-security-model), [ADR-0002](../adr/0002-terraform-structure.md).
 
 ---
 

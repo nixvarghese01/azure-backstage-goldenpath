@@ -1,4 +1,9 @@
-# Implementation plan
+# Implementation plan (historical)
+
+> **Kept for reference.** This is the plan the project started from (milestone 1). It is not updated:
+> the current behaviour is in the [README](../../README.md), the [golden path](../developer-guide/golden-path.md)
+> and the [CHANGELOG](../../CHANGELOG.md). Links in this file are relative to the repository root, where it
+> used to live.
 
 The proposed workflow, CI/CD design and phased delivery plan for milestone 1 of Internal Developer Portal: **a developer requests a secure NestJS API in Backstage and receives a running application on AKS, with its URLs.**
 

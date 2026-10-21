@@ -278,3 +278,64 @@ Splitting further now, for example into separate approval, policy, notification 
 | Policy reused outside this workflow | A `policy` service, or OPA as a sidecar |
 | Webhook volume much higher than API traffic | A separate `webhook-ingestor` deployment writing to the inbox |
 | Several teams owning different workflow parts | Split by team ownership, with a broker (for example Azure Service Bus) replacing the database queue |
+
+## 11. API reference
+
+The services' HTTP APIs, as implemented. The browser never calls them: only the Backstage backend
+(and, for discovery, the orchestrator) does.
+
+### 11.1 `provisioning-orchestrator`
+
+The orchestrator is a FastAPI API plus a separate worker process, both sharing one PostgreSQL database:
+
+- **State machine.** Each request is a row with an explicit state (see the README's [Workflow lifecycle](../../README.md#workflow-lifecycle)). Every state change goes through one transition function that rejects illegal transitions.
+- **Durable jobs.** The worker claims pending steps with `SELECT ... FOR UPDATE SKIP LOCKED`, so several workers or a restarted worker never process the same step twice. In-flight requests resume after a restart.
+- **Idempotency.** Each request has an idempotency key and each step has a deduplication key. A duplicate submission returns the existing request. Repeated webhooks for the same run are ignored.
+- **Approvals.** Decisions are made in the Backstage UI and enforced through GitHub custom deployment protection rules (see [Approval in Backstage](../developer-guide/golden-path.md#approval-in-backstage)). The orchestrator holds the request in `AWAITING_APPROVAL` and binds each approval to a plan hash.
+- **No Azure write access.** The orchestrator only uses a GitHub App token. All Azure changes are made by Terraform in GitHub Actions using OIDC identities.
+- **Audit.** An append-only `audit_events` table records who requested, who approved, which workflow run produced which result and what changed. Secrets and sensitive Terraform output are never stored.
+
+Endpoints:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/v1/requests` | Submit and validate a request (idempotent) |
+| `GET` | `/v1/requests/{id}` | Current state, stage history and diagnostics |
+| `POST` | `/v1/requests/{id}/repository` | Record the created repository and start the asynchronous workflow |
+| `GET` | `/v1/approvals?status=pending` | Pending approvals visible to the caller |
+| `POST` | `/v1/requests/{id}/approval` | Approve or reject the current plan (plan hash, comment) |
+| `POST` | `/v1/requests/{id}/cancel` | Cancel a request that has not started applying |
+| `GET` | `/v1/requests/{id}/starter` | The stack's starter application for the new repository's first commit |
+| `POST` | `/v1/requests/{id}/retry` | Continue a failed request from the step where it stopped |
+| `POST` | `/v1/requests/{id}/cleanup` | Start controlled cleanup of resources the platform created |
+| `GET` | `/v1/requests/{id}/operations` | What runs now: health, running image and digest, pods and links, read from the cluster (requester, owning team and approvers only) |
+| `POST` | `/v1/webhooks/github` | Receive GitHub events (HMAC-verified) |
+| `POST` | `/v1/callbacks/actions` | Receive plan summaries, plan hashes and outputs from workflow runs (GitHub OIDC-verified) |
+| `GET` | `/healthz`, `/readyz` | Health checks |
+
+### 11.2 `azure-discovery`
+
+Discovery runs as a separate Python service so it can use the official Azure SDKs for Python (`azure-identity`, `azure-mgmt-resource-subscriptions`, `azure-mgmt-resourcegraph`). It can also be developed, tested and deployed independently of the Backstage release cycle.
+
+Endpoints (all read-only):
+
+| Method | Path | Returns |
+|---|---|---|
+| `GET` | `/healthz` | Liveness |
+| `GET` | `/readyz` | Readiness, including whether an Azure credential can be acquired |
+| `GET` | `/v1/subscriptions` | Enabled subscriptions visible to the discovery identity, filtered by the allowlist |
+| `GET` | `/v1/subscriptions/{id}/capabilities` | Which **Create new** options this subscription supports, with reasons (billing account type for vending, regional vCPU quota, availability zones) |
+| `GET` | `/v1/subscriptions/{id}/resource-groups` | Allowlisted resource groups in an approved region |
+| `GET` | `/v1/subscriptions/{id}/aks-clusters` | Approved shared AKS clusters, including whether Workload Identity and the OIDC issuer are enabled, and node pool zones and node counts (for HA eligibility) |
+| `GET` | `/v1/subscriptions/{id}/container-registries` | Approved container registries |
+| `GET` | `/v1/subscriptions/{id}/resources?type=…` | Allowlisted Storage accounts and Key Vaults available for reuse |
+| `POST` | `/v1/validate` | Server-side eligibility check for a full selection set, used by the orchestrator |
+
+Design rules:
+
+- Authentication uses `DefaultAzureCredential`: Workload Identity on AKS, and `az login` or environment credentials for local development. No client secrets are stored in the repository.
+- The identity has only the `Reader` role. The service never calls write operations.
+- Resource Graph results are paginated using skip tokens. Throttling (`429`) and transient errors are retried with backoff. Permission errors and missing resources produce typed error responses, never empty success responses.
+- Only the Backstage bridge and the orchestrator call the service, using service-to-service authentication. Discovery results are suggestions only: the orchestrator re-validates every submitted ID through `/v1/validate` before acting on it.
+
+**Microsoft Graph** is used only for supported Microsoft Entra operations. It does not provision Azure infrastructure; Terraform does.

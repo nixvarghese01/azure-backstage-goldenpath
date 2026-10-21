@@ -15,6 +15,6 @@
 ## Checks
 
 - [ ] Targets `develop` (only releases and hotfixes target `main`)
-- [ ] The checks for the areas touched pass ([validation checklist](docs/operations/validation-checklist.md))
+- [ ] The checks for the areas touched pass ([validation checklist](https://github.com/nixvarghese01/azure-backstage-goldenpath/blob/develop/docs/operations/validation-checklist.md))
 - [ ] README / docs updated where behaviour changed
 - [ ] No secrets in the diff

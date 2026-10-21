@@ -1,23 +1,17 @@
-# Component compatibility plan
+# Component compatibility
 
-The component versions chosen for Internal Developer Portal milestone 1, why each was chosen, and how they depend on each other. Related documents: [README](README.md), [implementation plan](IMPLEMENTATION_PLAN.md), [ADR-0002 Terraform structure](docs/adr/0002-terraform-structure.md) and [ADR-0003 ingress](docs/adr/0003-ingress-gateway-api.md).
+The component versions the Internal Developer Portal uses, why each was chosen, and how they depend on each other. Related documents: [README](README.md), [original implementation plan](docs/history/implementation-plan.md), [ADR-0002 Terraform structure](docs/adr/0002-terraform-structure.md) and [ADR-0003 ingress](docs/adr/0003-ingress-gateway-api.md).
 
 - **Verified on:** 2026-10-10, against each project's official release page, registry or documentation (see [Sources](#sources)).
 - **Rule:** use the newest release that every dependent component supports, not simply the newest release. Where the newest release is not adopted, the reason is given.
 - **Pinning:** exact versions go in lock files (`yarn.lock`, `uv.lock`, `.terraform.lock.hcl`, Helm `Chart.lock`). Manifests use the ranges shown here, and GitHub Actions are pinned to commit SHAs.
 
-Container footprint update (2026-10-13): the Python HTTP services now request base FastAPI and Uvicorn
-packages, without optional `standard` extras. Package version ranges are unchanged. Local Backstage
-uses the optional `runtime-lite` image with prebuilt TechDocs; the full image retains Python/MkDocs
-for on-demand generation. These dependency and image changes have not been built or tested. See
-[ADR-0006](docs/adr/0006-container-delivery.md) and [local defaults](deploy/local/README.md).
-
 > Re-verify this page before each phase starts and whenever Dependabot or Renovate proposes a major upgrade. Update the *Verified on* date when you do.
 
-Additional application starter baselines (2026-10-13): Next.js 16/React 19 on Node 24, React/Vue
-with Vite 8, Go 1.26, ASP.NET Core/.NET 10, and Spring Boot 4.0.8 on Java 21. These do not change
-the Backstage workspace versions. Upstream design references are in the [technology inventory](docs/developer-guide/technology-stacks.md).
-Dependency resolution, runtime compatibility and security checks remain unverified; new stacks are disabled.
+The other application starters (Next.js 16/React 19 on Node 24, React and Vue with Vite 8, Go 1.26,
+ASP.NET Core on .NET 10, Spring Boot 4.0.8 on Java 21) don't change these versions; they are listed in the
+[technology inventory](docs/developer-guide/technology-stacks.md) and stay disabled until each has had a run
+on the target system.
 
 ---
 
@@ -25,7 +19,7 @@ Dependency resolution, runtime compatibility and security checks remain unverifi
 
 | Layer | Component | Chosen | Latest available | Notes |
 |---|---|---|---|---|
-| Portal | Backstage | **1.55.x** (main line) | 1.55.3; 1.56 in `next` | Monthly releases; upgrade with `backstage-cli versions:bump` |
+| Portal | Backstage | **1.55.x** (main line) | 1.56.1 | Monthly releases; upgrade with `backstage-cli versions:bump` |
 | Portal | Node.js (Backstage) | **24 LTS** (24.21.x) | 26 (Current) | Backstage supports exactly `22 \|\| 24` |
 | Portal | Yarn | **4.13.0** | 4.13.0 | Pinned by the Backstage 1.55 app template (`packageManager`) |
 | Portal | TypeScript (Backstage) | **~5.8** | 7.0.2 | As pinned by the Backstage template; don't override |
@@ -41,7 +35,7 @@ Dependency resolution, runtime compatibility and security checks remain unverifi
 | Python services | azure-identity | **1.26.x** | 1.26.0 | `DefaultAzureCredential`, including Workload Identity |
 | Python services | azure-mgmt-resourcegraph | **8.0.x** | 8.0.1 | Resource Graph queries |
 | Python services | azure-mgmt-resource-subscriptions | **1.0.x** | 1.0.0 | Listing subscriptions (split out of `azure-mgmt-resource`) |
-| Python services | PostgreSQL (orchestrator) | **17** | 18.6 | Azure Database for PostgreSQL flexible server supports 11–18 |
+| Python services | PostgreSQL (orchestrator) | **17** | 18.6 | In the cluster in dev ([ADR-0009](docs/adr/0009-dev-in-cluster-postgres.md)); Azure Database for PostgreSQL flexible server supports 11–18 |
 | Generated app | NestJS | **12.1.x** | 12.1.2 | Needs Node 20.19+ or 22.12+ |
 | Generated app | Node.js (app runtime) | **24 LTS** | 26 (Current) | Same major version as the portal |
 | Generated app | TypeScript (app) | **^6.0** | 7.0.2 | As in the official Nest starter |
@@ -156,50 +150,17 @@ flowchart LR
 | 9 | **SQLAlchemy 2.1 is a new minor line** | Some 2.0 patterns are deprecated | Write code in 2.0+ style only (`select()`, typed `Mapped[]`), and pin `~=2.1` in `pyproject.toml`. |
 | 10 | **FastAPI 0.143 changed OpenTelemetry auto-configuration** to opt-in | Telemetry silently stops if 0.142 behaviour is assumed | Configure OpenTelemetry explicitly in code. Don't rely on `FASTAPI_OTEL_AUTO_CONFIGURE`. |
 
-## 5. Version ranges in manifests
+## 5. Where the versions are set
 
-```jsonc
-// Backstage root package.json
-"engines": { "node": "22 || 24" },
-"packageManager": "yarn@4.13.0"
+The summary table is the reference; the exact ranges live in the files themselves, not repeated here:
 
-// Generated NestJS app package.json
-"engines": { "node": ">=24 <25" },
-"dependencies": {
-  "@nestjs/core": "^12.1.0",
-  "@azure/identity": "^4.13.0",
-  "@azure/storage-blob": "^12.34.0"
-},
-"devDependencies": { "typescript": "^6.0.0", "vitest": "^4.0.0" }
-```
-
-```toml
-# services/*/pyproject.toml
-requires-python = ">=3.14,<3.15"
-dependencies = [
-  "fastapi~=0.143.0",
-  "pydantic~=2.14",
-  "uvicorn[standard]~=0.54.0",
-  "sqlalchemy~=2.1.0",          # orchestrator only
-  "alembic~=1.20",              # orchestrator only
-  "psycopg[binary]~=3.3",       # orchestrator only
-  "azure-identity~=1.26",
-  "azure-mgmt-resourcegraph~=8.0",            # discovery only
-  "azure-mgmt-resource-subscriptions~=1.0",   # discovery only
-]
-```
-
-```hcl
-# versions.tf (platform stacks and generated repositories)
-terraform {
-  required_version = "~> 1.16.0"
-  required_providers {
-    azurerm    = { source = "hashicorp/azurerm", version = "~> 5.9" }
-    azapi      = { source = "Azure/azapi", version = "~> 2.13" }          # platform AKS stack only
-    kubernetes = { source = "hashicorp/kubernetes", version = "~> 3.3" }
-  }
-}
-```
+| What | File |
+|---|---|
+| Node and Yarn for Backstage | [`portal/package.json`](portal/package.json) (`engines`, `packageManager`) |
+| Python and the service libraries | `services/*/pyproject.toml`, locked in [`services/uv.lock`](services/uv.lock) |
+| Terraform and providers | `versions.tf` in each stack under [`iac/platform/`](iac/platform/) and module under [`iac/modules/`](iac/modules/) |
+| Generated NestJS app | [`templates/applications/nestjs/application/`](templates/applications/nestjs/application/) |
+| CI tool versions and checksums | [`scripts/ci/install-tools.sh`](scripts/ci/install-tools.sh) |
 
 ## 6. Upgrade policy
 
