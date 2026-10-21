@@ -7,6 +7,9 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
 ## [Unreleased]
 
 ### Fixed
+- **Images:** the platform service images and the FastAPI starter drop `pip` from the runtime stage.
+  The service doesn't use it, and the copy of certifi bundled in the base image's pip (2026.6.17) failed
+  the release scan for GHSA-6q48-6c7w-9gw2 even though the application's own certifi was fixed.
 - **Approvals:** the orchestrator enforces the environment's `approvers_required`. Discovery returns the
   count with the validation result, and the apply (or destroy) stays held until that many distinct
   approvers approve the exact plan run; repeat approvals by one person count once, a new plan or retry

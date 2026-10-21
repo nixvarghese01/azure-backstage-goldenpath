@@ -10,7 +10,8 @@ RUN if [ -f uv.lock ]; then uv sync --package provisioning-orchestrator --no-dev
     else uv sync --package provisioning-orchestrator --no-dev --no-editable; fi
 
 FROM python:3.14-slim
-RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
+# pip is not needed at runtime, and its vendored certifi lags behind (GHSA-6q48-6c7w-9gw2).
+RUN pip uninstall --yes pip \n    && groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
 WORKDIR /app
 COPY --from=build /opt/venv /opt/venv
 COPY services/provisioning-orchestrator/alembic.ini /app/alembic.ini
