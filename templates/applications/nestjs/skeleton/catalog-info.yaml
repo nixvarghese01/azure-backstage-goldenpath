@@ -9,6 +9,9 @@ metadata:
     idp.io/request-id: ${{ values.requestId }}
     idp.io/environment: ${{ values.environment }}
     idp.io/availability-tier: ${{ values.availabilityTier }}
+    # Kubernetes tab: the release's pods, in the application's namespace (labels set by the Helm chart).
+    backstage.io/kubernetes-label-selector: app.kubernetes.io/instance=${{ values.name }}
+    backstage.io/kubernetes-namespace: ${{ values.name }}
   tags: [nestjs, typescript, golden-path]
   links:
     - url: ${{ values.urlScheme }}://${{ values.endpointHost }}

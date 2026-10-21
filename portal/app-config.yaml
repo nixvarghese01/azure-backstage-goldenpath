@@ -96,3 +96,13 @@ idp:
     - { id: nextjs, name: Next.js (React), enabled: false }
     - { id: react, name: React + Vite, enabled: false }
     - { id: vue, name: Vue + Vite, enabled: false }
+
+# Kubernetes tab. No cluster outside AKS (local runs show "no cluster"); production adds the in-cluster one.
+kubernetes:
+  serviceLocatorMethod:
+    type: multiTenant
+  clusterLocatorMethods:
+    - type: config
+      clusters: []
+  # Only what the tab shows; never Secrets or ConfigMaps.
+  objectTypes: [pods, services, deployments, replicasets, horizontalpodautoscalers]

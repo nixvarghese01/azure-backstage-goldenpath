@@ -23,6 +23,7 @@
     "@backstage/integration-react": "backstage:^",
     "@backstage/plugin-catalog": "backstage:^",
     "@backstage/plugin-catalog-react": "backstage:^",
+    "@backstage/plugin-kubernetes": "backstage:^",
     "@backstage/plugin-notifications": "backstage:^",
     "@backstage/plugin-org": "backstage:^",
     "@backstage/plugin-permission-react": "backstage:^",
