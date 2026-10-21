@@ -110,3 +110,13 @@ techdocs:
     local:
       # The root filesystem is read-only; generated docs go to the writable /tmp volume.
       publishDirectory: /tmp/techdocs
+
+# The cluster Backstage runs in. With authProvider serviceAccount and no token, the backend uses an
+# in-cluster client with the pod's own service account (read-only role idp-backstage-kubernetes-reader).
+kubernetes:
+  clusterLocatorMethods:
+    - type: config
+      clusters:
+        - name: aks-idp-shared-dev
+          url: https://kubernetes.default.svc
+          authProvider: serviceAccount

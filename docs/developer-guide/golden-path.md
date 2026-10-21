@@ -275,6 +275,12 @@ The *Provisioning* tab is history: a request that succeeded yesterday says nothi
 
 Only the requester, the owning team and approvers can see it. The orchestrator reads the cluster with a read-only role (Deployments, ReplicaSets and Pods; no Secrets, ConfigMaps, logs or exec), so the browser never gets cluster or Azure credentials. Each workload is read at most once every 15 seconds (`ORCHESTRATOR_OPERATIONS_CACHE_SECONDS`), however many people have the tab open. Failed reads are cached too, and the tab refreshes every 30 seconds while visible and every 2 minutes after a failure.
 
+### Kubernetes tab: the workload in detail
+
+Each generated service also has a **Kubernetes** tab, the [Backstage Kubernetes plugin](https://backstage.io/docs/features/kubernetes/), which lists the release's pods, deployments, replica sets, services and autoscalers on `aks-idp-shared-dev`, with their status, restarts and errors. The catalog entry finds them through `backstage.io/kubernetes-label-selector: app.kubernetes.io/instance=<app>` and `backstage.io/kubernetes-namespace: <app>`, using labels the Helm chart already sets.
+
+Backstage reads the cluster with its own service account and the read-only `idp-backstage-kubernetes-reader` role (pods, logs, services, events, deployments, replica sets, autoscalers; no Secrets or ConfigMaps). **Pod logs and events** go through the plugin's proxy, which can call any path with those credentials and can't be limited to one service, so the portal's permission policy allows the proxy (`kubernetes.proxy`) only for platform approvers. Everyone signed in sees the workloads. The *Operations* tab stays the per-team summary of health and version.
+
 ## Developer checkout
 
 The repository initially contains infrastructure only. After the application's generated pull

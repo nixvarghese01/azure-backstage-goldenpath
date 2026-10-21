@@ -24,6 +24,8 @@
     "@backstage/plugin-auth-node": "backstage:^",
     "@backstage/plugin-catalog-backend": "backstage:^",
     "@backstage/plugin-catalog-backend-module-scaffolder-entity-model": "backstage:^",
+    "@backstage/plugin-kubernetes-backend": "backstage:^",
+    "@backstage/plugin-kubernetes-common": "backstage:^",
     "@backstage/plugin-notifications-backend": "backstage:^",
     "@backstage/plugin-permission-backend": "backstage:^",
     "@backstage/plugin-permission-common": "backstage:^",
@@ -38,6 +40,7 @@
     "pg": "^8.13.0"
   },
   "devDependencies": {
+    "@backstage/backend-test-utils": "backstage:^",
     "@backstage/cli": "backstage:^"
   },
   "files": [

@@ -19,6 +19,8 @@ backend.add(import('@backstage/plugin-scaffolder-backend-module-github'));
 backend.add(import('@backstage/plugin-techdocs-backend'));
 backend.add(import('@backstage/plugin-notifications-backend'));
 backend.add(import('@backstage/plugin-signals-backend'));
+// Kubernetes tab: the cluster(s) come from config; in AKS, Backstage's own read-only service account.
+backend.add(import('@backstage/plugin-kubernetes-backend'));
 
 // Permissions with the IDP policy (approve permission restricted to platform-approvers)
 backend.add(import('@backstage/plugin-permission-backend'));

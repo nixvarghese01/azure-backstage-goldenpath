@@ -343,6 +343,51 @@ resource "kubernetes_cluster_role_binding_v1" "operations_reader" {
   }
 }
 
+# Backstage's Kubernetes tab reads the applications' workloads with its own service account: read-only,
+# no Secrets or ConfigMaps. Pod logs and events are read through the plugin's proxy, which the portal's
+# permission policy allows only for platform approvers.
+resource "kubernetes_cluster_role_v1" "backstage_reader" {
+  metadata {
+    name = "idp-backstage-kubernetes-reader"
+  }
+  rule {
+    api_groups = [""]
+    resources  = ["pods", "pods/log", "services", "events", "namespaces"]
+    verbs      = ["get", "list", "watch"]
+  }
+  rule {
+    api_groups = ["apps"]
+    resources  = ["deployments", "replicasets"]
+    verbs      = ["get", "list", "watch"]
+  }
+  rule {
+    api_groups = ["autoscaling"]
+    resources  = ["horizontalpodautoscalers"]
+    verbs      = ["get", "list", "watch"]
+  }
+  rule {
+    api_groups = ["metrics.k8s.io"]
+    resources  = ["pods"]
+    verbs      = ["get", "list"]
+  }
+}
+
+resource "kubernetes_cluster_role_binding_v1" "backstage_reader" {
+  metadata {
+    name = "idp-backstage-kubernetes-reader"
+  }
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = kubernetes_cluster_role_v1.backstage_reader.metadata[0].name
+  }
+  subject {
+    kind      = "ServiceAccount"
+    name      = "backstage"
+    namespace = kubernetes_namespace_v1.platform.metadata[0].name
+  }
+}
+
 # What the platform charts need beyond an application's deployer role, in idp-platform only: the
 # orchestrator's migration Job (a Helm hook, deleted and re-created per release) and, in dev, the
 # in-cluster PostgreSQL (StatefulSet, its volume claim, and its generated credentials Secret, which

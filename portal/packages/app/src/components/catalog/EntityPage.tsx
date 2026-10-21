@@ -6,6 +6,7 @@ import {
   isKind,
 } from '@backstage/plugin-catalog';
 import { EntityMembersListCard, EntityOwnershipCard } from '@backstage/plugin-org';
+import { EntityKubernetesContent, isKubernetesAvailable } from '@backstage/plugin-kubernetes';
 import { EntityTechdocsContent } from '@backstage/plugin-techdocs';
 import { EntityIdpOperationsContent, EntityIdpProvisioningContent } from '@internal/plugin-idp-platform';
 import { Grid } from '@material-ui/core';
@@ -25,6 +26,9 @@ const componentPage = (
     </EntityLayout.Route>
     <EntityLayout.Route path="/operations" title="Operations">
       <EntityIdpOperationsContent />
+    </EntityLayout.Route>
+    <EntityLayout.Route path="/kubernetes" title="Kubernetes" if={isKubernetesAvailable}>
+      <EntityKubernetesContent refreshIntervalMs={30_000} />
     </EntityLayout.Route>
     <EntityLayout.Route path="/provisioning" title="Provisioning">
       <EntityIdpProvisioningContent />

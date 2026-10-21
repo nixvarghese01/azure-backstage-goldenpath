@@ -23,6 +23,11 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   revisions in kind (#114).
 
 ### Added
+- **Kubernetes tab:** the Backstage Kubernetes plugin shows each generated service's pods, deployments,
+  replica sets, services and autoscalers, read with Backstage's own read-only role
+  (`idp-backstage-kubernetes-reader`; no Secrets or ConfigMaps). New services' catalog entries carry the
+  label selector and namespace annotations. Pod logs and events (the plugin's proxy) are limited to
+  platform approvers by the permission policy.
 - **Portal look:** a modern dark theme (default) and a light one: near-black surfaces with thin borders,
   one violet accent, Inter (bundled, no external font request), flat headers with a soft glow, rounded
   cards, sentence-case buttons and tabs, and status colors used by the health and state chips. A new home
