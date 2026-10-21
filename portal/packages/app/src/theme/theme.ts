@@ -1,4 +1,4 @@
-import { createUnifiedTheme, palettes, type PageTheme } from '@backstage/theme';
+import { createUnifiedTheme, defaultComponentThemes, palettes, type PageTheme } from '@backstage/theme';
 
 /**
  * The portal's look: a calm, near-black dark theme (and a light one) in the style of current developer
@@ -38,7 +38,39 @@ function flatPages(background: string, glow: string, fontColor: string): Record<
   );
 }
 
-function components(border: string, subtle: string) {
+type ComponentThemes = Record<string, { defaultProps?: object; styleOverrides?: Record<string, unknown> }>;
+
+const resolve = (style: unknown, props: unknown) =>
+  (typeof style === 'function' ? style(props) : style ?? {}) as Record<string, unknown>;
+
+/**
+ * Layers our component styles on top of Backstage's defaults. createUnifiedTheme merges per component
+ * only, so an override would otherwise drop Backstage's own slots (dense tables, tab sizes, chip margins).
+ */
+export function withDefaults(overrides: ComponentThemes): ComponentThemes {
+  const base = (defaultComponentThemes ?? {}) as ComponentThemes;
+  const merged: ComponentThemes = { ...base };
+  for (const [name, mine] of Object.entries(overrides)) {
+    const theirs = base[name] ?? {};
+    const slots = new Set([...Object.keys(theirs.styleOverrides ?? {}), ...Object.keys(mine.styleOverrides ?? {})]);
+    const styleOverrides: Record<string, unknown> = {};
+    for (const slot of slots) {
+      styleOverrides[slot] = (props: unknown) => ({
+        ...resolve(theirs.styleOverrides?.[slot], props),
+        ...resolve(mine.styleOverrides?.[slot], props),
+      });
+    }
+    merged[name] = {
+      ...theirs,
+      ...mine,
+      defaultProps: { ...theirs.defaultProps, ...mine.defaultProps },
+      styleOverrides,
+    };
+  }
+  return merged;
+}
+
+function components(border: string, subtle: string): ComponentThemes {
   return {
     BackstageHeader: {
       styleOverrides: {
@@ -115,7 +147,7 @@ export const darkTheme = createUnifiedTheme({
     },
     tabbar: { indicator: accent.dark },
   },
-  components: components('rgba(255,255,255,0.08)', '#9AA3B2'),
+  components: withDefaults(components('rgba(255,255,255,0.08)', '#9AA3B2')) as never,
 });
 
 export const lightTheme = createUnifiedTheme({
@@ -147,5 +179,5 @@ export const lightTheme = createUnifiedTheme({
     },
     tabbar: { indicator: accent.light },
   },
-  components: components('#E5E7EB', '#475569'),
+  components: withDefaults(components('#E5E7EB', '#475569')) as never,
 });

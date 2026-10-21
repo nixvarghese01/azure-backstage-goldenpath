@@ -10,6 +10,7 @@ import { SignalsDisplay } from '@backstage/plugin-signals';
 import { TechDocsIndexPage, TechDocsReaderPage, techdocsPlugin } from '@backstage/plugin-techdocs';
 import { UserSettingsPage } from '@backstage/plugin-user-settings';
 import { UnifiedThemeProvider } from '@backstage/theme';
+import { CssBaseline } from '@material-ui/core';
 import DarkIcon from '@material-ui/icons/Brightness2';
 import LightIcon from '@material-ui/icons/WbSunny';
 import {
@@ -56,14 +57,23 @@ const app = createApp({
       title: 'Dark',
       variant: 'dark',
       icon: <DarkIcon />,
-      Provider: ({ children }) => <UnifiedThemeProvider theme={darkTheme} children={children} />,
+      // CssBaseline: border-box sizing, the theme's body font and colors for plain text.
+      Provider: ({ children }) => (
+        <UnifiedThemeProvider theme={darkTheme}>
+          <CssBaseline>{children}</CssBaseline>
+        </UnifiedThemeProvider>
+      ),
     },
     {
       id: 'idp-light',
       title: 'Light',
       variant: 'light',
       icon: <LightIcon />,
-      Provider: ({ children }) => <UnifiedThemeProvider theme={lightTheme} children={children} />,
+      Provider: ({ children }) => (
+        <UnifiedThemeProvider theme={lightTheme}>
+          <CssBaseline>{children}</CssBaseline>
+        </UnifiedThemeProvider>
+      ),
     },
   ],
 });
