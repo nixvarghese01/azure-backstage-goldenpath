@@ -38,13 +38,17 @@ container design, CI coverage and current capability limits.
 
 ### See it in action
 
-One Backstage form to a running, observed service: the [walkthrough with screenshots](docs/developer-guide/golden-path.md#walkthrough)
-follows a real `orders-api` request through the repository, plan, approval in Backstage, apply, CI and
-deploy.
+A real `orders-api` request, from one Backstage form to a running, observed service on AKS:
 
-| The repository the request creates | Every run, from plan to deploy |
+![The golden path, end to end](docs/assets/demo/golden-path.gif)
+
+| Home: services with live health, approvals and activity | Operations: live health, running version and pods |
 |---|---|
-| ![Repository created by the golden path](docs/assets/screenshots/09-repository.png) | ![All workflows green](docs/assets/screenshots/15-workflows-green.png) |
+| ![Developer Portal home](docs/assets/screenshots/01-home.png) | ![Operations tab](docs/assets/screenshots/11-operations.png) |
+| **Approve the exact Terraform plan in Backstage** | **Every run green, from plan to deploy** |
+| ![Approval in Backstage](docs/assets/screenshots/07-approval.png) | ![All workflows green](docs/assets/screenshots/09-workflows-green.png) |
+
+Step by step, with every screen: [the golden path walkthrough](docs/developer-guide/golden-path.md#walkthrough).
 
 ---
 

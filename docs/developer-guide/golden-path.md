@@ -14,15 +14,28 @@ This guide describes the happy path, from submitting a request in Backstage to r
 
 ## Walkthrough
 
-A real run of this path (`orders-api`, 2026-10-21) on the Free Trial platform. The GitHub side:
+A real run of this path (`orders-api`, 2026-10-21/22) on the Free Trial platform, as an animation:
 
-| | |
+![The golden path, end to end](../assets/demo/golden-path.gif)
+
+And screen by screen:
+
+| Step | Screen |
 |---|---|
-| The repository right after the request: infrastructure, the starter app, docs and catalog entry in the first commit | ![Repository after the request](../assets/screenshots/09-repository.png) |
-| Terraform validate and plan run in the repository's Actions, dispatched by the orchestrator | ![Plan running](../assets/screenshots/10-plan-running.png) |
-| The apply job waits on the `dev-infra` protection rule until the plan is approved in Backstage; the rule records who approved | ![Apply released after approval](../assets/screenshots/13-apply-released.png) |
-| Apply, the application pull request, CI and deploy: every run green | ![All workflows green](../assets/screenshots/15-workflows-green.png) |
-| The finished repository, deployed and ready for the team | ![Final repository](../assets/screenshots/18-repository-final.png) |
+| 1. The portal home: your services with live health, what waits for approval, recent activity and a Toolkit | ![01-home](../assets/screenshots/01-home.png) |
+| 2. **Create**: the golden path template | ![02-templates](../assets/screenshots/02-templates.png) |
+| 3. The request form: only the name and the owning team are required; everything else comes preselected | ![03-request-form](../assets/screenshots/03-request-form.png) |
+| 4. The repository the request creates: infrastructure, the starter app, docs and the catalog entry in the first commit | ![04-repository](../assets/screenshots/04-repository.png) |
+| 5. Terraform validate and plan run in the repository's Actions, dispatched by the orchestrator | ![05-plan-running](../assets/screenshots/05-plan-running.png) |
+| 6. The **Provisioning** tab follows each stage; the plan now waits for approval | ![06-awaiting-approval](../assets/screenshots/06-awaiting-approval.png) |
+| 7. **Approvals**: reviewers see the exact plan (create, update, destroy) and approve or reject it | ![07-approval](../assets/screenshots/07-approval.png) |
+| 8. GitHub holds the apply on the `dev-infra` protection rule until the Backstage approval, and records who approved | ![08-apply-released](../assets/screenshots/08-apply-released.png) |
+| 9. Apply, the application pull request, CI and deploy: every run green | ![09-workflows-green](../assets/screenshots/09-workflows-green.png) |
+| 10. Every stage verified, with the application, docs, repository, image and Azure links | ![10-succeeded](../assets/screenshots/10-succeeded.png) |
+| 11. **Operations**: health read from the cluster, the running image and digest, pods and links | ![11-operations](../assets/screenshots/11-operations.png) |
+| 12. **Kubernetes**: the workload in `aks-idp-shared-dev` | ![12-kubernetes](../assets/screenshots/12-kubernetes.png) |
+| 13. **Docs**: the service's TechDocs, with its runbook | ![13-docs](../assets/screenshots/13-docs.png) |
+| 14. The team's repository, deployed and ready to develop | ![14-repository-final](../assets/screenshots/14-repository-final.png) |
 
 ## Example request
 
