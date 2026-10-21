@@ -1,9 +1,23 @@
 # Internal Developer Portal (IDP), powered by Backstage
 
+![Internal Developer Platform on Backstage + Azure](docs/assets/social-preview.png)
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/nixvarghese01/azure-backstage-goldenpath)](https://github.com/nixvarghese01/azure-backstage-goldenpath/releases)
 [![ci-security](https://github.com/nixvarghese01/azure-backstage-goldenpath/actions/workflows/ci-security.yml/badge.svg?branch=develop)](https://github.com/nixvarghese01/azure-backstage-goldenpath/actions/workflows/ci-security.yml)
 [![codeql](https://github.com/nixvarghese01/azure-backstage-goldenpath/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/nixvarghese01/azure-backstage-goldenpath/actions/workflows/codeql.yml)
-[![Release](https://img.shields.io/github/v/release/nixvarghese01/azure-backstage-goldenpath)](https://github.com/nixvarghese01/azure-backstage-goldenpath/releases)
+[![Stars](https://img.shields.io/github/stars/nixvarghese01/azure-backstage-goldenpath?style=flat)](https://github.com/nixvarghese01/azure-backstage-goldenpath/stargazers)
+[![Last commit](https://img.shields.io/github/last-commit/nixvarghese01/azure-backstage-goldenpath/develop)](https://github.com/nixvarghese01/azure-backstage-goldenpath/commits/develop)
+
+![Backstage 1.55](https://img.shields.io/badge/Backstage-1.55-9BF0E1?logo=backstage&logoColor=white)
+![Azure AKS 1.36](https://img.shields.io/badge/Azure%20AKS-1.36-0078D4?logo=microsoftazure&logoColor=white)
+![Terraform 1.16](https://img.shields.io/badge/Terraform-1.16-844FBA?logo=terraform&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-OIDC-2088FF?logo=githubactions&logoColor=white)
+![Python 3.14](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
+![Azure Free Trial](https://img.shields.io/badge/runs%20on-Azure%20Free%20Trial-success)
+
+> If this helps you build your own platform, a ⭐ helps others find it. Questions and ideas are welcome in
+> [Discussions](https://github.com/nixvarghese01/azure-backstage-goldenpath/discussions).
 
 An Internal Developer Platform (IDP) built on [Backstage](https://backstage.io), Microsoft Azure, Azure Kubernetes Service (AKS), Terraform, Helm and GitHub Actions.
 
