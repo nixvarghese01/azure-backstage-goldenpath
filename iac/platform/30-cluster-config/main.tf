@@ -307,6 +307,42 @@ resource "kubernetes_role_binding_v1" "platform_deployer" {
   }
 }
 
+# The orchestrator's Operations view (#115) reads what runs in the application namespaces: read-only,
+# workloads and pods only. No Secrets, ConfigMaps, logs or exec. Best practice would bind it per
+# application namespace (through the app-namespace module); one ClusterRoleBinding keeps the module
+# and the generated repositories' pinned module versions unchanged.
+resource "kubernetes_cluster_role_v1" "operations_reader" {
+  metadata {
+    name = "idp-operations-reader"
+  }
+  rule {
+    api_groups = ["apps"]
+    resources  = ["deployments", "replicasets"]
+    verbs      = ["get", "list"]
+  }
+  rule {
+    api_groups = [""]
+    resources  = ["pods"]
+    verbs      = ["get", "list"]
+  }
+}
+
+resource "kubernetes_cluster_role_binding_v1" "operations_reader" {
+  metadata {
+    name = "idp-operations-reader"
+  }
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = kubernetes_cluster_role_v1.operations_reader.metadata[0].name
+  }
+  subject {
+    kind      = "ServiceAccount"
+    name      = "provisioning-orchestrator"
+    namespace = kubernetes_namespace_v1.platform.metadata[0].name
+  }
+}
+
 # What the platform charts need beyond an application's deployer role, in idp-platform only: the
 # orchestrator's migration Job (a Helm hook, deleted and re-created per release) and, in dev, the
 # in-cluster PostgreSQL (StatefulSet, its volume claim, and its generated credentials Secret, which

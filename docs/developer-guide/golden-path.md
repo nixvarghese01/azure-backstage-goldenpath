@@ -263,6 +263,18 @@ Each stage is reported as its own outcome:
 ✅ Deployed                     healthy · 1/1 pods ready (Standard tier)
 ```
 
+### Operations tab: how the service is doing now
+
+The *Provisioning* tab is history: a request that succeeded yesterday says nothing about today. The **Operations** tab shows what runs **now**, observed in the cluster:
+
+- **Health** from the workload itself, not the last workflow: `healthy`, `degraded` (fewer ready replicas than desired, or a stuck rollout, with the reason such as `CrashLoopBackOff`), `down` (none ready), `stopped` (scaled to zero), `missing` (the Deployment is gone), `not_deployed` or `removed`. Pod readiness uses the application's `/health/ready` probe.
+- **Running version:** the image and its digest, the last successful deployment (time, Helm revision, image tag) and a warning when the cluster runs a different image.
+- **Pods:** ready, restarts and the current reason.
+- **Links:** application, repository, last deployment run, runbook (the TechDocs *Runbook* section), and dashboard, logs and traces. The last three come from the monitoring stack (#107); until it's configured they show *unavailable (not configured)*.
+- **Source and age:** when the cluster can't be read (no permission, API unreachable), health is **unknown**, never healthy, and the last observation is kept and marked stale.
+
+Only the requester, the owning team and approvers can see it. The orchestrator reads the cluster with a read-only role (Deployments, ReplicaSets and Pods; no Secrets, ConfigMaps, logs or exec), so the browser never gets cluster or Azure credentials. Each workload is read at most once every 15 seconds (`ORCHESTRATOR_OPERATIONS_CACHE_SECONDS`), however many people have the tab open. Failed reads are cached too, and the tab refreshes every 30 seconds while visible and every 2 minutes after a failure.
+
 ## Developer checkout
 
 The repository initially contains infrastructure only. After the application's generated pull

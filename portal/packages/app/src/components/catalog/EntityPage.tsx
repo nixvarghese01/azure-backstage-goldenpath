@@ -7,7 +7,7 @@ import {
 } from '@backstage/plugin-catalog';
 import { EntityMembersListCard, EntityOwnershipCard } from '@backstage/plugin-org';
 import { EntityTechdocsContent } from '@backstage/plugin-techdocs';
-import { EntityIdpProvisioningContent } from '@internal/plugin-idp-platform';
+import { EntityIdpOperationsContent, EntityIdpProvisioningContent } from '@internal/plugin-idp-platform';
 import { Grid } from '@material-ui/core';
 import React from 'react';
 
@@ -22,6 +22,9 @@ const componentPage = (
           <EntityLinksCard />
         </Grid>
       </Grid>
+    </EntityLayout.Route>
+    <EntityLayout.Route path="/operations" title="Operations">
+      <EntityIdpOperationsContent />
     </EntityLayout.Route>
     <EntityLayout.Route path="/provisioning" title="Provisioning">
       <EntityIdpProvisioningContent />

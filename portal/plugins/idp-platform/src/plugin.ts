@@ -44,6 +44,13 @@ export const EntityIdpProvisioningContent = idpPlugin.provide(
   }),
 );
 
+export const EntityIdpOperationsContent = idpPlugin.provide(
+  createComponentExtension({
+    name: 'EntityIdpOperationsContent',
+    component: { lazy: () => import('./components/OperationsContent').then(m => m.OperationsContent) },
+  }),
+);
+
 export const IdpAzureResourcePickerExtension = idpPlugin.provide(
   createScaffolderFieldExtension({
     name: 'IdpAzureResourcePicker',

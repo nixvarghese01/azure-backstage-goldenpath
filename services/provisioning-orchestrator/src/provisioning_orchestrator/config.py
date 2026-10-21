@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -41,6 +41,10 @@ class Settings:
     reconcile_interval_seconds: int
     max_step_attempts: int
     log_level: str
+    # Operations view (#115): how long one cluster observation is reused, and optional links with
+    # {app}, {namespace}, {environment} and {request_id} placeholders (set by the monitoring stack, #107).
+    operations_cache_seconds: float = 15.0
+    operations_links: dict[str, str | None] = field(default_factory=dict)
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -80,4 +84,9 @@ class Settings:
             reconcile_interval_seconds=int(_env("ORCHESTRATOR_RECONCILE_SECONDS", "60") or 60),
             max_step_attempts=int(_env("ORCHESTRATOR_MAX_STEP_ATTEMPTS", "6") or 6),
             log_level=_env("LOG_LEVEL", "INFO") or "INFO",
+            operations_cache_seconds=float(_env("ORCHESTRATOR_OPERATIONS_CACHE_SECONDS", "15") or 15),
+            operations_links={
+                kind: _env(f"ORCHESTRATOR_{kind.upper()}_URL_TEMPLATE")
+                for kind in ("dashboard", "logs", "traces")
+            },
         )

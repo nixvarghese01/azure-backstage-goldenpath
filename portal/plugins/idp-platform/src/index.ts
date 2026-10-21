@@ -3,6 +3,7 @@ export {
   approvalsRouteRef,
   IdpApprovalsPage,
   EntityIdpProvisioningContent,
+  EntityIdpOperationsContent,
   IdpAzureResourcePickerExtension,
   IdpAvailabilityPickerExtension,
   IdpStackPickerExtension,

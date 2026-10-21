@@ -22,6 +22,11 @@
 - { name: ORCHESTRATOR_PLATFORM_REPO_REF, value: {{ .Values.config.platformRepoRef | default "main" | quote }} }
 - { name: ORCHESTRATOR_APPROVER_GROUP, value: {{ .Values.config.approverGroup | quote }} }
 - { name: ORCHESTRATOR_SELF_APPROVAL_ENVIRONMENTS, value: {{ .Values.config.selfApprovalEnvironments | quote }} }
+{{- range $kind, $template := .Values.config.operationsLinks }}
+{{- if $template }}
+- { name: {{ printf "ORCHESTRATOR_%s_URL_TEMPLATE" (upper $kind) }}, value: {{ $template | quote }} }
+{{- end }}
+{{- end }}
 # Paths to CSI-mounted secret files (values never in env): secret-management.md §5
 - { name: ORCHESTRATOR_GITHUB_APP_PRIVATE_KEY_FILE, value: /mnt/secrets/gh-app-orchestrator-key }
 - { name: ORCHESTRATOR_GITHUB_WEBHOOK_SECRET_FILE, value: /mnt/secrets/gh-app-orchestrator-webhook-secret }

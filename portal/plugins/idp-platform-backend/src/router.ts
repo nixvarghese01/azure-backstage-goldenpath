@@ -107,6 +107,12 @@ export async function createRouter(deps: {
     res.json(await client.orchestrator('GET', `/v1/requests/${id(req.params.id)}`));
   });
 
+  // Current health of the deployed workload (#115). The orchestrator checks the user may see it
+  // (requester, owning team or approver) and reads the cluster itself; nothing reaches the browser.
+  router.get('/requests/:id/operations', async (req, res) => {
+    res.json(await client.orchestrator('GET', `/v1/requests/${id(req.params.id)}/operations`, { user: await user(req) }));
+  });
+
   // ---------------- approvals (permission checked here, re-checked by the orchestrator) ----------------
   router.get('/approvals', async (req, res) => {
     res.json(await client.orchestrator('GET', '/v1/approvals', { user: await user(req) }));

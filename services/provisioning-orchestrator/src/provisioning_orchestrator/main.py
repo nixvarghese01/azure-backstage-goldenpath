@@ -7,7 +7,7 @@ import hmac
 import os
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi import Request as HttpRequest
@@ -25,6 +25,13 @@ from provisioning_orchestrator.config import Settings
 from provisioning_orchestrator.db import engine_from_settings, make_session_factory
 from provisioning_orchestrator.engine import RetryNotPossibleError, app_values, retry_request
 from provisioning_orchestrator.models import InboxEvent, Request
+from provisioning_orchestrator.operations import (
+    OperationsCache,
+    WorkloadReader,
+    last_deployment,
+    links,
+    reader_from_env,
+)
 from provisioning_orchestrator.schemas import (
     ApprovalDecision,
     CallbackBody,
@@ -75,7 +82,11 @@ def approvers_required(req: Request) -> int:
     )
 
 
-def create_app(settings: Settings | None = None, sessions: sessionmaker[Session] | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    sessions: sessionmaker[Session] | None = None,
+    workloads: WorkloadReader | None = None,
+) -> FastAPI:
     settings = settings or Settings.from_env()
     configure_logging("provisioning-orchestrator", settings.log_level)
     configure_tracing("provisioning-orchestrator")
@@ -83,6 +94,9 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
         sessions = make_session_factory(engine_from_settings(settings))
 
     app = FastAPI(title="provisioning-orchestrator", version="1.0.0")
+    operations = OperationsCache(
+        workloads or reader_from_env(dict(os.environ)), ttl=settings.operations_cache_seconds
+    )
 
     def db() -> Iterator[Session]:
         with sessions() as s:
@@ -335,6 +349,37 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
                 u.user_ref == req.requested_by or u.in_group(req.owner) or u.in_group(settings.approver_group)
             )
         )
+
+    @app.get("/v1/requests/{request_id}/operations")
+    def request_operations(request_id: str, caller: User, s: DB) -> dict[str, Any]:
+        """What runs now, observed in the cluster; independent of the provisioning outcome (#115)."""
+        req = load(s, request_id)
+        if not _may_manage(caller, req):
+            raise _forbidden(
+                "not_allowed", "Only the requester, owning team or approvers can see operations."
+            )
+        view = out(req)
+        base: dict[str, Any] = {
+            "request_id": req.id,
+            "application": req.application_name,
+            "owner": req.owner,
+            "environment": req.environment,
+            "namespace": req.spec["namespace"]["name"],
+            "provisioning_state": req.state,
+            "last_deployment": last_deployment(req),
+            "links": links(req, settings.operations_links, view.urls),
+        }
+        if req.state == State.CLEANED_UP:
+            return {**base, "health": "removed", "summary": "The application was cleaned up.", "stale": False}
+        if not req.deployment and not req.application.get("image"):
+            return {**base, "health": "not_deployed", "summary": "Nothing is deployed yet.", "stale": False}
+        observed = operations.observe(req.id, base["namespace"], req.application_name)
+        expected = (req.deployment or {}).get("image_tag")
+        running = [r["image"] for r in observed.get("running", [])]
+        observed["matches_last_deployment"] = (
+            None if not expected or not running else any(str(i).endswith(f":{expected}") for i in running)
+        )
+        return {**base, **observed}
 
     @app.post("/v1/requests/{request_id}/cancel", response_model=RequestOut)
     def cancel(request_id: str, caller: User, s: DB) -> RequestOut:
