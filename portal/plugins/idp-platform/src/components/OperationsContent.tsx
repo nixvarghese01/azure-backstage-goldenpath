@@ -84,7 +84,9 @@ export const OperationsContent = () => {
     return request ? api.operations(request.id) : undefined;
   }, [api, entity.metadata.name]);
   const failing = !!error || value?.health === 'unknown';
-  useInterval(retry, document.hidden ? null : failing ? BACKOFF_MS : REFRESH_MS);
+  let refresh: number | null = failing ? BACKOFF_MS : REFRESH_MS;
+  if (document.hidden) refresh = null;
+  useInterval(retry, refresh);
 
   if (loading && !value) return <Progress />;
   if (error && !value) return <Alert severity="error">Operations data is unavailable: {error.message}</Alert>;
