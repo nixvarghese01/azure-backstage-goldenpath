@@ -8,5 +8,15 @@ export interface Config {
      * @visibility frontend
      */
     githubOwnerType?: 'user' | 'organization';
+    /**
+     * GitHub account that holds the platform repository; the home page's Toolkit links to it.
+     * @visibility frontend
+     */
+    githubOrg?: string;
+    /**
+     * The platform repository's name (default azure-backstage-goldenpath).
+     * @visibility frontend
+     */
+    platformRepository?: string;
   };
 }

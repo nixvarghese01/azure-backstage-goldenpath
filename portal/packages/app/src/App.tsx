@@ -9,6 +9,9 @@ import { ScaffolderFieldExtensions } from '@backstage/plugin-scaffolder-react';
 import { SignalsDisplay } from '@backstage/plugin-signals';
 import { TechDocsIndexPage, TechDocsReaderPage, techdocsPlugin } from '@backstage/plugin-techdocs';
 import { UserSettingsPage } from '@backstage/plugin-user-settings';
+import { UnifiedThemeProvider } from '@backstage/theme';
+import DarkIcon from '@material-ui/icons/Brightness2';
+import LightIcon from '@material-ui/icons/WbSunny';
 import {
   IdpApprovalsPage,
   IdpAvailabilityPickerExtension,
@@ -18,10 +21,12 @@ import {
   IdpGithubAccessExtension,
 } from '@internal/plugin-idp-platform';
 import React from 'react';
-import { Navigate, Route } from 'react-router-dom';
+import { Route } from 'react-router-dom';
 import { apis } from './apis';
 import { entityPage } from './components/catalog/EntityPage';
+import { HomePage } from './components/home/HomePage';
 import { Root } from './components/Root';
+import { darkTheme, lightTheme } from './theme/theme';
 
 function PlatformSignInPage(props: SignInPageProps) {
   const config = useApi(configApiRef);
@@ -44,11 +49,28 @@ const app = createApp({
   components: {
     SignInPage: PlatformSignInPage,
   },
+  // Dark first: it is the default unless the browser asks for light.
+  themes: [
+    {
+      id: 'idp-dark',
+      title: 'Dark',
+      variant: 'dark',
+      icon: <DarkIcon />,
+      Provider: ({ children }) => <UnifiedThemeProvider theme={darkTheme} children={children} />,
+    },
+    {
+      id: 'idp-light',
+      title: 'Light',
+      variant: 'light',
+      icon: <LightIcon />,
+      Provider: ({ children }) => <UnifiedThemeProvider theme={lightTheme} children={children} />,
+    },
+  ],
 });
 
 const routes = (
   <FlatRoutes>
-    <Route path="/" element={<Navigate to="catalog" />} />
+    <Route path="/" element={<HomePage />} />
     <Route path="/catalog" element={<CatalogIndexPage />} />
     <Route path="/catalog/:namespace/:kind/:name" element={<CatalogEntityPage />}>
       {entityPage}

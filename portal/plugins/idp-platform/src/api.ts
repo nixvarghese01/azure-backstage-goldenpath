@@ -38,6 +38,8 @@ export interface IdpApi {
     resourceGroup?: string): Promise<NamedResource[]>;
   stacks(): Promise<Stack[]>;
   requestsFor(application: string): Promise<RequestView[]>;
+  /** The newest requests across the platform (home page). */
+  recentRequests(): Promise<RequestView[]>;
   approvals(): Promise<RequestView[]>;
   decide(requestId: string, decision: 'approve' | 'reject', planHash: string, comment: string): Promise<RequestView>;
   cancel(requestId: string): Promise<RequestView>;
@@ -95,6 +97,9 @@ export class IdpClient implements IdpApi {
   }
   requestsFor(application: string) {
     return this.req<RequestView[]>(`/requests${this.qs({ application })}`);
+  }
+  recentRequests() {
+    return this.req<RequestView[]>('/requests');
   }
   approvals() {
     return this.req<RequestView[]>('/approvals');

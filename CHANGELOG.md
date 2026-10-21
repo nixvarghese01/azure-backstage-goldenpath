@@ -23,6 +23,11 @@ merge into `main` releases (CONTRIBUTING.md "Releases").
   revisions in kind (#114).
 
 ### Added
+- **Portal look:** a modern dark theme (default) and a light one: near-black surfaces with thin borders,
+  one violet accent, Inter (bundled, no external font request), flat headers with a soft glow, rounded
+  cards, sentence-case buttons and tabs, and status colors used by the health and state chips. A new home
+  page greets the user and shows quick actions, a Toolkit (Docs, GitHub, Contributing, Plugins Directory,
+  Submit New Issue), what waits for approval and the recent requests; the sidebar gets a logo mark.
 - **Operations tab:** each component shows how it runs now, observed in the cluster, separately from the
   provisioning history: health from the workload (healthy, degraded, down, stopped, missing; never healthy
   when the cluster can't be read, with the last observation marked stale), the running image and digest
