@@ -4,7 +4,9 @@ import React from 'react';
 
 const useStyles = makeStyles(theme => ({
   root: {
+    boxSizing: 'border-box',
     width: sidebarConfig.drawerWidthClosed,
+    overflow: 'hidden',
     gap: theme.spacing(1.5),
     height: 3 * sidebarConfig.logoHeight,
     display: 'flex',
@@ -22,7 +24,9 @@ const useStyles = makeStyles(theme => ({
     '&:hover': { textDecoration: 'none', color: theme.palette.navigation.selectedColor },
   },
   title: {
-    ...theme.typography.h6,
+    ...theme.typography.subtitle1,
+    display: 'block',
+    whiteSpace: 'nowrap',
     fontWeight: theme.typography.fontWeightBold as number,
     lineHeight: 1.2,
     letterSpacing: '0.01em',
@@ -62,7 +66,7 @@ export const SidebarLogo = () => {
         {isOpen ? (
           <span>
             <Typography component="span" className={classes.title}>
-              Internal Developer Portal
+              Developer Portal
             </Typography>
             <Typography component="span" className={classes.subtitle}>
               powered by Backstage
