@@ -1,6 +1,6 @@
 # Build from the repository root: docker build -f services/azure-discovery/Dockerfile .
 # Pin base images by digest when building releases (see COMPATIBILITY.md).
-FROM python:3.14-slim AS build
+FROM python:3.15-slim AS build
 COPY --from=ghcr.io/astral-sh/uv:0.13 /uv /usr/local/bin/uv
 WORKDIR /src
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/opt/venv
@@ -9,7 +9,7 @@ COPY services/ ./
 RUN if [ -f uv.lock ]; then uv sync --package azure-discovery --no-dev --frozen --no-editable; \
     else uv sync --package azure-discovery --no-dev --no-editable; fi
 
-FROM python:3.14-slim
+FROM python:3.15-slim
 # pip is not needed at runtime, and its vendored certifi lags behind (GHSA-6q48-6c7w-9gw2).
 RUN pip uninstall --yes pip \n    && groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
 WORKDIR /app
